@@ -413,6 +413,7 @@
                         <button class="master-tab" data-master-sub="columns">Custom Columns</button>
                         <button class="master-tab" data-master-sub="members" id="tab-master-members">Member Directory</button>
                         <button class="master-tab" data-master-sub="cloud-sync" id="tab-master-cloud-sync">Cloud Sync (Firebase)</button>
+                        <button class="master-tab" data-master-sub="ai-developer" id="tab-master-ai-developer"><i data-lucide="github" style="width:14px; height:14px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> AI & GitHub Deploy</button>
                     </div>
 
                     <div class="master-content-panel">
@@ -616,6 +617,63 @@
                                             <button type="submit" class="btn btn-primary" id="btn-gemini-save">Save AI Key</button>
                                         </div>
                                     </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel G: AI Developer Settings -->
+                        <div id="master-panel-ai-developer" class="master-sub-panel">
+                            <div class="panel-action-header">
+                                <h4>AI Developer & GitHub Deployment</h4>
+                                <p style="font-size:12px; color:var(--text-secondary);">Directly deploy your local code updates to GitHub. Host your app on GitHub Pages automatically.</p>
+                            </div>
+                            
+                            <div class="github-deploy-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; margin-top: 15px;">
+                                <!-- Config Card -->
+                                <div class="card" style="padding: 20px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
+                                    <h5 style="margin-top: 0; margin-bottom: 15px;">GitHub Configuration</h5>
+                                    <form id="form-github-config">
+                                        <div class="form-group" style="margin-bottom: 15px;">
+                                            <label for="github-token" style="display:block; margin-bottom:6px; font-size:12px; font-weight:600;">Personal Access Token *</label>
+                                            <input type="password" id="github-token" required placeholder="ghp_..." style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                                            <span style="font-size: 10px; color: var(--text-secondary);">Token requires 'repo' permissions to write contents.</span>
+                                        </div>
+                                        
+                                        <div class="form-group" style="margin-bottom: 15px;">
+                                            <label for="github-repo" style="display:block; margin-bottom:6px; font-size:12px; font-weight:600;">Repository (owner/repo) *</label>
+                                            <input type="text" id="github-repo" required placeholder="e.g. aryaa/wealth-plus" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                                        </div>
+
+                                        <div class="form-group" style="margin-bottom: 15px;">
+                                            <label for="github-branch" style="display:block; margin-bottom:6px; font-size:12px; font-weight:600;">Branch *</label>
+                                            <input type="text" id="github-branch" required placeholder="main" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                                        </div>
+                                        
+                                        <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+                                            <button type="submit" class="btn btn-primary" id="btn-github-save">Save Settings</button>
+                                        </div>
+                                    </form>
+                                </div>
+
+                                <!-- Deploy Control Card -->
+                                <div class="card" style="padding: 20px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 15px;">
+                                    <h5 style="margin-top: 0; margin-bottom: 5px;">Deploy Status & Deployment</h5>
+                                    <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 10px;">Deploy index.html, app.js, shree.js, style.css, server.py, and README.md directly to your repository.</p>
+                                    
+                                    <div class="form-group" style="margin-bottom: 5px;">
+                                        <label for="github-commit-message" style="display:block; margin-bottom:6px; font-size:12px; font-weight:600;">Commit Message (Optional)</label>
+                                        <input type="text" id="github-commit-message" placeholder="Update via Wealth Plus AI Developer" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                                    </div>
+
+                                    <button type="button" class="btn btn-primary" id="btn-github-deploy-now" style="width: 100%; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                        <i data-lucide="upload-cloud"></i> Deploy App Now
+                                    </button>
+
+                                    <div id="github-deploy-log-box" style="display: none; flex-direction: column; gap: 8px; margin-top: 10px;">
+                                        <label style="font-size: 11px; font-weight: 600; color: var(--text-primary);">Deployment Progress</label>
+                                        <div id="github-deploy-log" style="font-family: monospace; font-size: 11px; background: var(--bg-primary); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color); max-height: 180px; overflow-y: auto; white-space: pre-wrap; color: var(--text-primary);">
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -938,7 +996,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="app.js?v=2.0"></script>
-    <script src="shree.js?v=2.0"></script>
+    <script src="app.js?v=2.2"></script>
+    <script src="shree.js?v=2.2"></script>
 </body>
 </html>
