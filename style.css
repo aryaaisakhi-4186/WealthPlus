@@ -1805,3 +1805,24 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--text-secondary);
     margin: 0;
 }
+
+/* AI Developer & GitHub Deploy styles */
+.spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #ffffff;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+#github-deploy-log span {
+    display: block;
+    line-height: 1.5;
+    margin-bottom: 4px;
+}
