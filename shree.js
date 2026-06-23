@@ -413,7 +413,10 @@ function addMessageToShreeChat(sender, text) {
 // --- SHREE NATURAL LANGUAGE COMMAND INTERPRETER ---
 
 function processShreeCommand(commandText) {
-    const cmd = commandText.toLowerCase().trim();
+    let cmd = commandText.toLowerCase().trim();
+    
+    // Convert Devanagari Hindi number words to standard digits
+    cmd = convertHindiNumberWordsToDigits(cmd);
 
     // 0. CLEAR CHAT COMMAND (e.g., "श्री अपना चैट बॉक्स क्लियर कर दो", "चैट साफ करो")
     if (cmd.includes("clear chat") || cmd.includes("चैट क्लियर") || cmd.includes("चैट साफ") || cmd.includes("चैट साफ़") || cmd.includes("चैट मिटाओ")) {
@@ -941,11 +944,10 @@ function handleBalanceQuery(query) {
 function matchCreateClient(cmd) {
     let text = cmd.replace("shree", "").replace("shri", "").replace("श्री", "").trim();
 
-    // Check if it contains client/grahak/ग्राहक/क्लाइंट intent
+    // Check if it contains client/grahak/ग्राहक/क्लाइंट intent (MUST be present)
     const hasIntent = text.includes("client") || text.includes("grahak") || text.includes("ग्राहक") || text.includes("क्लाइंट");
-    const hasAction = text.includes("add") || text.includes("create") || text.includes("जोड़") || text.includes("बना") || text.includes("दर्ज") || text.includes("ऐड") || text.includes("एड");
-
-    if (!hasIntent && !hasAction) return null;
+    
+    if (!hasIntent) return null;
 
     // 1. Try matching name and monthly retainer amount (e.g. Acme 25000 / Acme grahak with 25000)
     const regexWithAmount = /([a-zA-Z\s\u0900-\u097F]+)\s+(?:with|monthly|retainer|के साथ|का|मासिक)?\s*(\d+)/i;
@@ -1135,7 +1137,7 @@ function matchLogExpense(cmd) {
         if (cmd.includes(cat.toLowerCase())) { category = cat; break; }
     }
     // Hindi category keywords maps
-    if (cmd.includes("khaana") || cmd.includes("खाना") || cmd.includes("चाय") || cmd.includes("नाश्ता") || cmd.includes("lunch") || cmd.includes("tea") || cmd.includes("dinner")) {
+    if (cmd.includes("khaana") || cmd.includes("खाना") || cmd.includes("चाय") || cmd.includes("नाश्ता") || cmd.includes("lunch") || cmd.includes("tea") || cmd.includes("dinner") || cmd.includes("mithai") || cmd.includes("मिठाई")) {
         category = 'Food';
     } else if (cmd.includes("recharge") || cmd.includes("electricity") || cmd.includes("बिजली") || cmd.includes("bill") || cmd.includes("server") || cmd.includes("बिल")) {
         category = 'Bills';
@@ -1150,6 +1152,10 @@ function matchLogExpense(cmd) {
     let matchedAccount = null;
     for (let a of state.accounts) {
         if (cmd.includes(a.name.toLowerCase())) { matchedAccount = a; break; }
+    }
+    // Default to the first account (e.g. Main Cash) if the user didn't specify one
+    if (!matchedAccount && state.accounts.length > 0) {
+        matchedAccount = state.accounts[0];
     }
 
     let matchedClient = null;
@@ -1167,6 +1173,39 @@ function matchLogExpense(cmd) {
     } else if (cmd.includes("के लिए")) {
         const parts = cmd.split("के लिए");
         description = parts[0].replace(/\d+/g, "").replace("रुपये", "").replace("रुपया", "").replace("रुपए", "").replace("रु", "").trim();
+    } else {
+        // Fallback: Clean key action words and use the rest as description
+        let descClean = cmd.replace(amountMatch[0], "")
+                           .replace("rupaya", "")
+                           .replace("rupaye", "")
+                           .replace("rs", "")
+                           .replace("रुपये", "")
+                           .replace("रुपया", "")
+                           .replace("रुपए", "")
+                           .replace("रु", "")
+                           .replace("खर्च", "")
+                           .replace("खर्चा", "")
+                           .replace("ऐड कर दो", "")
+                           .replace("ऐड करो", "")
+                           .replace("ऐड", "")
+                           .replace("add", "")
+                           .replace("shree", "")
+                           .replace("shri", "")
+                           .replace("श्री", "")
+                           .replace("मिसलेनियस", "")
+                           .replace("misc", "")
+                           .replace("miscellaneous", "")
+                           .replace("ka", "")
+                           .replace("की", "")
+                           .replace("का", "")
+                           .replace("थी", "")
+                           .replace("था", "")
+                           .replace("लिया", "")
+                           .replace("ली", "")
+                           .trim();
+        if (descClean.length > 1) {
+            description = descClean;
+        }
     }
 
     if (matchedAccount) description = description.replace(matchedAccount.name.toLowerCase(), "").trim();
@@ -1284,3 +1323,46 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// Helper to convert Hindi number words (e.g. सौ, हजार) to digits
+function convertHindiNumberWordsToDigits(text) {
+    let result = text;
+    
+    // Common word-based amounts
+    result = result.replace(/(?:एक\s+)?सौ/g, "100");
+    result = result.replace(/दो\s+सौ/g, "200");
+    result = result.replace(/तीन\s+सौ/g, "300");
+    result = result.replace(/चार\s+सौ/g, "400");
+    result = result.replace(/पांच\s+सौ/g, "500");
+    result = result.replace(/छह\s+सौ/g, "600");
+    result = result.replace(/सात\s+सौ/g, "700");
+    result = result.replace(/आठ\s+सौ/g, "800");
+    result = result.replace(/नौ\s+सौ/g, "900");
+    result = result.replace(/डेढ़\s+सौ|डेढ़\s+सौ/g, "150");
+    result = result.replace(/ढाई\s+सौ/g, "250");
+    
+    result = result.replace(/(?:एक\s+)?हजार|(?:एक\s+)?हज़ार/g, "1000");
+    result = result.replace(/दो\s+हजार|दो\s+हज़ार/g, "2000");
+    result = result.replace(/तीन\s+हजार|तीन\s+हज़ार/g, "3000");
+    result = result.replace(/चार\s+हजार|चार\s+हज़ार/g, "4000");
+    result = result.replace(/पांच\s+हजार|पांच\s+हज़ार/g, "5000");
+    result = result.replace(/दस\s+हजार|दस\s+हज़ार/g, "10000");
+    
+    result = result.replace(/(?:एक\s+)?लाख/g, "100000");
+    result = result.replace(/दो\s+लाख/g, "200000");
+    result = result.replace(/पांच\s+लाख/g, "500000");
+    
+    // Single Devanagari numbers
+    result = result.replace(/\bएक\b/g, "1");
+    result = result.replace(/\bदो\b/g, "2");
+    result = result.replace(/\bतीन\b/g, "3");
+    result = result.replace(/\bचार\b/g, "4");
+    result = result.replace(/\bपाँच\b|\bपांच\b/g, "5");
+    result = result.replace(/\bछह\b|\bछै\b/g, "6");
+    result = result.replace(/\bसात\b/g, "7");
+    result = result.replace(/\bआठ\b/g, "8");
+    result = result.replace(/\bनौ\b/g, "9");
+    result = result.replace(/\bदस\b/g, "10");
+
+    return result;
+}
