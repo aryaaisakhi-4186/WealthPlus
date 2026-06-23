@@ -214,8 +214,10 @@ function initShreeSpeech() {
         recognition = new SpeechRecognition();
         recognition.continuous = false;
         recognition.lang = 'hi-IN'; // Native Hindi recognition
-        recognition.interimResults = false;
+        recognition.interimResults = true; // Enable real-time partial results
         recognition.maxAlternatives = 1;
+
+        let silenceTimer = null;
 
         recognition.onstart = () => {
             isListening = true;
@@ -233,6 +235,10 @@ function initShreeSpeech() {
 
         recognition.onend = () => {
             isListening = false;
+            if (silenceTimer) {
+                clearTimeout(silenceTimer);
+                silenceTimer = null;
+            }
             if (isHandsFreeMode && !isShreeSpeaking) {
                 safeStartRecognition();
             } else if (!isHandsFreeMode) {
@@ -241,20 +247,14 @@ function initShreeSpeech() {
             }
         };
 
-        recognition.onresult = (event) => {
-            // CRITICAL: Ignore own voice speech feedback to prevent infinite loop
-            if (window.speechSynthesis && window.speechSynthesis.speaking) {
-                console.log("Ignoring speech result: SpeechSynthesis is speaking.");
-                return;
-            }
-
-            const transcript = event.results[event.results.length - 1][0].transcript.trim();
-            const lowerText = transcript.toLowerCase();
+        const processRecognizedText = (transcript) => {
+            const trimmed = transcript.trim();
+            if (!trimmed) return;
             
-            console.log("Speech recognized:", transcript);
+            const lowerText = trimmed.toLowerCase();
+            console.log("Processing recognized text:", trimmed);
             
             if (isHandsFreeMode) {
-                // Check for wake words
                 const wakeWords = ["wakeup shree", "wake up shree", "वेकअप श्री", "वेक अप श्री", "shree suno", "श्री सुनो", "सुनो श्री", "shree", "श्री", "shri", "jai hari", "जय हरी", "जय हरि"];
                 let foundWakeWord = false;
                 let matchedWord = "";
@@ -268,31 +268,80 @@ function initShreeSpeech() {
                 }
                 
                 if (foundWakeWord) {
-                    // Extract command after wake word
                     const idx = lowerText.indexOf(matchedWord);
-                    let command = transcript.slice(idx + matchedWord.length).trim();
+                    let command = trimmed.slice(idx + matchedWord.length).trim();
                     command = command.replace(/^[,.\s?।!]+/g, "").trim();
                     
                     if (command.length > 0) {
-                        addMessageToShreeChat("user", transcript);
+                        addMessageToShreeChat("user", trimmed);
                         processShreeCommand(command);
                     } else {
-                        addMessageToShreeChat("user", transcript);
+                        addMessageToShreeChat("user", trimmed);
                         speakShreeText("जी कहिए, मैं सुन रही हूँ।");
                         setShreeStatus("सुन रही हूँ...");
                     }
                 }
             } else {
                 // Standard mode: process everything
-                addMessageToShreeChat("user", transcript);
-                processShreeCommand(transcript);
+                addMessageToShreeChat("user", trimmed);
+                processShreeCommand(trimmed);
+            }
+        };
+
+        recognition.onresult = (event) => {
+            if (window.speechSynthesis && window.speechSynthesis.speaking) {
+                console.log("Ignoring speech result: SpeechSynthesis is speaking.");
+                return;
+            }
+
+            if (silenceTimer) {
+                clearTimeout(silenceTimer);
+                silenceTimer = null;
+            }
+
+            let interimTranscript = "";
+            let finalTranscript = "";
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+
+            const currentText = (finalTranscript || interimTranscript).trim();
+            if (!currentText) return;
+
+            // Live update the text input box so the user gets real-time typing feedback!
+            const textInput = document.getElementById('shree-text-input');
+            if (textInput) {
+                textInput.value = currentText;
+            }
+
+            console.log("Speech interim result:", currentText);
+
+            if (finalTranscript) {
+                processRecognizedText(finalTranscript);
+            } else {
+                // If it's partial, set a 1.2s timeout. If no new speech is received, process it immediately!
+                silenceTimer = setTimeout(() => {
+                    console.log("Speech pause detected. Processing interim text:", currentText);
+                    try {
+                        recognition.stop();
+                    } catch (e) {}
+                    processRecognizedText(currentText);
+                }, 1200);
             }
         };
 
         recognition.onerror = (event) => {
             console.error("Speech recognition error:", event.error);
+            if (silenceTimer) {
+                clearTimeout(silenceTimer);
+                silenceTimer = null;
+            }
             
-            // 'no-speech' is normal when hands-free is active and user is silent.
             if (event.error === 'no-speech') return;
 
             if (isHandsFreeMode) {
