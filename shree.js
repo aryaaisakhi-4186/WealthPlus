@@ -188,12 +188,8 @@ function speakShreeText(text) {
         // Wait 1000ms after speaking ends before restarting mic
         setTimeout(() => {
             isShreeSpeaking = false;
-            if (isHandsFreeMode && recognition && !isListening) {
-                try {
-                    recognition.start();
-                } catch(e) {
-                    console.error("Failed to restart mic after speaking:", e);
-                }
+            if (isHandsFreeMode && !isListening) {
+                safeStartRecognition();
             } else if (!isHandsFreeMode) {
                 setShreeStatus("तैयार");
                 updateMicButtonUI(false);
@@ -203,8 +199,8 @@ function speakShreeText(text) {
 
     utterance.onerror = () => {
         isShreeSpeaking = false;
-        if (isHandsFreeMode && recognition && !isListening) {
-            try { recognition.start(); } catch(e){}
+        if (isHandsFreeMode && !isListening) {
+            safeStartRecognition();
         }
     };
     
@@ -238,18 +234,7 @@ function initShreeSpeech() {
         recognition.onend = () => {
             isListening = false;
             if (isHandsFreeMode && !isShreeSpeaking) {
-                // If hands-free mode is active and not currently speaking, restart automatically!
-                try {
-                    recognition.start();
-                } catch (e) {
-                    console.error("Failed to restart speech recognition:", e);
-                    // Retry after 1.5 seconds if blocked/busy
-                    setTimeout(() => {
-                        if (isHandsFreeMode && !isListening && !isShreeSpeaking) {
-                            try { recognition.start(); } catch(err){}
-                        }
-                    }, 1500);
-                }
+                safeStartRecognition();
             } else if (!isHandsFreeMode) {
                 updateMicButtonUI(false);
                 setShreeStatus("तैयार");
@@ -306,9 +291,14 @@ function initShreeSpeech() {
 
         recognition.onerror = (event) => {
             console.error("Speech recognition error:", event.error);
-            // Ignore error restart if in hands-free mode
+            
+            // 'no-speech' is normal when hands-free is active and user is silent.
+            if (event.error === 'no-speech') return;
+
             if (isHandsFreeMode) {
+                if (event.error === 'network' || event.error === 'aborted') return;
                 setShreeStatus("पुनः प्रारंभ...");
+                safeStartRecognition();
                 return;
             }
             
@@ -336,6 +326,24 @@ function setShreeStatus(text) {
 
 let isHandsFreeMode = false;
 
+function safeStartRecognition() {
+    if (!recognition || isListening) return;
+    try {
+        recognition.start();
+    } catch (e) {
+        console.warn("Recognition start failed, retrying in 1.2s...", e);
+        setTimeout(() => {
+            if (isHandsFreeMode && !isListening) {
+                try {
+                    recognition.start();
+                } catch (err) {
+                    console.error("Failed to restart recognition on retry:", err);
+                }
+            }
+        }, 1200);
+    }
+}
+
 function toggleShreeListening() {
     if (!recognition) {
         alert("माइक इनपुट इस ब्राउज़र में समर्थित नहीं है। कृपया क्रोम/एज का उपयोग करें या टाइप करें।");
@@ -352,6 +360,7 @@ function toggleShreeListening() {
             speakShreeText("वॉयस असिस्टेंट सक्रिय है। आप श्री या जय हरी बोलकर निर्देश दे सकते हैं।");
         } catch (e) {
             console.error(e);
+            safeStartRecognition();
         }
     }
 }
@@ -499,9 +508,9 @@ function processShreeCommand(commandText) {
             .catch(err => {
                 console.error("Gemini API error:", err);
                 setShreeStatus("त्रुटि");
-                const defaultReply = "माफ़ कीजिये, सर्वर से संपर्क नहीं हो पाया। कृपया दोबारा प्रयास करें।";
+                const defaultReply = `माफ़ कीजिये, सर्वर से संपर्क नहीं हो पाया। (त्रुटि: ${err.message})`;
                 addMessageToShreeChat("shree", defaultReply);
-                speakShreeText(defaultReply);
+                speakShreeText("माफ़ कीजिये, सर्वर से संपर्क नहीं हो पाया।");
             });
     } else {
         const defaultReply = "मैं सुन पा रही हूँ, पर मैं इस कमांड को समझ नहीं सकी। कृपया बोलें: 'श्री जय हरी, 100 रुपये खर्च चाय के लिए'। जेमिनी ए आई के साथ सामान्य बातचीत के लिए मास्टर सेटिंग्स में ए आई की चाबी दर्ज करें।";
@@ -510,13 +519,14 @@ function processShreeCommand(commandText) {
     }
 }
 
+// Global cache for discovered Gemini model configuration to prevent repeating discovery
+let discoveredGeminiConfig = null;
+
 // Call Google Gemini API directly
 async function callGeminiAI(userPrompt) {
     const apiKey = state.geminiApiKey;
     if (!apiKey) throw new Error("Gemini API Key is missing.");
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    
     // Create a context-aware system prompt
     const systemInstruction = `You are Shree, the sweet and polite female AI manager of the Wealth Plus bookkeeping web application.
 Your character:
@@ -527,33 +537,160 @@ Your character:
 - Answer general questions (business tips, calculations, general knowledge, chit-chat) politely in Hinglish.
 - If the user asks you to perform an action (like adding transaction or checking balance) that you cannot do directly via LLM, tell them politely: "Main samajh gayi. Aap is kam ko voice command se ya manual entries se aasaani se kar sakte hain."`;
 
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            contents: [{
-                parts: [{
-                    text: `${systemInstruction}\n\nUser Question: ${userPrompt}\nShree Response:`
-                }]
-            }],
-            generationConfig: {
-                maxOutputTokens: 250,
-                temperature: 0.7
-            }
-        })
-    });
+    const requestBody = {
+        contents: [{
+            parts: [{
+                text: `${systemInstruction}\n\nUser Question: ${userPrompt}\nShree Response:`
+            }]
+        }],
+        generationConfig: {
+            maxOutputTokens: 250,
+            temperature: 0.7
+        }
+    };
 
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+    // Helper to send generateContent request
+    const sendGenerateContent = async (version, modelName) => {
+        const url = `https://generativelanguage.googleapis.com/${version}/${modelName}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            const msg = errData.error?.message || `HTTP error! status: ${response.status}`;
+            throw new Error(msg);
+        }
+        const data = await response.json();
+        if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0]) {
+            return data.candidates[0].content.parts[0].text.trim();
+        } else {
+            throw new Error("Invalid response format from Gemini API.");
+        }
+    };
+
+    // If we already successfully made a call or discovered a working config, reuse it
+    if (discoveredGeminiConfig) {
+        try {
+            return await sendGenerateContent(discoveredGeminiConfig.version, discoveredGeminiConfig.model);
+        } catch (e) {
+            console.warn("Cached Gemini config failed, retrying discovery:", e);
+            discoveredGeminiConfig = null; // Clear cache to trigger rediscovery
+        }
     }
 
-    const data = await response.json();
-    if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0]) {
-        return data.candidates[0].content.parts[0].text.trim();
-    } else {
-        throw new Error("Invalid response format from Gemini API.");
+    // Attempt 1: Try gemini-1.5-flash with v1beta endpoint (Google AI Studio's default)
+    try {
+        console.log("Attempting Gemini call with gemini-1.5-flash on v1beta...");
+        const result = await sendGenerateContent("v1beta", "models/gemini-1.5-flash");
+        discoveredGeminiConfig = { version: "v1beta", model: "models/gemini-1.5-flash" };
+        return result;
+    } catch (err1) {
+        console.warn("Gemini call failed with gemini-1.5-flash on v1beta:", err1.message);
+        
+        // Attempt 2: Try gemini-1.5-flash with v1 endpoint (stable endpoint)
+        try {
+            console.log("Attempting Gemini call with gemini-1.5-flash on v1...");
+            const result = await sendGenerateContent("v1", "models/gemini-1.5-flash");
+            discoveredGeminiConfig = { version: "v1", model: "models/gemini-1.5-flash" };
+            return result;
+        } catch (err2) {
+            console.warn("Gemini call failed with gemini-1.5-flash on v1:", err2.message);
+
+            // Attempt 3: Try gemini-2.5-flash with v1 endpoint (standard model for 2026)
+            try {
+                console.log("Attempting Gemini call with gemini-2.5-flash on v1...");
+                const result = await sendGenerateContent("v1", "models/gemini-2.5-flash");
+                discoveredGeminiConfig = { version: "v1", model: "models/gemini-2.5-flash" };
+                return result;
+            } catch (err3) {
+                console.warn("Gemini call failed with gemini-2.5-flash on v1:", err3.message);
+
+                // Attempt 4: Try gemini-2.0-flash with v1 endpoint
+                try {
+                    console.log("Attempting Gemini call with gemini-2.0-flash on v1...");
+                    const result = await sendGenerateContent("v1", "models/gemini-2.0-flash");
+                    discoveredGeminiConfig = { version: "v1", model: "models/gemini-2.0-flash" };
+                    return result;
+                } catch (err4) {
+                    console.warn("Gemini call failed with gemini-2.0-flash on v1:", err4.message);
+
+                    // Attempt 5: Try gemini-pro on v1 (older stable model)
+                    try {
+                        console.log("Attempting Gemini call with gemini-pro on v1...");
+                        const result = await sendGenerateContent("v1", "models/gemini-pro");
+                        discoveredGeminiConfig = { version: "v1", model: "models/gemini-pro" };
+                        return result;
+                    } catch (err5) {
+                        console.warn("Gemini call failed with gemini-pro on v1:", err5.message);
+
+                        // Attempt 6: Let's query ListModels to find out exactly what models this API key has access to!
+                        console.log("Attempting to list available models for API key...");
+                        let availableModels = [];
+                        let listError = null;
+
+                        // Try fetching list from v1beta
+                        try {
+                            const listResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+                            if (listResponse.ok) {
+                                const listData = await listResponse.json();
+                                if (listData.models) availableModels = listData.models;
+                            }
+                        } catch (e) {
+                            listError = e;
+                        }
+
+                        // If empty, try fetching list from v1
+                        if (availableModels.length === 0) {
+                            try {
+                                const listResponse = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`);
+                                if (listResponse.ok) {
+                                    const listData = await listResponse.json();
+                                    if (listData.models) availableModels = listData.models;
+                                }
+                            } catch (e) {
+                                if (!listError) listError = e;
+                            }
+                        }
+
+                        if (availableModels.length > 0) {
+                            // Find a model supporting generateContent
+                            const generateModels = availableModels.filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'));
+                            if (generateModels.length > 0) {
+                                // Sort so that we prefer: flash -> pro -> others
+                                const preferredOrder = ['flash', 'pro', 'gemini'];
+                                let selectedModel = null;
+                                for (const pref of preferredOrder) {
+                                    selectedModel = generateModels.find(m => m.name.toLowerCase().includes(pref));
+                                    if (selectedModel) break;
+                                }
+                                if (!selectedModel) {
+                                    selectedModel = generateModels[0];
+                                }
+                                
+                                console.log(`Discovered available model: ${selectedModel.name}. Attempting to call...`);
+                                const version = "v1beta";
+                                try {
+                                    const result = await sendGenerateContent(version, selectedModel.name);
+                                    discoveredGeminiConfig = { version: version, model: selectedModel.name };
+                                    return result;
+                                } catch (errDiscovered) {
+                                    console.error(`Failed calling discovered model ${selectedModel.name}:`, errDiscovered);
+                                    throw new Error(`Failed calling discovered model ${selectedModel.name}: ${errDiscovered.message}`);
+                                }
+                            }
+                        }
+
+                        // If listing models failed or returned nothing, bubble up the errors
+                        const finalErr = new Error(`None of the models succeeded. \n- v1beta (gemini-1.5-flash): ${err1.message}\n- v1 (gemini-1.5-flash): ${err2.message}\n- v1 (gemini-2.5-flash): ${err3.message}\n- v1 (gemini-2.0-flash): ${err4.message}\n- v1 (gemini-pro): ${err5.message}\n- listModels error: ${listError ? listError.message : 'no models found'}`);
+                        throw finalErr;
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -631,19 +768,19 @@ function parseCustomJaiHariCommand(cmd) {
 
 // Navigation matcher
 function matchNavigation(cmd) {
-    if (cmd.includes("dashboard") || cmd.includes("home") || cmd.includes("मुख्य पेज") || cmd.includes("होम")) {
+    if (cmd.includes("dashboard") || cmd.includes("home") || cmd.includes("मुख्य पेज") || cmd.includes("होम") || cmd.includes("डैशबोर्ड")) {
         return { page: 'dashboard', label: 'डैशबोर्ड' };
     }
-    if (cmd.includes("client") || cmd.includes("income") || cmd.includes("आमदनी") || cmd.includes("ग्राहक") || cmd.includes("पेमेंट")) {
+    if (cmd.includes("client") || cmd.includes("income") || cmd.includes("आमदनी") || cmd.includes("ग्राहक") || cmd.includes("पेमेंट") || cmd.includes("क्लाइंट")) {
         return { page: 'clients', label: 'ग्राहक और आमदनी' };
     }
-    if (cmd.includes("expense") || cmd.includes("kharch") || cmd.includes("खर्च") || cmd.includes("भुगतान")) {
+    if (cmd.includes("expense") || cmd.includes("kharch") || cmd.includes("खर्च") || cmd.includes("भुगतान") || cmd.includes("एक्सपेंस") || cmd.includes("एक्सपेंसेस")) {
         return { page: 'expenses', label: 'खर्चे' };
     }
-    if (cmd.includes("report") || cmd.includes("ledger") || cmd.includes("हिसाब") || cmd.includes("बहीखाता") || cmd.includes("रिपोर्ट")) {
+    if (cmd.includes("report") || cmd.includes("ledger") || cmd.includes("हिसाब") || cmd.includes("बहीखाता") || cmd.includes("रिपोर्ट") || cmd.includes("लेजर") || cmd.includes("लेज़र")) {
         return { page: 'reports', label: 'रिपोर्ट और खाता बही' };
     }
-    if (cmd.includes("master") || cmd.includes("settings") || cmd.includes("सेटिंग") || cmd.includes("सेटअप")) {
+    if (cmd.includes("master") || cmd.includes("settings") || cmd.includes("सेटिंग") || cmd.includes("सेटअप") || cmd.includes("मास्टर")) {
         return { page: 'master', label: 'मास्टर सेटिंग्स' };
     }
     return null;
@@ -678,15 +815,42 @@ function handleBalanceQuery(query) {
     }
 }
 
-// Create client
+// Create client (Supports English & Hindi Devanagari names, works with/without monthly pay)
 function matchCreateClient(cmd) {
-    const regex1 = /(?:add|create)\s+client\s+([a-zA-Z\s]+)\s+(?:with|monthly|retainer)\s+(?:monthly|retainer)?\s*(\d+)/i;
-    const regex2 = /([a-zA-Z\s]+)\s+(?:client|grahak|ग्राहक)\s+(?:बनाओ|जोड़ो|add|create)\s+(?:monthly|retainer)?\s*(\d+)/i;
+    let text = cmd.replace("shree", "").replace("shri", "").replace("श्री", "").trim();
 
-    let match = cmd.match(regex1) || cmd.match(regex2);
+    // Check if it contains client/grahak/ग्राहक creation intent
+    const hasIntent = text.includes("client") || text.includes("grahak") || text.includes("ग्राहक");
+    const hasAction = text.includes("add") || text.includes("create") || text.includes("जोड़") || text.includes("बना") || text.includes("दर्ज");
+
+    if (!hasIntent && !hasAction) return null;
+
+    // 1. Try matching name and monthly retainer amount (e.g. Acme 25000 / Acme grahak with 25000)
+    // Supports Devanagari characters range: \u0900-\u097F
+    const regexWithAmount = /([a-zA-Z\s\u0900-\u097F]+)\s+(?:with|monthly|retainer|के साथ|का|मासिक)?\s*(\d+)/i;
+    let match = text.match(regexWithAmount);
     if (match) {
-        return { name: match[1].trim(), monthlyPay: Number(match[2]) };
+        let name = match[1].replace(/(?:client|grahak|ग्राहक|add|create|बनाओ|जोड़ो|दर्ज करो|नया|एक|में|के नाम से|नाम से)/gi, "").trim();
+        name = name.replace(/^[,.\s?।!]+/g, "").trim();
+        if (name.length > 1) {
+            return { name: name, monthlyPay: Number(match[2]) };
+        }
     }
+
+    // 2. Try matching name without monthly retainer (defaults to 0)
+    let name = "";
+    if (text.includes("ke naam se") || text.includes("के नाम से") || text.includes("नाम से")) {
+        const parts = text.split(/(?:ke naam se|के नाम से|नाम से)/)[0].split(/(?:client|grahak|ग्राहक|add|create|बनाओ|जोड़ो|दर्ज करो|नया|एक|में)/);
+        name = parts[parts.length - 1].trim();
+    } else {
+        name = text.replace(/(?:client|grahak|ग्राहक|add|create|बनाओ|जोड़ो|दर्ज करो|नया|एक|में)/gi, "").trim();
+    }
+
+    name = name.replace(/^[,.\s?।!]+/g, "").trim();
+    if (name.length > 1) {
+        return { name: name, monthlyPay: 0 };
+    }
+
     return null;
 }
 
