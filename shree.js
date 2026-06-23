@@ -415,6 +415,22 @@ function addMessageToShreeChat(sender, text) {
 function processShreeCommand(commandText) {
     const cmd = commandText.toLowerCase().trim();
 
+    // 0. CLEAR CHAT COMMAND (e.g., "श्री अपना चैट बॉक्स क्लियर कर दो", "चैट साफ करो")
+    if (cmd.includes("clear chat") || cmd.includes("चैट क्लियर") || cmd.includes("चैट साफ") || cmd.includes("चैट साफ़") || cmd.includes("चैट मिटाओ")) {
+        const container = document.getElementById('shree-messages-container');
+        if (container) {
+            container.innerHTML = `
+                <div class="shree-msg msg-shree">
+                    <p>नमस्ते! मैं श्री हूँ, आपकी AI मुनीम। मैं आपकी आवाज़ सुनकर खर्च दर्ज कर सकती हूँ। बोलकर प्रयास करें: <em>"श्री जय हरि, मिसलेनियस एक्सपेंसेस में 100 रुपये खर्च हुए ऑफिस रिफ्रमेंट के लिए"</em></p>
+                    <span class="msg-time">सक्रिय</span>
+                </div>
+            `;
+        }
+        const reply = "चैट बॉक्स साफ़ कर दिया गया है।";
+        speakShreeText(reply);
+        return;
+    }
+
     // ==========================================
     // 1. SPECIFIC CUSTOM TRIGGER: "श्री जय हरि, मिसलेनियस एक्सपेंसेस में 100 रुपये खर्च हुए ऑफिस रिफ्रेशमेंट के लिए"
     // ==========================================
@@ -758,27 +774,35 @@ Your character:
                             // Find a model supporting generateContent
                             const generateModels = availableModels.filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'));
                             if (generateModels.length > 0) {
-                                // Sort so that we prefer: flash -> pro -> others
+                                // Sort candidates by preference (flash -> pro -> others)
+                                const candidates = [];
                                 const preferredOrder = ['flash', 'pro', 'gemini'];
-                                let selectedModel = null;
                                 for (const pref of preferredOrder) {
-                                    selectedModel = generateModels.find(m => m.name.toLowerCase().includes(pref));
-                                    if (selectedModel) break;
+                                    const matching = generateModels.filter(m => m.name.toLowerCase().includes(pref) && !candidates.some(c => c.name === m.name));
+                                    candidates.push(...matching);
                                 }
-                                if (!selectedModel) {
-                                    selectedModel = generateModels[0];
+                                generateModels.forEach(m => {
+                                    if (!candidates.some(c => c.name === m.name)) candidates.push(m);
+                                });
+
+                                console.log("List of discovered candidate models:", candidates.map(c => c.name));
+
+                                // Loop through candidates and find the first one that successfully runs (skips overloaded models)
+                                let lastError = null;
+                                for (const modelCandidate of candidates) {
+                                    const version = "v1beta";
+                                    console.log(`Attempting discovered model ${modelCandidate.name} on ${version}...`);
+                                    try {
+                                        const result = await sendGenerateContent(version, modelCandidate.name);
+                                        discoveredGeminiConfig = { version: version, model: modelCandidate.name };
+                                        return result;
+                                    } catch (errCandidate) {
+                                        console.warn(`Discovered model ${modelCandidate.name} failed:`, errCandidate.message);
+                                        lastError = errCandidate;
+                                        // Continue to the next candidate model
+                                    }
                                 }
-                                
-                                console.log(`Discovered available model: ${selectedModel.name}. Attempting to call...`);
-                                const version = "v1beta";
-                                try {
-                                    const result = await sendGenerateContent(version, selectedModel.name);
-                                    discoveredGeminiConfig = { version: version, model: selectedModel.name };
-                                    return result;
-                                } catch (errDiscovered) {
-                                    console.error(`Failed calling discovered model ${selectedModel.name}:`, errDiscovered);
-                                    throw new Error(`Failed calling discovered model ${selectedModel.name}: ${errDiscovered.message}`);
-                                }
+                                throw new Error(`All discovered models failed. Last error: ${lastError ? lastError.message : 'unknown'}`);
                             }
                         }
 
