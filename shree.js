@@ -564,16 +564,6 @@ function processShreeCommand(commandText) {
         return;
     }
 
-    // 3. PAGE NAVIGATION
-    const navMatch = matchNavigation(cmd);
-    if (navMatch) {
-        navigateToPage(navMatch.page);
-        const reply = `${navMatch.label} पेज खोला जा रहा है।`;
-        addMessageToShreeChat("shree", reply);
-        speakShreeText(reply);
-        return;
-    }
-
     // 4. BALANCE QUERIES
     const balQuery = matchBalanceQuery(cmd);
     if (balQuery) {
@@ -610,6 +600,16 @@ function processShreeCommand(commandText) {
         return;
     }
 
+    // 3. PAGE NAVIGATION (Moved down to prevent intercepting specific actions)
+    const navMatch = matchNavigation(cmd);
+    if (navMatch) {
+        navigateToPage(navMatch.page);
+        const reply = `${navMatch.label} पेज खोला जा रहा है।`;
+        addMessageToShreeChat("shree", reply);
+        speakShreeText(reply);
+        return;
+    }
+
     // Default Fallback - Call Gemini API if Key is present, otherwise show default local help
     if (typeof state !== 'undefined' && state.geminiApiKey) {
         setShreeStatus("सोच रही हूँ...");
@@ -627,9 +627,9 @@ function processShreeCommand(commandText) {
                 speakShreeText("माफ़ कीजिये, सर्वर से संपर्क नहीं हो पाया।");
             });
     } else {
-        const defaultReply = "मैं सुन पा रही हूँ, पर मैं इस कमांड को समझ नहीं सकी। कृपया बोलें: 'श्री जय हरी, 100 रुपये खर्च चाय के लिए'। जेमिनी ए आई के साथ सामान्य बातचीत के लिए मास्टर सेटिंग्स में ए आई की चाबी दर्ज करें।";
+        const defaultReply = "माफ़ कीजिये, मैं यह काम सीधे नहीं कर सकती। यदि आप खर्च जोड़ना या नया ग्राहक बनाना चाहते हैं, तो कृपया वॉइस कमांड का उपयोग करें (जैसे: 'श्री जय हरी, 100 रुपये खर्च चाय के लिए')। सामान्य बातचीत के लिए मास्टर सेटिंग्स में ए आई की चाबी दर्ज करें।";
         addMessageToShreeChat("shree", defaultReply);
-        speakShreeText("माफ़ कीजिये, मैं यह निर्देश समझ नहीं सकी।");
+        speakShreeText("माफ़ कीजिये, मैं यह काम सीधे नहीं कर सकती हूँ।");
     }
 }
 
@@ -649,7 +649,7 @@ Your character:
 - You are talking to the business owner/user.
 - Current app stats: clients count: ${state.clients.length}, transactions count: ${state.transactions.length}.
 - Answer general questions (business tips, calculations, general knowledge, chit-chat) politely in Hinglish.
-- If the user asks you to perform an action (like adding transaction or checking balance) that you cannot do directly via LLM, tell them politely: "Main samajh gayi. Aap is kam ko voice command se ya manual entries se aasaani se kar sakte hain."`;
+- If the user asks you to do something that you cannot do (such as deleting transactions, editing clients, exporting files, system resets, or other unsupported operations), explain politely that you cannot do this task directly, and guide them on how to do it manually if applicable (e.g., "Maaf kijiye, main directly delete nahi kar sakti. Aap screen par check karke manually delete kar sakte hain.").`;
 
     const requestBody = {
         contents: [{
@@ -941,9 +941,9 @@ function handleBalanceQuery(query) {
 function matchCreateClient(cmd) {
     let text = cmd.replace("shree", "").replace("shri", "").replace("श्री", "").trim();
 
-    // Check if it contains client/grahak/ग्राहक creation intent
-    const hasIntent = text.includes("client") || text.includes("grahak") || text.includes("ग्राहक");
-    const hasAction = text.includes("add") || text.includes("create") || text.includes("जोड़") || text.includes("बना") || text.includes("दर्ज");
+    // Check if it contains client/grahak/ग्राहक/क्लाइंट creation intent
+    const hasIntent = text.includes("client") || text.includes("grahak") || text.includes("ग्राहक") || text.includes("क्लाइंट");
+    const hasAction = text.includes("add") || text.includes("create") || text.includes("जोड़") || text.includes("बना") || text.includes("दर्ज") || text.includes("ऐड") || text.includes("एड");
 
     if (!hasIntent && !hasAction) return null;
 
@@ -952,7 +952,7 @@ function matchCreateClient(cmd) {
     const regexWithAmount = /([a-zA-Z\s\u0900-\u097F]+)\s+(?:with|monthly|retainer|के साथ|का|मासिक)?\s*(\d+)/i;
     let match = text.match(regexWithAmount);
     if (match) {
-        let name = match[1].replace(/(?:client|grahak|ग्राहक|add|create|बनाओ|जोड़ो|दर्ज करो|नया|एक|में|के नाम से|नाम से)/gi, "").trim();
+        let name = match[1].replace(/(?:client|grahak|ग्राहक|क्लाइंट|add|create|ऐड|एड|बनाओ|जोड़ो|दर्ज करो|नया|एक|में|के नाम से|नाम से)/gi, "").trim();
         name = name.replace(/^[,.\s?।!]+/g, "").trim();
         if (name.length > 1) {
             return { name: name, monthlyPay: Number(match[2]) };
@@ -962,10 +962,10 @@ function matchCreateClient(cmd) {
     // 2. Try matching name without monthly retainer (defaults to 0)
     let name = "";
     if (text.includes("ke naam se") || text.includes("के नाम से") || text.includes("नाम से")) {
-        const parts = text.split(/(?:ke naam se|के नाम से|नाम से)/)[0].split(/(?:client|grahak|ग्राहक|add|create|बनाओ|जोड़ो|दर्ज करो|नया|एक|में)/);
+        const parts = text.split(/(?:ke naam se|के नाम से|नाम से)/)[0].split(/(?:client|grahak|ग्राहक|क्लाइंट|add|create|ऐड|एड|बनाओ|जोड़ो|दर्ज करो|नया|एक|में)/);
         name = parts[parts.length - 1].trim();
     } else {
-        name = text.replace(/(?:client|grahak|ग्राहक|add|create|बनाओ|जोड़ो|दर्ज करो|नया|एक|में)/gi, "").trim();
+        name = text.replace(/(?:client|grahak|ग्राहक|क्लाइंट|add|create|ऐड|एड|बनाओ|जोड़ो|दर्ज करो|नया|एक|में|करो|कर दो)/gi, "").trim();
     }
 
     name = name.replace(/^[,.\s?।!]+/g, "").trim();
