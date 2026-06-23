@@ -6,6 +6,7 @@ let isShreeVoiceEnabled = true;
 let recognition = null;
 let isListening = false;
 let selectedVoice = null;
+let lastSpokenText = ""; // Global cache of last speech synthesis output to prevent feedback loops
 
 // Initialize Speech Synthesis and attempt to select a sweet female voice
 function initShreeVoices() {
@@ -135,6 +136,9 @@ let isShreeSpeaking = false;
 function speakShreeText(text) {
     if (!isShreeVoiceEnabled || !window.speechSynthesis) return;
 
+    // Save cleaned lowercase spoken text to prevent microphone feedback loops
+    lastSpokenText = text.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()।?]/g,"").trim();
+
     window.speechSynthesis.cancel(); // stop current speak
     const utterance = new SpeechSynthesisUtterance(text);
     
@@ -185,7 +189,7 @@ function speakShreeText(text) {
     };
 
     utterance.onend = () => {
-        // Wait 1000ms after speaking ends before restarting mic
+        // Wait 2500ms (2.5 seconds) after speaking ends before restarting mic to prevent picking up echoes
         setTimeout(() => {
             isShreeSpeaking = false;
             if (isHandsFreeMode && !isListening) {
@@ -194,7 +198,7 @@ function speakShreeText(text) {
                 setShreeStatus("तैयार");
                 updateMicButtonUI(false);
             }
-        }, 1000);
+        }, 2500);
     };
 
     utterance.onerror = () => {
@@ -218,9 +222,11 @@ function initShreeSpeech() {
         recognition.maxAlternatives = 1;
 
         let silenceTimer = null;
+        let isProcessed = false;
 
         recognition.onstart = () => {
             isListening = true;
+            isProcessed = false;
             updateMicButtonUI(true);
             if (isHandsFreeMode) {
                 setShreeStatus("सतत सुन रही हूँ...");
@@ -235,6 +241,15 @@ function initShreeSpeech() {
 
         recognition.onend = () => {
             isListening = false;
+            // Fallback: if browser stopped recognition before silence timer fired, process whatever was heard
+            if (!isProcessed) {
+                const textInput = document.getElementById('shree-text-input');
+                const finalVal = textInput ? textInput.value.trim() : "";
+                if (finalVal) {
+                    isProcessed = true;
+                    processRecognizedText(finalVal);
+                }
+            }
             if (silenceTimer) {
                 clearTimeout(silenceTimer);
                 silenceTimer = null;
@@ -251,7 +266,14 @@ function initShreeSpeech() {
             const trimmed = transcript.trim();
             if (!trimmed) return;
             
-            const lowerText = trimmed.toLowerCase();
+            const lowerText = trimmed.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()।?]/g,"").trim();
+            
+            // Self-echo loop prevention: check if recognized text is part of last spoken response
+            if (lastSpokenText && (lowerText.includes(lastSpokenText) || lastSpokenText.includes(lowerText))) {
+                console.log("Ignoring echo feedback of Shree's own voice:", trimmed);
+                return;
+            }
+            
             console.log("Processing recognized text:", trimmed);
             
             if (isHandsFreeMode) {
@@ -299,18 +321,12 @@ function initShreeSpeech() {
                 silenceTimer = null;
             }
 
-            let interimTranscript = "";
-            let finalTranscript = "";
-
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript;
-                } else {
-                    interimTranscript += event.results[i][0].transcript;
-                }
+            let fullTranscript = "";
+            for (let i = 0; i < event.results.length; ++i) {
+                fullTranscript += event.results[i][0].transcript;
             }
 
-            const currentText = (finalTranscript || interimTranscript).trim();
+            const currentText = fullTranscript.trim();
             if (!currentText) return;
 
             // Live update the text input box so the user gets real-time typing feedback!
@@ -319,20 +335,19 @@ function initShreeSpeech() {
                 textInput.value = currentText;
             }
 
-            console.log("Speech interim result:", currentText);
+            console.log("Speech interim/final result:", currentText);
 
-            if (finalTranscript) {
-                processRecognizedText(finalTranscript);
-            } else {
-                // If it's partial, set a 1.2s timeout. If no new speech is received, process it immediately!
-                silenceTimer = setTimeout(() => {
-                    console.log("Speech pause detected. Processing interim text:", currentText);
+            // Set a 1600ms timeout for silence detection. If the user stops speaking for 1.6s, process it!
+            silenceTimer = setTimeout(() => {
+                console.log("Silence pause detected. Processing text:", currentText);
+                if (!isProcessed) {
+                    isProcessed = true;
                     try {
                         recognition.stop();
                     } catch (e) {}
                     processRecognizedText(currentText);
-                }, 1200);
-            }
+                }
+            }, 1600);
         };
 
         recognition.onerror = (event) => {
@@ -344,6 +359,25 @@ function initShreeSpeech() {
             
             if (event.error === 'no-speech') return;
 
+            // Handle fatal mic permission or capability errors (especially important for mobile HTTPS constraints)
+            if (event.error === 'not-allowed' || event.error === 'service-not-allowed' || event.error === 'language-not-supported') {
+                isHandsFreeMode = false;
+                updateMicButtonUI(false);
+                setShreeStatus("त्रुटि");
+                
+                let errMsg = "माफ़ कीजिये, मैं सुन नहीं पाई।";
+                if (event.error === 'not-allowed') {
+                    errMsg = "माइक की अनुमति (Microphone Permission) नहीं मिली। कृपया ब्राउज़र सेटिंग्स में जाकर माइक की अनुमति दें। ध्यान दें: मोबाइल पर आवाज़ कमांड के लिए वेबसाइट का HTTPS (सुरक्षित) होना आवश्यक है।";
+                    alert("माइक अनुमति त्रुटि: कृपया ब्राउज़र के एड्रेस बार में ताले (lock) के आइकॉन पर क्लिक करके माइक की अनुमति दें। मोबाइल पर वॉइस कमांड चलाने के लिए इसे HTTPS (Firebase Hosting) पर चलाना आवश्यक है।");
+                } else if (event.error === 'language-not-supported') {
+                    errMsg = "आपके ब्राउज़र में हिंदी भाषा का वॉयस सपोर्ट नहीं है। कृपया क्रोम का उपयोग करें।";
+                }
+                
+                speakShreeText("माफ़ कीजिये, माइक एक्सेस नहीं हो पाया।");
+                addMessageToShreeChat("shree", errMsg);
+                return;
+            }
+
             if (isHandsFreeMode) {
                 if (event.error === 'network' || event.error === 'aborted') return;
                 setShreeStatus("पुनः प्रारंभ...");
@@ -353,10 +387,6 @@ function initShreeSpeech() {
             
             setShreeStatus("त्रुटि");
             let errMsg = "माफ़ कीजिये, मैं सुन नहीं पाई। कृपया माइक दबाकर दोबारा बोलें।";
-            if (event.error === 'not-allowed') {
-                errMsg = "माइक की अनुमति (Microphone Permission) नहीं मिली। कृपया ब्राउज़र सेटिंग्स में जाकर माइक की अनुमति दें। ध्यान दें: मोबाइल पर आवाज़ कमांड के लिए वेबसाइट का HTTPS (सुरक्षित) होना आवश्यक है।";
-                alert("माइक अनुमति त्रुटि: कृपया ब्राउज़र के एड्रेस बार में ताले (lock) के आइकॉन पर क्लिक करके माइक की अनुमति दें। मोबाइल पर वॉइस कमांड चलाने के लिए इसे Firebase Hosting (HTTPS) पर चलाना आवश्यक है।");
-            }
             speakShreeText("माफ़ कीजिये, मैं सुन नहीं पाई।");
             addMessageToShreeChat("shree", errMsg);
         };
@@ -376,17 +406,20 @@ function setShreeStatus(text) {
 let isHandsFreeMode = false;
 
 function safeStartRecognition() {
-    if (!recognition || isListening) return;
+    if (!recognition || isListening || isShreeSpeaking || (window.speechSynthesis && window.speechSynthesis.speaking)) return;
     try {
         recognition.start();
     } catch (e) {
         console.warn("Recognition start failed, retrying in 1.2s...", e);
         setTimeout(() => {
-            if (isHandsFreeMode && !isListening) {
+            if (isHandsFreeMode && !isListening && !isShreeSpeaking && !(window.speechSynthesis && window.speechSynthesis.speaking)) {
                 try {
                     recognition.start();
                 } catch (err) {
                     console.error("Failed to restart recognition on retry:", err);
+                    isHandsFreeMode = false;
+                    updateMicButtonUI(false);
+                    setShreeStatus("तैयार");
                 }
             }
         }, 1200);
@@ -414,30 +447,34 @@ function toggleShreeListening() {
     }
 }
 
-function toggleShreeVoiceOutput() {
-    isShreeVoiceEnabled = !isShreeVoiceEnabled;
-    const btn = document.getElementById('btn-shree-voice-toggle');
-    if (isShreeVoiceEnabled) {
-        btn.classList.add('voice-active');
-        btn.innerHTML = '<i data-lucide="volume-2"></i>';
-        speakShreeText("आवाज़ चालू कर दी गई है।");
-    } else {
-        btn.classList.remove('voice-active');
-        btn.innerHTML = '<i data-lucide="volume-x"></i>';
-        if (window.speechSynthesis) window.speechSynthesis.cancel();
-    }
-    lucide.createIcons();
-}
+// Headphone voice output toggle removed. Voice is enabled by default for seamless speech interaction.
 
 function updateMicButtonUI(listening) {
     const micBtn = document.getElementById('btn-shree-mic');
-    if (!micBtn) return;
+    const micToggleBtn = document.getElementById('btn-shree-mic-toggle');
+    
     if (listening) {
-        micBtn.classList.add('listening');
-        micBtn.innerHTML = '<i data-lucide="mic-off"></i>';
+        if (micBtn) {
+            micBtn.classList.add('listening');
+            micBtn.innerHTML = '<i data-lucide="mic-off"></i>';
+        }
+        if (micToggleBtn) {
+            micToggleBtn.classList.add('listening-active');
+            micToggleBtn.innerHTML = '<i data-lucide="mic"></i>';
+            micToggleBtn.title = "Mute Microphone";
+            micToggleBtn.style.color = "var(--success)"; // green active color
+        }
     } else {
-        micBtn.classList.remove('listening');
-        micBtn.innerHTML = '<i data-lucide="mic"></i>';
+        if (micBtn) {
+            micBtn.classList.remove('listening');
+            micBtn.innerHTML = '<i data-lucide="mic"></i>';
+        }
+        if (micToggleBtn) {
+            micToggleBtn.classList.remove('listening-active');
+            micToggleBtn.innerHTML = '<i data-lucide="mic-off"></i>';
+            micToggleBtn.title = "Unmute Microphone";
+            micToggleBtn.style.color = ""; // reset color
+        }
     }
     lucide.createIcons();
 }
@@ -467,7 +504,7 @@ function processShreeCommand(commandText) {
     // Convert Devanagari Hindi number words to standard digits
     cmd = convertHindiNumberWordsToDigits(cmd);
 
-    // 0. CLEAR CHAT COMMAND (e.g., "श्री अपना चैट बॉक्स क्लियर कर दो", "चैट साफ करो")
+    // 0. CLEAR CHAT COMMAND (always local for immediate UI cleaning)
     if (cmd.includes("clear chat") || cmd.includes("चैट क्लियर") || cmd.includes("चैट साफ") || cmd.includes("चैट साफ़") || cmd.includes("चैट मिटाओ")) {
         const container = document.getElementById('shree-messages-container');
         if (container) {
@@ -483,23 +520,70 @@ function processShreeCommand(commandText) {
         return;
     }
 
-    // ==========================================
-    // 1. SPECIFIC CUSTOM TRIGGER: "श्री जय हरि, मिसलेनियस एक्सपेंसेस में 100 रुपये खर्च हुए ऑफिस रिफ्रेशमेंट के लिए"
-    // ==========================================
+    // PRIMARY PATH: If Gemini API Key is present, Route directly to Generative AI!
+    if (typeof state !== 'undefined' && state.geminiApiKey) {
+        setShreeStatus("सोच रही हूँ...");
+        callGeminiAI(commandText)
+            .then(reply => {
+                setShreeStatus("Idle");
+                let resObj = null;
+                try {
+                    let jsonText = reply.trim();
+                    const startIdx = jsonText.indexOf('{');
+                    const endIdx = jsonText.lastIndexOf('}');
+                    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+                        jsonText = jsonText.slice(startIdx, endIdx + 1);
+                    }
+                    resObj = JSON.parse(jsonText);
+                } catch (e) {
+                    console.error("Gemini response is not valid JSON:", e, reply);
+                    resObj = {
+                        speech: reply,
+                        action: null,
+                        params: {}
+                    };
+                }
+
+                let speech = resObj ? resObj.speech : reply;
+                if (!speech || speech.trim() === "{" || speech.trim() === "}") {
+                    speech = "माफ़ कीजिये, मैं समझ नहीं पाई। क्या आप कृपया फिर से कह सकते हैं?";
+                }
+                addMessageToShreeChat("shree", speech);
+                speakShreeText(speech);
+
+                if (resObj.action) {
+                    executeAgentAction(resObj.action, resObj.params);
+                }
+            })
+            .catch(err => {
+                console.warn("Gemini API call failed, falling back to local processing:", err);
+                processLocalCommandFallback(cmd);
+            });
+        return;
+    }
+
+    // OFFLINE FALLBACK PATH: If no Gemini key is present, process locally
+    processLocalCommandFallback(cmd);
+}
+
+// Local offline matchers fallback processor
+function processLocalCommandFallback(cmd) {
+    // 1. SPECIFIC CUSTOM TRIGGER: "श्री जय हरि..."
     if (cmd.includes("jai hari") || cmd.includes("shree jai hari") || cmd.includes("shri jai hari") || cmd.includes("जय हरी") || cmd.includes("जय हरि") || cmd.includes("जयहरि")) {
         const parsedExpense = parseCustomJaiHariCommand(cmd);
         if (parsedExpense) {
-            // Add transaction via direct cloud sync function
             const newTx = {
                 id: 't_' + Date.now(),
                 description: parsedExpense.description,
-                category: 'Others', // Misc. Expenses
+                category: 'Others',
                 amount: parsedExpense.amount,
                 date: new Date().toISOString().split('T')[0],
-                mode: state.accounts[0]?.name || 'Main Cash', // default to first account
+                mode: state.accounts[0]?.name || 'Main Cash',
                 clientId: ""
             };
-            addExpenseDirect(newTx); // Syncs to local storage and firebase cloud in real time
+            addExpenseDirect(newTx);
+            if (typeof renderDashboard === 'function') renderDashboard();
+            if (typeof renderExpensesPage === 'function') renderExpensesPage();
 
             const vocalReply = `जय हरी! अन्य खर्च में ${parsedExpense.description} के लिए ${parsedExpense.amount} रुपये दर्ज कर दिए गए हैं।`;
             const textReply = `<strong>जय हरी!</strong> ₹${parsedExpense.amount} सफलतापूर्वक <strong>Others (Misc.)</strong> श्रेणी में दर्ज कर दिया गया है।<br>विवरण: "${parsedExpense.description}"`;
@@ -518,7 +602,7 @@ function processShreeCommand(commandText) {
         return;
     }
 
-    // 2.5 READ SCREEN/PAGE COMMANDS (e.g., "श्री एक्सपेंस पढ़कर बताओ", "इसे पढ़ो", "पेज सुनाओ")
+    // 2.5 READ SCREEN/PAGE COMMANDS
     const isReadCommand = cmd.includes("read") || cmd.includes("पढ़") || cmd.includes("पढ़") || cmd.includes("सुनाओ") || cmd.includes("सुनाए") || cmd.includes("बोलकर बताओ") || cmd.includes("बताओ क्या है");
     if (isReadCommand) {
         let vocalReply = "";
@@ -526,14 +610,12 @@ function processShreeCommand(commandText) {
         const formatCur = v => '₹' + Math.round(v).toLocaleString('en-IN');
         const formatCurVocal = v => Math.round(v) + ' रुपये';
 
-        // Check if specific section is mentioned
         const mentionsExpense = cmd.includes("expense") || cmd.includes("kharch") || cmd.includes("खर्च") || cmd.includes("भुगतान") || cmd.includes("एक्सपेंस") || cmd.includes("एक्सपेंसेस");
         const mentionsClient = cmd.includes("client") || cmd.includes("grahak") || cmd.includes("ग्राहक") || cmd.includes("क्लाइंट") || cmd.includes("पेमेंट") || cmd.includes("आमदनी") || cmd.includes("income");
         const mentionsDashboard = cmd.includes("dashboard") || cmd.includes("home") || cmd.includes("मुख्य पेज") || cmd.includes("होम") || cmd.includes("डैशबोर्ड") || cmd.includes("बैलेंस") || cmd.includes("balance") || cmd.includes("पैसे") || cmd.includes("पैसा");
 
         if (mentionsExpense) {
-            // Read Expenses list
-            const recentTxs = state.transactions.slice().reverse().slice(0, 5); // last 5
+            const recentTxs = state.transactions.slice().reverse().slice(0, 5);
             vocalReply = "Haal hi ke kharche hain: ";
             textReply = "<strong>Recent Expenses Summary:</strong><br>";
             if (recentTxs.length > 0) {
@@ -548,7 +630,6 @@ function processShreeCommand(commandText) {
                 textReply += "No expenses logged yet.";
             }
         } else if (mentionsClient) {
-            // Read Clients list
             const totalClients = state.clients.length;
             vocalReply = `Aapke total ${totalClients} client hain. `;
             textReply = `<strong>Client Page Summary:</strong><br>👥 Total Clients: <strong>${totalClients}</strong><br>`;
@@ -561,12 +642,10 @@ function processShreeCommand(commandText) {
                 });
             }
         } else if (mentionsDashboard) {
-            // Read Dashboard
             const stats = getGlobalStats();
             vocalReply = `Aapka cash balance ${formatCurVocal(stats.cashBalance)} hai, bank balance ${formatCurVocal(stats.bankBalance)} hai, aur total kharche ${formatCurVocal(stats.periodExpenses)} hain.`;
             textReply = `<strong>Dashboard Summary:</strong><br>💵 Cash Balance: <strong>${formatCur(stats.cashBalance)}</strong><br>🏦 Bank Balance: <strong>${formatCur(stats.bankBalance)}</strong><br>📉 Period Expenses: <strong>${formatCur(stats.periodExpenses)}</strong>`;
         } else {
-            // Read based on active page
             const activePage = state.activePage || 'dashboard';
             if (activePage === 'dashboard') {
                 const stats = getGlobalStats();
@@ -585,7 +664,7 @@ function processShreeCommand(commandText) {
                     });
                 }
             } else if (activePage === 'expenses') {
-                const recentTxs = state.transactions.slice().reverse().slice(0, 5); // last 5
+                const recentTxs = state.transactions.slice().reverse().slice(0, 5);
                 vocalReply = "Expenses page par haal hi ke kharche hain: ";
                 textReply = "<strong>Recent Expenses Summary:</strong><br>";
                 if (recentTxs.length > 0) {
@@ -599,12 +678,6 @@ function processShreeCommand(commandText) {
                     vocalReply = "Abhi koi kharcha darj nahi kiya gaya hai.";
                     textReply += "No expenses logged yet.";
                 }
-            } else if (activePage === 'reports') {
-                vocalReply = "Reports page par aap alag-alag ledgers aur statements check kar sakte hain.";
-                textReply = "<strong>Reports Summary:</strong><br>You can check client ledgers and financial reports on this page.";
-            } else if (activePage === 'master') {
-                vocalReply = "Master settings page par aap configuration aur settings settings check kar sakte hain.";
-                textReply = "<strong>Master Settings Summary:</strong><br>Manage accounts, budgets, and configurations here.";
             } else {
                 vocalReply = "Main page ke content ko read kar sakti hoon. Kripya page open karein.";
                 textReply = "I can read page content when you navigate to a specific page.";
@@ -652,7 +725,7 @@ function processShreeCommand(commandText) {
         return;
     }
 
-    // 3. PAGE NAVIGATION (Moved down to prevent intercepting specific actions)
+    // 3. PAGE NAVIGATION
     const navMatch = matchNavigation(cmd);
     if (navMatch) {
         navigateToPage(navMatch.page);
@@ -662,50 +735,10 @@ function processShreeCommand(commandText) {
         return;
     }
 
-    // Default Fallback - Call Gemini API if Key is present, otherwise show default local help
-    if (typeof state !== 'undefined' && state.geminiApiKey) {
-        setShreeStatus("सोच रही हूँ...");
-        callGeminiAI(commandText)
-            .then(reply => {
-                setShreeStatus("Idle");
-                let resObj = null;
-                try {
-                    let jsonText = reply.trim();
-                    const startIdx = jsonText.indexOf('{');
-                    const endIdx = jsonText.lastIndexOf('}');
-                    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-                        jsonText = jsonText.slice(startIdx, endIdx + 1);
-                    }
-                    resObj = JSON.parse(jsonText);
-                } catch (e) {
-                    console.error("Gemini response is not valid JSON:", e, reply);
-                    resObj = {
-                        speech: reply,
-                        action: null,
-                        params: {}
-                    };
-                }
-
-                const speech = resObj.speech || reply;
-                addMessageToShreeChat("shree", speech);
-                speakShreeText(speech);
-
-                if (resObj.action) {
-                    executeAgentAction(resObj.action, resObj.params);
-                }
-            })
-            .catch(err => {
-                console.error("Gemini API error:", err);
-                setShreeStatus("त्रुटि");
-                const defaultReply = `माफ़ कीजिये, सर्वर से संपर्क नहीं हो पाया। (त्रुटि: ${err.message})`;
-                addMessageToShreeChat("shree", defaultReply);
-                speakShreeText("माफ़ कीजिये, सर्वर से संपर्क नहीं हो पाया।");
-            });
-    } else {
-        const defaultReply = "माफ़ कीजिये, मैं यह काम सीधे नहीं कर सकती। यदि आप खर्च जोड़ना या नया ग्राहक बनाना चाहते हैं, तो कृपया वॉइस कमांड का उपयोग करें (जैसे: 'श्री जय हरी, 100 रुपये खर्च चाय के लिए')। सामान्य बातचीत के लिए मास्टर सेटिंग्स में ए आई की चाबी दर्ज करें।";
-        addMessageToShreeChat("shree", defaultReply);
-        speakShreeText("माफ़ कीजिये, मैं यह काम सीधे नहीं कर सकती हूँ।");
-    }
+    // Default Fallback
+    const defaultReply = "माफ़ कीजिये, मैं यह काम सीधे नहीं कर सकती। यदि आप खर्च जोड़ना या नया ग्राहक बनाना चाहते हैं, तो कृपया वॉइस कमांड का उपयोग करें (जैसे: 'श्री जय हरी, 100 रुपये खर्च चाय के लिए')। सामान्य बातचीत के लिए मास्टर सेटिंग्स में ए आई की चाबी दर्ज करें।";
+    addMessageToShreeChat("shree", defaultReply);
+    speakShreeText("माफ़ कीजिये, मैं यह काम सीधे नहीं कर सकती हूँ।");
 }
 
 // Global cache for discovered Gemini model configuration to prevent repeating discovery
@@ -759,13 +792,36 @@ Current App State:
     const requestBody = {
         contents: [{
             parts: [{
-                text: `${systemInstruction}\n\nUser Question: ${userPrompt}\nShree Response:`
+                text: `${systemInstruction}\n\nUser Question: ${userPrompt}`
             }]
         }],
         generationConfig: {
-            maxOutputTokens: 350,
+            maxOutputTokens: 450,
             temperature: 0.2,
-            responseMimeType: "application/json"
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: "OBJECT",
+                properties: {
+                    speech: { type: "STRING" },
+                    action: { type: "STRING" },
+                    params: {
+                        type: "OBJECT",
+                        properties: {
+                            pageId: { type: "STRING" },
+                            name: { type: "STRING" },
+                            monthlyPay: { type: "NUMBER" },
+                            amount: { type: "NUMBER" },
+                            category: { type: "STRING" },
+                            description: { type: "STRING" },
+                            clientName: { type: "STRING" },
+                            date: { type: "STRING" },
+                            mode: { type: "STRING" },
+                            commitMessage: { type: "STRING" }
+                        }
+                    }
+                },
+                required: ["speech"]
+            }
         }
     };
 
@@ -1191,6 +1247,8 @@ function handleCreateClient(clientData) {
         monthlyPay: clientData.monthlyPay
     };
     addClientDirect(newClient);
+    if (typeof renderMasterClients === 'function') renderMasterClients();
+    if (typeof renderClientsPage === 'function') renderClientsPage();
     return `ग्राहक ${newClient.name} को ₹${clientData.monthlyPay.toLocaleString('en-IN')} के मासिक रिटेनर के साथ जोड़ दिया गया है।`;
 }
 
@@ -1225,6 +1283,8 @@ function handleLogIncome(incomeData) {
         mode: incomeData.account.name
     };
     addIncomeDirect(newIncome);
+    if (typeof renderDashboard === 'function') renderDashboard();
+    if (typeof renderClientsPage === 'function') renderClientsPage();
     return `${incomeData.client.name} से प्राप्त ₹${incomeData.amount.toLocaleString('en-IN')} को ${incomeData.account.name} में जमा कर दिया गया है।`;
 }
 
@@ -1342,6 +1402,8 @@ function handleLogExpense(expenseData) {
         clientId: expenseData.client ? expenseData.client.id : ""
     };
     addExpenseDirect(newExpense);
+    if (typeof renderDashboard === 'function') renderDashboard();
+    if (typeof renderExpensesPage === 'function') renderExpensesPage();
     return `${expenseData.account.name} से ${expenseData.description} (${expenseData.category}) के लिए ₹${expenseData.amount.toLocaleString('en-IN')} का खर्च दर्ज कर दिया गया है।`;
 }
 
@@ -1393,10 +1455,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Voice response mute/unmute
-    const voiceToggle = document.getElementById('btn-shree-voice-toggle');
-    if (voiceToggle) {
-        voiceToggle.addEventListener('click', toggleShreeVoiceOutput);
+    // Voice response mute/unmute (Headphone Toggle removed)
+
+    // Microphone toggle button (Mic Toggle)
+    const micToggleBtn = document.getElementById('btn-shree-mic-toggle');
+    if (micToggleBtn) {
+        micToggleBtn.addEventListener('click', toggleShreeListening);
     }
 
     // Mic button trigger
