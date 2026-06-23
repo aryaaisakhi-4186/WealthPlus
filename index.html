@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wealth Plus — Bookkeeping & AI Assistant</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS CDN for Excel Export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="light-theme">
+
+    <!-- ==========================================
+         SECURE MEMBER LOGIN SCREEN OVERLAY
+         ========================================== -->
+    <div id="login-screen" class="login-overlay">
+        <div class="login-box">
+            <div class="login-logo">
+                <div class="logo-icon"><i data-lucide="lock"></i></div>
+                <h3>Wealth Plus</h3>
+                <p>Secure Bookkeeping Portal</p>
+            </div>
+            <form id="form-login" class="login-form">
+                <div class="form-group">
+                    <label for="login-mobile">Registered Mobile Number *</label>
+                    <input type="text" id="login-mobile" required placeholder="e.g. 9999999999" maxlength="10" pattern="\d{10}" inputmode="numeric">
+                </div>
+                <div class="form-group">
+                    <label for="login-pin">4-Digit Security PIN *</label>
+                    <input type="password" id="login-pin" required placeholder="&bull; &bull; &bull; &bull;" maxlength="4" pattern="\d{4}" inputmode="numeric">
+                </div>
+                <div id="login-error-msg" class="login-error-text" style="display: none;">Invalid credentials or member not registered.</div>
+                <button type="submit" class="btn btn-primary btn-block" style="width:100%; margin-top:10px;">Verify & Log In</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div class="app-container">
+        <!-- Sidebar Navigation (Laptop/Desktop) -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon">
+                    <i data-lucide="wallet"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>Wealth Plus</h1>
+                    <span>Bookkeeping & Billing</span>
+                </div>
+            </div>
+            <nav class="sidebar-menu">
+                <a href="#" class="menu-item active" data-page="dashboard" id="nav-dashboard">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="menu-item" data-page="clients" id="nav-clients">
+                    <i data-lucide="users"></i>
+                    <span>Clients & Income</span>
+                </a>
+                <a href="#" class="menu-item" data-page="expenses" id="nav-expenses">
+                    <i data-lucide="arrow-up-right"></i>
+                    <span>Expenses</span>
+                </a>
+                <a href="#" class="menu-item" data-page="reports" id="nav-reports">
+                    <i data-lucide="file-bar-chart"></i>
+                    <span>Reports & Ledgers</span>
+                </a>
+                <a href="#" class="menu-item" data-page="master" id="nav-master">
+                    <i data-lucide="settings"></i>
+                    <span>Master Settings</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <p>&copy; 2026 Wealth Plus</p>
+                <p>v3.5 (Shree AI & Logins)</p>
+            </div>
+        </aside>
+
+        <!-- Main Workspace Area -->
+        <main class="main-content">
+            <!-- Global Top Bar with Period Filter -->
+            <header class="top-bar">
+                <div class="welcome-text" style="display:flex; flex-direction:column; gap:4px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <h2 id="page-title" style="margin:0;">Dashboard Overview</h2>
+                        <span id="current-user-badge" style="font-size:11px; padding:3px 8px; background:var(--primary-glow); color:var(--primary); font-weight:600; border-radius:4px; display:inline-flex; align-items:center;"></span>
+                        <button id="btn-logout" class="btn btn-outline" style="padding:4px 8px; font-size:10px; height:auto; display:inline-flex; align-items:center; gap:4px;"><i data-lucide="log-out" style="width:11px; height:11px;"></i> Log Out</button>
+                    </div>
+                    <p id="current-date-display" style="margin:0; font-size:12px;">Active Period: Calculating...</p>
+                </div>
+                <div class="period-filter-container">
+                    <div class="filter-wrapper">
+                        <i data-lucide="calendar" class="calendar-icon"></i>
+                        <select id="period-selector" class="select-filter">
+                            <option value="financial-year" selected>This Financial Year (Apr 1 - Mar 31)</option>
+                            <option value="this-month">This Month</option>
+                            <option value="this-quarter">This Quarter</option>
+                            <option value="custom">Custom Period</option>
+                        </select>
+                    </div>
+                    <div id="custom-date-inputs" class="custom-date-inputs" style="display: none;">
+                        <input type="date" id="custom-start-date" class="date-input" title="Start Date">
+                        <span>to</span>
+                        <input type="date" id="custom-end-date" class="date-input" title="End Date">
+                    </div>
+                </div>
+            </header>
+
+            <!-- Pages Wrapper -->
+            <div class="page-content">
+
+                <!-- 1. DASHBOARD PAGE -->
+                <section id="page-dashboard" class="app-page active">
+                    <!-- Stats Grid -->
+                    <div class="stats-grid">
+                        <div class="stat-card" id="card-cash-balance">
+                            <div class="stat-icon cash-bg">
+                                <i data-lucide="coins"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Total Cash Balance</h3>
+                                <span class="amount" id="stat-cash-balance">₹0</span>
+                                <span class="helper-text">Click to view Cash Ledgers</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" id="card-bank-balance">
+                            <div class="stat-icon bank-bg">
+                                <i data-lucide="landmark"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Total Bank Balance</h3>
+                                <span class="amount" id="stat-bank-balance">₹0</span>
+                                <span class="helper-text">Click to view Bank Ledgers</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" id="card-period-expenses">
+                            <div class="stat-icon expense-bg">
+                                <i data-lucide="trending-up"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Period Expenses</h3>
+                                <span class="amount" id="stat-period-expenses">₹0</span>
+                                <span class="helper-text">Click to view Expenses</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dashboard Core Layout Grid -->
+                    <div class="dashboard-core-grid">
+                        <!-- Left Panel (Charts and Recent) -->
+                        <div class="dashboard-left-panel">
+                            <!-- Accounts Balances Overview -->
+                            <div class="dashboard-box" style="margin-bottom: 20px;">
+                                <div class="box-header">
+                                    <h4>Account Book Balances</h4>
+                                </div>
+                                <div class="account-balances-summary-grid" id="dash-account-balances-grid">
+                                    <!-- Populated dynamically -->
+                                </div>
+                            </div>
+
+                            <div class="charts-grid">
+                                <div class="chart-card main-chart">
+                                    <div class="card-header">
+                                        <h4>Expense Trend</h4>
+                                    </div>
+                                    <div class="chart-wrapper">
+                                        <canvas id="trendChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="chart-card mini-chart">
+                                    <div class="card-header">
+                                        <h4>Category Share</h4>
+                                    </div>
+                                    <div class="chart-wrapper">
+                                        <canvas id="categoryChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="recent-box" style="margin-top: 20px;">
+                                <div class="box-header">
+                                    <h4>Recent Transactions</h4>
+                                    <button class="btn btn-sm btn-outline-primary" id="dash-view-all-tx">View All</button>
+                                </div>
+                                <div class="recent-list" id="dashboard-recent-transactions">
+                                    <!-- Rendered dynamically -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel (Yearly Budget Progress) -->
+                        <div class="dashboard-right-panel">
+                            <div class="budget-box">
+                                <div class="box-header">
+                                    <h4>Yearly Budget Progress</h4>
+                                    <span class="sub-header-text">April 1st to March 31st</span>
+                                </div>
+                                <div class="budget-totals-overall" id="dash-budget-overall-stats">
+                                    <!-- Overall budget statistics -->
+                                </div>
+                                <hr class="divider">
+                                <div class="category-budget-progress-list" id="dash-budget-category-list">
+                                    <!-- Generated dynamically -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. CLIENTS & INCOME PAGE -->
+                <section id="page-clients" class="app-page">
+                    <div class="section-actions-header">
+                        <h3>Clients Directory</h3>
+                        <button class="btn btn-primary" id="btn-add-client">
+                            <i data-lucide="user-plus"></i> Add Client
+                        </button>
+                    </div>
+
+                    <!-- Clients Grid -->
+                    <div class="clients-grid" id="clients-list-container">
+                        <!-- Rendered dynamically -->
+                    </div>
+
+                    <hr class="section-divider">
+
+                    <div class="section-actions-header">
+                        <h3>Received Amount Logs</h3>
+                        <button class="btn btn-success" id="btn-log-income">
+                            <i data-lucide="plus-circle"></i> Log Received Amount
+                        </button>
+                    </div>
+
+                    <!-- Received Amount List -->
+                    <div class="table-container">
+                        <table class="data-table" id="table-income-logs">
+                            <thead>
+                                <tr id="income-table-headers">
+                                    <th>Client Name</th>
+                                    <th>Received Date</th>
+                                    <th>Destination Account</th>
+                                    <th>Amount</th>
+                                    <!-- Custom columns injected here -->
+                                    <th class="actions-col">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="income-logs-tbody">
+                                <!-- Rendered dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 3. EXPENSES PAGE -->
+                <section id="page-expenses" class="app-page">
+                    <div class="section-actions-header">
+                        <h3>Wealth Plus Entries</h3>
+                        <button class="btn btn-primary" id="btn-add-expense">
+                            <i data-lucide="plus"></i> Add Expense
+                        </button>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table" id="table-expenses">
+                            <thead>
+                                <tr id="expense-table-headers">
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Category</th>
+                                    <th>Paid From Account</th>
+                                    <th>Fund Source Client</th>
+                                    <th>Amount</th>
+                                    <!-- Custom columns injected here -->
+                                    <th class="actions-col">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expenses-tbody">
+                                <!-- Rendered dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 4. REPORTS & LEDGERS PAGE -->
+                <section id="page-reports" class="app-page">
+                    <div class="reports-header-bar">
+                        <div class="reports-nav-tabs">
+                            <button class="report-tab active" data-report-type="client">Client Reports</button>
+                            <button class="report-tab" data-report-type="ledger">Account Ledgers</button>
+                            <button class="report-tab" data-report-type="budget">Budget Analysis</button>
+                        </div>
+                        <button class="btn btn-success" id="btn-export-excel">
+                            <i data-lucide="download"></i> Export Excel Report
+                        </button>
+                    </div>
+
+                    <!-- Report Content Screens -->
+                    <div class="report-content-panel">
+                        <!-- Client Report Content -->
+                        <div id="report-screen-client" class="report-sub-screen active">
+                            <div class="report-filter-bar">
+                                <label for="report-client-select">Select Client:</label>
+                                <select id="report-client-select" class="select-filter select-wide">
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+
+                            <div class="report-summary-cards" id="client-report-stats-grid">
+                                <!-- Rendered dynamically -->
+                            </div>
+
+                            <div class="report-details-grid">
+                                <div class="report-chart-box">
+                                    <h5>Expenditure Allocation</h5>
+                                    <div class="category-progress-list" id="client-category-progress">
+                                        <!-- Progress bars generated dynamically -->
+                                    </div>
+                                </div>
+                                <div class="report-table-box">
+                                    <h5>Allocated Expenses</h5>
+                                    <div class="table-container-mini">
+                                        <table class="data-table-mini">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Description</th>
+                                                    <th>Category</th>
+                                                    <th>Paid From</th>
+                                                    <th>Amount</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="client-expenses-tbody">
+                                                <!-- Dynamic rows -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dynamic Account Ledger Screen -->
+                        <div id="report-screen-ledger" class="report-sub-screen">
+                            <div class="report-filter-bar">
+                                <label for="ledger-account-select">Select Account Book:</label>
+                                <select id="ledger-account-select" class="select-filter select-wide">
+                                    <!-- Populated dynamically with accounts -->
+                                </select>
+                                <div class="ledger-summary-badge" style="margin-left: auto;">
+                                    Closing Balance: <strong id="selected-ledger-closing-balance">₹0.00</strong>
+                                </div>
+                            </div>
+                            <div class="table-container">
+                                <table class="data-table ledger-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Particulars / Description</th>
+                                            <th>Category / Account</th>
+                                            <th class="text-right">Debit (Inflow)</th>
+                                            <th class="text-right">Credit (Outflow)</th>
+                                            <th class="text-right">Running Balance</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="account-ledger-tbody">
+                                        <!-- Rendered dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Budget Analysis Screen -->
+                        <div id="report-screen-budget" class="report-sub-screen">
+                            <div class="ledger-header">
+                                <h4>Budget Analysis Report</h4>
+                                <span class="sub-header-text">Filtered by Selected Period</span>
+                            </div>
+                            <div class="table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Category Name</th>
+                                            <th class="text-right">Monthly Budget</th>
+                                            <th class="text-right">Yearly Budget</th>
+                                            <th class="text-right">Actual Spent</th>
+                                            <th class="text-right">Remaining (Savings)</th>
+                                            <th class="text-right">Overspent (Extra Kharch)</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="budget-analysis-tbody">
+                                        <!-- Rendered dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 5. MASTER SETTINGS PAGE -->
+                <section id="page-master" class="app-page">
+                    <div class="master-tabs-header">
+                        <button class="master-tab active" data-master-sub="accounts">Accounts Master</button>
+                        <button class="master-tab" data-master-sub="clients-config">Clients Configuration</button>
+                        <button class="master-tab" data-master-sub="budgets">Category Budgets</button>
+                        <button class="master-tab" data-master-sub="columns">Custom Columns</button>
+                        <button class="master-tab" data-master-sub="members" id="tab-master-members">Member Directory</button>
+                        <button class="master-tab" data-master-sub="cloud-sync" id="tab-master-cloud-sync">Cloud Sync (Firebase)</button>
+                    </div>
+
+                    <div class="master-content-panel">
+                        <!-- Panel A: Accounts Master -->
+                        <div id="master-panel-accounts" class="master-sub-panel active">
+                            <div class="panel-action-header">
+                                <h4>Cash & Bank Accounts Setup</h4>
+                                <button class="btn btn-primary btn-sm" id="btn-master-add-account">
+                                    <i data-lucide="plus"></i> Add Account
+                                </button>
+                            </div>
+                            <div class="table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Account Name</th>
+                                            <th>Account Type</th>
+                                            <th>Cumulative Balance</th>
+                                            <th class="actions-col">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="master-accounts-tbody">
+                                        <!-- Rendered dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Panel B: Clients Setup -->
+                        <div id="master-panel-clients-config" class="master-sub-panel">
+                            <div class="panel-action-header">
+                                <h4>Clients Settings</h4>
+                            </div>
+                            <div class="table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Client Name</th>
+                                            <th>Monthly Retainer</th>
+                                            <th>Yearly Retainer</th>
+                                            <th class="actions-col">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="master-clients-tbody">
+                                        <!-- Rendered dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Panel C: Budgets Setup -->
+                        <div id="master-panel-budgets" class="master-sub-panel">
+                            <div class="panel-action-header">
+                                <h4>Category Budgets Editor</h4>
+                                <p style="font-size:12px; color:var(--text-secondary);">Set expected Monthly budgets. Dashboard multiplies values by 12 for Yearly analysis.</p>
+                            </div>
+                            <div class="budgets-editor-form-box">
+                                <form id="form-category-budgets" class="inline-grid-form">
+                                    <div class="budgets-inputs-grid" id="budget-inputs-container">
+                                        <!-- Category budget inputs rendered dynamically -->
+                                    </div>
+                                    <div style="margin-top:20px; display:flex; justify-content:flex-end;">
+                                        <button type="submit" class="btn btn-primary">Save Category Budgets</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Panel D: Custom Columns Setup -->
+                        <div id="master-panel-columns" class="master-sub-panel">
+                            <div class="custom-fields-settings-grid">
+                                <div class="fields-box">
+                                    <div class="panel-action-header">
+                                        <h5>Client Fields</h5>
+                                        <button class="btn btn-outline-primary btn-sm" id="btn-add-client-field">
+                                            <i data-lucide="plus"></i> Add Field
+                                        </button>
+                                    </div>
+                                    <div class="fields-list" id="client-custom-fields-list">
+                                        <!-- Dynamic client custom columns list -->
+                                    </div>
+                                </div>
+                                <div class="fields-box">
+                                    <div class="panel-action-header">
+                                        <h5>Transaction Fields</h5>
+                                        <button class="btn btn-outline-primary btn-sm" id="btn-add-tx-field">
+                                            <i data-lucide="plus"></i> Add Field
+                                        </button>
+                                    </div>
+                                    <div class="fields-list" id="tx-custom-fields-list">
+                                        <!-- Dynamic transaction custom columns list -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel E: Members Settings -->
+                        <div id="master-panel-members" class="master-sub-panel">
+                            <div class="panel-action-header">
+                                <h4>Registered Members Directory</h4>
+                                <button class="btn btn-primary btn-sm" id="btn-master-add-member">
+                                    <i data-lucide="user-plus"></i> Add Member
+                                </button>
+                            </div>
+                            <div class="table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Member Name</th>
+                                            <th>Mobile Number</th>
+                                            <th>Security PIN</th>
+                                            <th>Role Profile</th>
+                                            <th class="actions-col">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="master-members-tbody">
+                                        <!-- Rendered dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Panel F: Cloud Sync Settings -->
+                        <div id="master-panel-cloud-sync" class="master-sub-panel">
+                            <div class="panel-action-header">
+                                <h4>Firebase Real-time Cloud Sync</h4>
+                                <p style="font-size:12px; color:var(--text-secondary);">Sync your ledger in real-time between multiple mobile devices and PCs.</p>
+                            </div>
+                            
+                            <div class="cloud-sync-container">
+                                <!-- Status Card -->
+                                <div class="cloud-status-card" id="cloud-status-card">
+                                    <div class="status-icon-wrapper" id="cloud-status-icon">
+                                        <i data-lucide="cloud-off"></i>
+                                    </div>
+                                    <div class="status-info">
+                                        <h5 id="cloud-status-title">Cloud Sync: Disabled</h5>
+                                        <p id="cloud-status-desc">Your ledger data is currently stored locally in this browser. Configure Firebase below to sync across devices.</p>
+                                    </div>
+                                </div>
+
+                                <!-- Action Buttons if active -->
+                                <div id="cloud-active-actions" style="display: none; margin-bottom: 20px; gap: 10px;">
+                                    <button class="btn btn-outline" id="btn-cloud-upload-data" type="button">
+                                        <i data-lucide="upload-cloud"></i> Push Local Data to Cloud
+                                    </button>
+                                    <button class="btn btn-danger" id="btn-cloud-disable" type="button">
+                                        <i data-lucide="cloud-off"></i> Disable Cloud Sync
+                                    </button>
+                                </div>
+
+                                <!-- Config Form -->
+                                <div class="card" style="padding: 20px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
+                                    <h5 style="margin-top: 0; margin-bottom: 15px;">Firebase Web App Configuration</h5>
+                                    <form id="form-cloud-config">
+                                        <div class="form-group" style="margin-bottom: 15px;">
+                                            <label for="cloud-api-key" style="display:block; margin-bottom:6px; font-size:12px; font-weight:600;">API Key *</label>
+                                            <input type="text" id="cloud-api-key" required placeholder="AIzaSy..." style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border-color);">
+                                        </div>
+                                        <div class="form-group-row" style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom: 15px;">
+                                            <div class="form-group">
+                                                <label for="cloud-auth-domain" style="display:block; margin-bottom:6px; font-size:12px; font-weight:600;">Auth Domain *</label>
+                                                <input type="text" id="cloud-auth-domain" required placeholder="your-project.firebaseapp.com" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border-color);">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="cloud-project-id" style="display:block; margin-bottom:6px; font-size:12px; font-weight:600;">Project ID *</label>
+                                                <input type="text" id="cloud-project-id" required placeholder="your-project-id" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border-color);">
+                                            </div>
+                                        </div>
+                                        <div class="form-group-row" style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom: 15px;">
+                                            <div class="form-group">
+                                                <label for="cloud-storage-bucket" style="display:block; margin-bottom:6px; font-size:12px; font-weight:600;">Storage Bucket *</label>
+                                                <input type="text" id="cloud-storage-bucket" required placeholder="your-project.appspot.com" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border-color);">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="cloud-messaging-sender-id" style="display:block; margin-bottom:6px; font-size:12px; font-weight:600;">Messaging Sender ID *</label>
+                                                <input type="text" id="cloud-messaging-sender-id" required placeholder="1234567890" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border-color);">
+                                            </div>
+                                        </div>
+                                        <div class="form-group" style="margin-bottom: 15px;">
+                                            <label for="cloud-app-id" style="display:block; margin-bottom:6px; font-size:12px; font-weight:600;">App ID *</label>
+                                            <input type="text" id="cloud-app-id" required placeholder="1:1234567890:web:abcdef..." style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border-color);">
+                                        </div>
+                                        
+                                        <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+                                            <button type="submit" class="btn btn-primary" id="btn-cloud-save">Enable & Sync Cloud</button>
+                                        </div>
+                                    </form>
+                                </div>
+
+                                <!-- Gemini AI API Config Form -->
+                                <div class="card" style="padding: 20px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color); margin-top: 20px;">
+                                    <h5 style="margin-top: 0; margin-bottom: 5px;">Gemini AI API Settings (Optional)</h5>
+                                    <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 15px;">Enter your Gemini API Key to enable general knowledge chat & smart Hinglish conversations with Shree AI.</p>
+                                    <form id="form-gemini-config">
+                                        <div class="form-group" style="margin-bottom: 15px;">
+                                            <label for="gemini-api-key" style="display:block; margin-bottom:6px; font-size:12px; font-weight:600;">Gemini API Key</label>
+                                            <input type="password" id="gemini-api-key" placeholder="Enter Gemini API Key..." style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
+                                        </div>
+                                        <div style="display: flex; justify-content: flex-end;">
+                                            <button type="submit" class="btn btn-primary" id="btn-gemini-save">Save AI Key</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+
+        <!-- Bottom Mobile Menu (Phones/Tablets) -->
+        <nav class="bottom-nav">
+            <a href="#" class="bottom-nav-item active" data-page="dashboard">
+                <i data-lucide="layout-dashboard"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-page="clients">
+                <i data-lucide="users"></i>
+                <span>Clients</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-page="expenses">
+                <i data-lucide="arrow-up-right"></i>
+                <span>Expenses</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-page="reports">
+                <i data-lucide="file-bar-chart"></i>
+                <span>Reports</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-page="master">
+                <i data-lucide="settings"></i>
+                <span>Master</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- ==========================================
+         OVERLAY MODALS
+         ========================================== -->
+
+    <!-- Modal 1: Add/Edit Client -->
+    <div id="modal-client" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h4 id="modal-client-title">Add New Client</h4>
+                <button class="btn-close-modal" id="btn-close-client-modal"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-client" class="modal-form">
+                <input type="hidden" id="edit-client-id">
+                <div class="form-group">
+                    <label for="client-name">Client Name *</label>
+                    <input type="text" id="client-name" required placeholder="e.g. Acme Corporation">
+                </div>
+                <div class="form-group">
+                    <label for="client-monthly-pay">Monthly Receivable (INR) *</label>
+                    <input type="number" id="client-monthly-pay" required min="0" placeholder="e.g. 25000">
+                    <span class="field-helper-text" id="yearly-calculation-preview">Yearly Total: ₹0.00</span>
+                </div>
+                <!-- Dynamic client custom fields container -->
+                <div id="client-modal-custom-fields-container"></div>
+                
+                <div class="modal-footer-actions">
+                    <button type="button" class="btn btn-outline" id="btn-cancel-client">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Client</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 2: Log/Edit Received Amount -->
+    <div id="modal-income" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h4 id="modal-income-title">Log Received Amount</h4>
+                <button class="btn-close-modal" id="btn-close-income-modal"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-income" class="modal-form">
+                <input type="hidden" id="edit-income-id">
+                <div class="form-group">
+                    <label for="income-client-select">Select Client *</label>
+                    <select id="income-client-select" required>
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="income-amount">Amount Received (INR) *</label>
+                    <input type="number" id="income-amount" required min="1" placeholder="e.g. 50000">
+                </div>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="income-date">Received Date *</label>
+                        <input type="date" id="income-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="income-account-select">Destination Account *</label>
+                        <select id="income-account-select" required>
+                            <!-- Populated dynamically with dynamic accounts -->
+                        </select>
+                    </div>
+                </div>
+                <!-- Dynamic income custom fields container -->
+                <div id="income-modal-custom-fields-container"></div>
+                
+                <div class="modal-footer-actions">
+                    <button type="button" class="btn btn-outline" id="btn-cancel-income">Cancel</button>
+                    <button type="submit" class="btn btn-success">Save Transaction</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 3: Add/Edit Expense -->
+    <div id="modal-expense" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h4 id="modal-expense-title">Add Expense Entry</h4>
+                <button class="btn-close-modal" id="btn-close-expense-modal"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-expense" class="modal-form">
+                <input type="hidden" id="edit-expense-id">
+                <div class="form-group">
+                    <label for="expense-description">Description *</label>
+                    <input type="text" id="expense-description" required placeholder="e.g. Server hosting fee">
+                </div>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="expense-category">Category *</label>
+                        <select id="expense-category" required>
+                            <option value="Food">Food</option>
+                            <option value="Shopping">Shopping</option>
+                            <option value="Bills">Bills</option>
+                            <option value="Transport">Transport</option>
+                            <option value="Rent">Rent</option>
+                            <option value="Others">Others</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="expense-amount">Amount (INR) *</label>
+                        <input type="number" id="expense-amount" required min="1" placeholder="e.g. 4500">
+                    </div>
+                </div>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="expense-date">Expense Date *</label>
+                        <input type="date" id="expense-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="expense-account-select">Paid From Account *</label>
+                        <select id="expense-account-select" required>
+                            <!-- Populated dynamically with dynamic accounts -->
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="expense-client-source">Allocate to Client Fund (Optional)</label>
+                    <select id="expense-client-source">
+                        <option value="">None / General Expense</option>
+                        <!-- Populated dynamically -->
+                    </select>
+                    <span class="field-helper-text">Select client whose revenue funded this expense.</span>
+                </div>
+                <!-- Dynamic expense custom fields container -->
+                <div id="expense-modal-custom-fields-container"></div>
+                
+                <div class="modal-footer-actions">
+                    <button type="button" class="btn btn-outline" id="btn-cancel-expense">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Expense</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 4: Add Account (Master Page) -->
+    <div id="modal-account" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h4 id="modal-account-title">Add New Account Book</h4>
+                <button class="btn-close-modal" id="btn-close-account-modal"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-account" class="modal-form">
+                <input type="hidden" id="edit-account-id">
+                <div class="form-group">
+                    <label for="account-name">Account Name *</label>
+                    <input type="text" id="account-name" required placeholder="e.g. SBI Savings Bank">
+                </div>
+                <div class="form-group">
+                    <label for="account-type">Account Type *</label>
+                    <select id="account-type" required>
+                        <option value="Bank">Bank Account (UPI / NetBanking / Cards)</option>
+                        <option value="Cash">Cash Book (Physical Cash-in-hand)</option>
+                    </select>
+                </div>
+                <div class="modal-footer-actions">
+                    <button type="button" class="btn btn-outline" id="btn-cancel-account">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 5: Add Custom Column Field -->
+    <div id="modal-field" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h4 id="modal-field-title">Add Custom Column</h4>
+                <button class="btn-close-modal" id="btn-close-field-modal"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-field" class="modal-form">
+                <input type="hidden" id="field-scope"> <!-- 'client' or 'transaction' -->
+                <div class="form-group">
+                    <label for="field-name">Column Header Name *</label>
+                    <input type="text" id="field-name" required placeholder="e.g. GSTIN or Invoice No">
+                </div>
+                <div class="form-group">
+                    <label for="field-type">Data Type *</label>
+                    <select id="field-type" required>
+                        <option value="text">Short Text / Value</option>
+                        <option value="number">Numeric Value</option>
+                        <option value="date">Calendar Date</option>
+                    </select>
+                </div>
+                <div class="modal-footer-actions">
+                    <button type="button" class="btn btn-outline" id="btn-cancel-field">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Column</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 6: Add Member (Master Page) -->
+    <div id="modal-member" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h4 id="modal-member-title">Add Registered Member</h4>
+                <button class="btn-close-modal" id="btn-close-member-modal"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-member" class="modal-form">
+                <input type="hidden" id="edit-member-id">
+                <div class="form-group">
+                    <label for="member-name">Full Name *</label>
+                    <input type="text" id="member-name" required placeholder="e.g. Ramesh Kumar">
+                </div>
+                <div class="form-group">
+                    <label for="member-mobile">Mobile Number *</label>
+                    <input type="text" id="member-mobile" required placeholder="e.g. 9876543210" maxlength="10" pattern="\d{10}" inputmode="numeric">
+                </div>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="member-pin">4-Digit Security PIN *</label>
+                        <input type="text" id="member-pin" required placeholder="e.g. 5678" maxlength="4" pattern="\d{4}" inputmode="numeric">
+                    </div>
+                    <div class="form-group">
+                        <label for="member-role">Access Role *</label>
+                        <select id="member-role" required>
+                            <option value="Staff">Staff (View/Add logs only)</option>
+                            <option value="Admin">Admin (Full Control)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer-actions">
+                    <button type="button" class="btn btn-outline" id="btn-cancel-member">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Member</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         SHREE AI FEMALE VOICE/TEXT ASSISTANT CHAT WIDGET
+         ========================================== -->
+    <div id="shree-chat-widget" class="shree-widget">
+        <button id="btn-shree-toggle" class="shree-toggle-btn" title="Ask Shree (AI Assistant)">
+            <i data-lucide="message-square"></i>
+            <span class="pulse-indicator"></span>
+        </button>
+        <div id="shree-chat-window" class="shree-chat-window">
+            <div class="shree-header">
+                <div class="shree-header-info">
+                    <div class="shree-avatar">S</div>
+                    <div>
+                        <h4 style="margin:0; font-size:14px;">Shree</h4>
+                        <span id="shree-status-text" style="font-size:10px; color:rgba(255,255,255,0.75);">AI Assistant &bull; Idle</span>
+                    </div>
+                </div>
+                <div class="shree-header-actions">
+                    <button id="btn-shree-voice-toggle" class="btn-shree-action voice-active" title="Mute/Unmute Shree Voice Response">
+                        <i data-lucide="volume-2"></i>
+                    </button>
+                    <button id="btn-shree-close" class="btn-shree-action" title="Minimize Chat">
+                        <i data-lucide="minimize-2"></i>
+                    </button>
+                </div>
+            </div>
+            <!-- Voice selection dropdown bar -->
+            <div class="shree-voice-settings-bar" style="padding: 6px 12px; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                <span style="font-size: 11px; color: var(--text-secondary); font-weight: 500; display: flex; align-items: center; gap: 4px;"><i data-lucide="languages" style="width: 12px; height: 12px;"></i> आवाज़ (Voice):</span>
+                <select id="shree-voice-select" style="font-size: 11px; padding: 2px 6px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary); color: var(--text-primary); max-width: 160px; outline: none; cursor: pointer;">
+                    <option value="AUTO_DETECT">Auto (Sweet Hindi)</option>
+                </select>
+            </div>
+            <div class="shree-messages" id="shree-messages-container">
+                <!-- Welcome Message -->
+                <div class="shree-msg msg-shree">
+                    <p>नमस्ते! मैं श्री हूँ, आपकी AI मुनीम। मैं आपकी आवाज़ सुनकर खर्च दर्ज कर सकती हूँ। बोलकर प्रयास करें: <em>"श्री जय हरि, मिसलेनियस एक्सपेंसेस में 100 रुपये खर्च हुए ऑफिस रिफ्रमेंट के लिए"</em></p>
+                    <span class="msg-time">सक्रिय</span>
+                </div>
+            </div>
+            <div class="shree-footer">
+                <button id="btn-shree-mic" class="btn-mic" title="Speak to Shree (Hindi)">
+                    <i data-lucide="mic"></i>
+                </button>
+                <input type="text" id="shree-text-input" placeholder="कमांड टाइप करें (जैसे श्री जय हरि...)..." autocomplete="off">
+                <button id="btn-shree-send" class="btn-send" title="Send Command">
+                    <i data-lucide="send"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Compat -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <!-- Application Engines -->
+    <script src="app.js"></script>
+    <script src="shree.js"></script>
+</body>
+</html>
