@@ -16,6 +16,9 @@ let state = {
     cloudSyncEnabled: false, // Firebase sync status
     firebaseConfig: null,    // Firebase Config JSON
     geminiApiKey: null,      // Gemini AI API Key
+    githubToken: null,       // GitHub Personal Access Token
+    githubRepo: null,        // GitHub repo path (owner/repo)
+    githubBranch: 'main',    // GitHub branch (defaults to main)
     activePage: 'dashboard',
     activeReportTab: 'client',
     activeMasterTab: 'accounts',
@@ -146,6 +149,9 @@ function runStateMigrations() {
     if (state.cloudSyncEnabled === undefined) { state.cloudSyncEnabled = false; updated = true; }
     if (state.firebaseConfig === undefined) { state.firebaseConfig = null; updated = true; }
     if (state.geminiApiKey === undefined) { state.geminiApiKey = null; updated = true; }
+    if (state.githubToken === undefined) { state.githubToken = null; updated = true; }
+    if (state.githubRepo === undefined) { state.githubRepo = null; updated = true; }
+    if (state.githubBranch === undefined) { state.githubBranch = 'main'; updated = true; }
 
     if (updated) {
         saveState();
@@ -1419,6 +1425,8 @@ function renderMasterSubPanel(tabId) {
         renderMasterMembers();
     } else if (tabId === 'cloud-sync') {
         renderMasterCloudSync();
+    } else if (tabId === 'ai-developer') {
+        renderMasterAIDeveloper();
     }
 }
 
@@ -1461,6 +1469,187 @@ function renderMasterCloudSync() {
     }
     
     lucide.createIcons();
+}
+
+function renderMasterAIDeveloper() {
+    const tokenInput = document.getElementById('github-token');
+    const repoInput = document.getElementById('github-repo');
+    const branchInput = document.getElementById('github-branch');
+
+    if (tokenInput) tokenInput.value = state.githubToken || '';
+    if (repoInput) repoInput.value = state.githubRepo || '';
+    if (branchInput) branchInput.value = state.githubBranch || 'main';
+
+    lucide.createIcons();
+}
+
+function handleGithubConfigSubmit(e) {
+    e.preventDefault();
+    const token = document.getElementById('github-token').value.trim();
+    const repo = document.getElementById('github-repo').value.trim();
+    const branch = document.getElementById('github-branch').value.trim();
+
+    state.githubToken = token || null;
+    state.githubRepo = repo || null;
+    state.githubBranch = branch || 'main';
+    saveState();
+    alert("GitHub configuration saved successfully!");
+}
+
+function logDeployProgress(message, isError = false) {
+    const logDiv = document.getElementById('github-deploy-log');
+    if (!logDiv) return;
+    const time = new Date().toLocaleTimeString();
+    const prefix = isError ? '[ERROR]' : '[INFO]';
+    const color = isError ? 'var(--danger)' : 'var(--text-primary)';
+    const line = `<span style="color: ${color};">[${time}] ${prefix} ${message}</span>\n`;
+    logDiv.innerHTML += line;
+    logDiv.scrollTop = logDiv.scrollHeight;
+}
+
+function utf8ToBase64(str) {
+    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (m, p1) => String.fromCharCode(parseInt(p1, 16))));
+}
+
+async function deployAppToGitHub() {
+    const logBox = document.getElementById('github-deploy-log-box');
+    const logDiv = document.getElementById('github-deploy-log');
+    const deployBtn = document.getElementById('btn-github-deploy-now');
+    
+    if (location.protocol === 'file:') {
+        alert("Cannot deploy when running via file:// protocol. Please start the local python server (python server.py) and open http://localhost:8000/ to deploy files.");
+        return;
+    }
+
+    if (!state.githubToken || !state.githubRepo) {
+        alert("Please save your GitHub Personal Access Token and Repository owner/name settings first.");
+        return;
+    }
+
+    if (logBox) logBox.style.display = 'flex';
+    if (logDiv) logDiv.innerHTML = '';
+    
+    if (deployBtn) {
+        deployBtn.disabled = true;
+        deployBtn.innerHTML = '<span class="spinner" style="margin-right:6px;"></span> Deploying...';
+    }
+
+    logDeployProgress("Starting deployment process...");
+
+    const filesToDeploy = [
+        'index.html',
+        'app.js',
+        'shree.js',
+        'style.css',
+        'server.py',
+        'README.md'
+    ];
+
+    const ownerRepo = state.githubRepo.replace(/^\/|\/$/g, '');
+    const token = state.githubToken;
+    const branch = state.githubBranch || 'main';
+    const userCommitMsg = document.getElementById('github-commit-message').value.trim();
+    const commitMessage = userCommitMsg || `Update via Wealth Plus AI Developer (${new Date().toLocaleString()})`;
+
+    try {
+        for (const filename of filesToDeploy) {
+            logDeployProgress(`Fetching local file: ${filename}...`);
+            let fileContentText = '';
+            try {
+                const localFetch = await fetch(`/${filename}?cb=${Date.now()}`);
+                if (!localFetch.ok) {
+                    throw new Error(`Failed to fetch ${filename} from local server (Status: ${localFetch.status})`);
+                }
+                fileContentText = await localFetch.text();
+            } catch (err) {
+                logDeployProgress(`Local fetch error for ${filename}: ${err.message}`, true);
+                continue;
+            }
+
+            logDeployProgress(`Checking file existence in GitHub repo: ${filename}...`);
+            let currentSha = null;
+            try {
+                const checkUrl = `https://api.github.com/repos/${ownerRepo}/contents/${filename}?ref=${branch}`;
+                const checkResponse = await fetch(checkUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+
+                if (checkResponse.ok) {
+                    const checkData = await checkResponse.json();
+                    currentSha = checkData.sha;
+                    logDeployProgress(`Found existing file on GitHub (SHA: ${currentSha.substring(0, 7)})`);
+                } else if (checkResponse.status === 404) {
+                    logDeployProgress(`File ${filename} does not exist in GitHub yet. Creating new file.`);
+                } else {
+                    const checkErr = await checkResponse.json();
+                    logDeployProgress(`GitHub check failed for ${filename}: ${checkErr.message || checkResponse.statusText}. Attempting creation anyway.`, true);
+                }
+            } catch (err) {
+                logDeployProgress(`Error checking existence of ${filename}: ${err.message}. Attempting creation.`, true);
+            }
+
+            logDeployProgress(`Encoding ${filename} to Base64...`);
+            let base64Content = '';
+            try {
+                base64Content = utf8ToBase64(fileContentText);
+            } catch (err) {
+                logDeployProgress(`Base64 encoding error for ${filename}: ${err.message}`, true);
+                continue;
+            }
+
+            logDeployProgress(`Uploading/Committing ${filename} to GitHub...`);
+            try {
+                const putUrl = `https://api.github.com/repos/${ownerRepo}/contents/${filename}`;
+                const bodyObj = {
+                    message: commitMessage,
+                    content: base64Content,
+                    branch: branch
+                };
+                if (currentSha) {
+                    bodyObj.sha = currentSha;
+                }
+
+                const putResponse = await fetch(putUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(bodyObj)
+                });
+
+                if (putResponse.ok) {
+                    logDeployProgress(`Successfully deployed ${filename}!`, false);
+                } else {
+                    const putErr = await putResponse.json();
+                    throw new Error(putErr.message || `Status: ${putResponse.status}`);
+                }
+            } catch (err) {
+                logDeployProgress(`Upload failed for ${filename}: ${err.message}`, true);
+            }
+        }
+
+        logDeployProgress("Deployment process completed!");
+        if (window.speakShreeText) {
+            speakShreeText("जय हरी! सभी फ़ाइलें गिटहब पर अपलोड कर दी गई हैं।");
+        }
+    } catch (globalErr) {
+        logDeployProgress(`Critical Deployment Failure: ${globalErr.message}`, true);
+        if (window.speakShreeText) {
+            speakShreeText("माफ़ कीजियेगा, गिटहब पर फ़ाइलें अपलोड करने में कोई त्रुटि आई है।");
+        }
+    } finally {
+        if (deployBtn) {
+            deployBtn.disabled = false;
+            deployBtn.innerHTML = '<i data-lucide="upload-cloud"></i> Deploy App Now';
+            lucide.createIcons();
+        }
+    }
 }
 
 function renderMasterAccounts() {
@@ -2392,6 +2581,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const geminiForm = document.getElementById('form-gemini-config');
     if (geminiForm) {
         geminiForm.addEventListener('submit', handleGeminiConfigSubmit);
+    }
+
+    // GitHub Deploy Handlers
+    const githubForm = document.getElementById('form-github-config');
+    if (githubForm) {
+        githubForm.addEventListener('submit', handleGithubConfigSubmit);
+    }
+    const githubDeployBtn = document.getElementById('btn-github-deploy-now');
+    if (githubDeployBtn) {
+        githubDeployBtn.addEventListener('click', deployAppToGitHub);
     }
 
     if (state.currentUser) {
