@@ -2,7 +2,7 @@
    SHREE AI FEMALE BOOKKEEPER ASSISTANT - ENGINE (HINDI)
    ========================================================================== */
 
-let isShreeVoiceEnabled = false; // Voice output is disabled. Shree will remain silent and only output text.
+let isShreeVoiceEnabled = true; // Voice output is enabled by default.
 let recognition = null;
 let isListening = false;
 let selectedVoice = null;
@@ -1410,6 +1410,7 @@ function handleLogExpense(expenseData) {
 // --- DOM REGISTRATIONS ---
 
 document.addEventListener('DOMContentLoaded', () => {
+    initShreeVoices();
     initShreeSpeech();
 
     // Toggle Chat window bubble
