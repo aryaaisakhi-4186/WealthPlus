@@ -941,39 +941,139 @@ function handleBalanceQuery(query) {
 function matchCreateClient(cmd) {
     let text = cmd.replace("shree", "").replace("shri", "").replace("श्री", "").trim();
 
-    // Check if it contains client/grahak/ग्राहक/क्लाइंट creation intent
+    // Check if it contains client/grahak/ग्राहक/क्लाइंट intent
     const hasIntent = text.includes("client") || text.includes("grahak") || text.includes("ग्राहक") || text.includes("क्लाइंट");
     const hasAction = text.includes("add") || text.includes("create") || text.includes("जोड़") || text.includes("बना") || text.includes("दर्ज") || text.includes("ऐड") || text.includes("एड");
 
     if (!hasIntent && !hasAction) return null;
 
     // 1. Try matching name and monthly retainer amount (e.g. Acme 25000 / Acme grahak with 25000)
-    // Supports Devanagari characters range: \u0900-\u097F
     const regexWithAmount = /([a-zA-Z\s\u0900-\u097F]+)\s+(?:with|monthly|retainer|के साथ|का|मासिक)?\s*(\d+)/i;
     let match = text.match(regexWithAmount);
     if (match) {
-        let name = match[1].replace(/(?:client|grahak|ग्राहक|क्लाइंट|add|create|ऐड|एड|बनाओ|जोड़ो|दर्ज करो|नया|एक|में|के नाम से|नाम से)/gi, "").trim();
-        name = name.replace(/^[,.\s?।!]+/g, "").trim();
-        if (name.length > 1) {
-            return { name: name, monthlyPay: Number(match[2]) };
+        let rawName = match[1];
+        let cleaned = cleanClientName(rawName);
+        let englishName = transliterateDevanagariToEnglish(cleaned);
+        if (englishName.length > 1) {
+            return { name: englishName, monthlyPay: Number(match[2]) };
         }
     }
 
     // 2. Try matching name without monthly retainer (defaults to 0)
-    let name = "";
+    let rawName = "";
     if (text.includes("ke naam se") || text.includes("के नाम से") || text.includes("नाम से")) {
-        const parts = text.split(/(?:ke naam se|के नाम से|नाम से)/)[0].split(/(?:client|grahak|ग्राहक|क्लाइंट|add|create|ऐड|एड|बनाओ|जोड़ो|दर्ज करो|नया|एक|में)/);
-        name = parts[parts.length - 1].trim();
+        rawName = text.split(/(?:ke naam se|के नाम से|नाम से)/)[0];
     } else {
-        name = text.replace(/(?:client|grahak|ग्राहक|क्लाइंट|add|create|ऐड|एड|बनाओ|जोड़ो|दर्ज करो|नया|एक|में|करो|कर दो)/gi, "").trim();
+        rawName = text;
     }
 
-    name = name.replace(/^[,.\s?।!]+/g, "").trim();
-    if (name.length > 1) {
-        return { name: name, monthlyPay: 0 };
+    let cleaned = cleanClientName(rawName);
+    let englishName = transliterateDevanagariToEnglish(cleaned);
+    if (englishName.length > 1) {
+        return { name: englishName, monthlyPay: 0 };
     }
 
     return null;
+}
+
+// Clean client name by removing common prefixes and suffixes
+function cleanClientName(rawName) {
+    let name = rawName;
+    const wordsToRemove = [
+        "client", "grahak", "ग्राहक", "क्लाइंट", 
+        "add", "create", "ऐड", "एड", "new", "new client", "नया ग्राहक",
+        "बनाओ", "जोड़ो", "दर्ज करो", "बना दो", "जोड़ो", "बना",
+        "नया", "नए", "एक", "में", "करो", "कर दो", "कर", "दो", 
+        "के नाम से", "नाम से", "नाम", "के", "से", "को", "ek", "naya", "ko", "kar", "do"
+    ];
+    
+    wordsToRemove.forEach(word => {
+        const escWord = word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const regex = new RegExp(`\\b${escWord}\\b`, 'gi');
+        name = name.replace(regex, '');
+        name = name.replace(new RegExp(`(?:^|\\s)${escWord}(?:\\s|$)`, 'g'), ' ');
+    });
+    
+    return name.replace(/^[,.\s?।!]+/g, "").replace(/[,.\s?।!]+$/g, "").replace(/\s+/g, " ").trim();
+}
+
+// Transliterate Devanagari name to standard English uppercase
+function transliterateDevanagariToEnglish(text) {
+    const mapping = {
+        'अ': 'a', 'आ': 'a', 'इ': 'i', 'ई': 'i', 'उ': 'u', 'ऊ': 'u', 'ऋ': 'ri', 'ए': 'e', 'ऐ': 'ai', 'ओ': 'o', 'औ': 'au',
+        'क': 'ka', 'ख': 'kha', 'ग': 'ga', 'घ': 'gha', 'ङ': 'nga',
+        'च': 'cha', 'छ': 'chha', 'ज': 'ja', 'झ': 'jha', 'ञ': 'nya',
+        'ट': 'ta', 'ठ': 'tha', 'ड': 'da', 'ढ': 'dha', 'ण': 'na',
+        'त': 'ta', 'थ': 'tha', 'द': 'da', 'ध': 'dha', 'न': 'na',
+        'प': 'pa', 'फ': 'pha', 'ब': 'ba', 'भ': 'bha', 'म': 'ma',
+        'य': 'ya', 'र': 'ra', 'ल': 'la', 'व': 'va',
+        'श': 'sha', 'ष': 'sha', 'स': 'sa', 'ह': 'ha',
+        'क्ष': 'ksha', 'त्र': 'tra', 'ज्ञ': 'gya',
+        'ा': 'a', 'ि': 'i', 'ी': 'i', 'ु': 'u', 'ू': 'u', 'ृ': 'ri', 'े': 'e', 'ै': 'ai', 'ो': 'o', 'ौ': 'au',
+        'ं': 'n', 'ः': 'h', 'ँ': 'n', '्': ''
+    };
+
+    let result = "";
+    let i = 0;
+    const consonants = ['क','ख','ग','घ','ङ','च','छ','ज','झ','ञ','ट','ठ','ड','ढ','ण','त','थ','द','ध','न','प','फ','ब','भ','म','य','र','ल','व','श','ष','स','ह','क्ष','त्र','ज्ञ'];
+    const matras = ['ा','ि','ी','ु','ू','ृ','े','ै','ो','ौ','ं','ः','ँ'];
+
+    while (i < text.length) {
+        let char = text[i];
+        let nextChar = (i + 1 < text.length) ? text[i+1] : '';
+        
+        if (char === ' ') {
+            result += ' ';
+            i++;
+            continue;
+        }
+
+        if (char.match(/[a-zA-Z]/)) {
+            result += char;
+            i++;
+            continue;
+        }
+
+        let mapped = mapping[char] || char;
+
+        if (consonants.includes(char)) {
+            if (nextChar === '्') {
+                if (mapped.endsWith('a')) {
+                    mapped = mapped.slice(0, -1);
+                }
+                i += 2;
+                result += mapped;
+                continue;
+            } else if (matras.includes(nextChar)) {
+                if (mapped.endsWith('a')) {
+                    mapped = mapped.slice(0, -1);
+                }
+                let matraMapped = mapping[nextChar] || '';
+                result += mapped + matraMapped;
+                i += 2;
+                continue;
+            } else {
+                if (i + 1 === text.length || text[i+1] === ' ') {
+                    if (mapped.endsWith('a') && mapped.length > 1) {
+                        mapped = mapped.slice(0, -1);
+                    }
+                }
+                result += mapped;
+                i++;
+                continue;
+            }
+        } else {
+            result += mapped;
+            i++;
+        }
+    }
+    
+    return result.toUpperCase().trim()
+        .replace(/\s+/g, ' ')
+        .replace(/PREMA/g, 'PREM')
+        .replace(/NARAYANA/g, 'NARAYAN')
+        .replace(/BALAKRISHNA/g, 'BALKRISHNA')
+        .replace(/KRISHNA/g, 'KRISHNA');
 }
 
 function handleCreateClient(clientData) {
