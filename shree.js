@@ -668,8 +668,31 @@ function processShreeCommand(commandText) {
         callGeminiAI(commandText)
             .then(reply => {
                 setShreeStatus("Idle");
-                addMessageToShreeChat("shree", reply);
-                speakShreeText(reply);
+                let resObj = null;
+                try {
+                    let jsonText = reply.trim();
+                    const startIdx = jsonText.indexOf('{');
+                    const endIdx = jsonText.lastIndexOf('}');
+                    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+                        jsonText = jsonText.slice(startIdx, endIdx + 1);
+                    }
+                    resObj = JSON.parse(jsonText);
+                } catch (e) {
+                    console.error("Gemini response is not valid JSON:", e, reply);
+                    resObj = {
+                        speech: reply,
+                        action: null,
+                        params: {}
+                    };
+                }
+
+                const speech = resObj.speech || reply;
+                addMessageToShreeChat("shree", speech);
+                speakShreeText(speech);
+
+                if (resObj.action) {
+                    executeAgentAction(resObj.action, resObj.params);
+                }
             })
             .catch(err => {
                 console.error("Gemini API error:", err);
@@ -688,20 +711,50 @@ function processShreeCommand(commandText) {
 // Global cache for discovered Gemini model configuration to prevent repeating discovery
 let discoveredGeminiConfig = null;
 
-// Call Google Gemini API directly
+// Call Google Gemini API directly (Agentic implementation)
 async function callGeminiAI(userPrompt) {
     const apiKey = state.geminiApiKey;
     if (!apiKey) throw new Error("Gemini API Key is missing.");
 
-    // Create a context-aware system prompt
-    const systemInstruction = `You are Shree, the sweet and polite female AI manager of the Wealth Plus bookkeeping web application.
-Your character:
-- Speak in sweet Hinglish (Hindi mixed with English, written in English script or Devanagari script, e.g., "Haan, maine check kiya. Main screen par dashboard open kar diya hai.").
-- Keep your answers short, sweet, and professional. Maximum 2-3 sentences.
-- You are talking to the business owner/user.
-- Current app stats: clients count: ${state.clients.length}, transactions count: ${state.transactions.length}.
-- Answer general questions (business tips, calculations, general knowledge, chit-chat) politely in Hinglish.
-- If the user asks you to do something that you cannot do (such as deleting transactions, editing clients, exporting files, system resets, or other unsupported operations), explain politely that you cannot do this task directly, and guide them on how to do it manually if applicable (e.g., "Maaf kijiye, main directly delete nahi kar sakti. Aap screen par check karke manually delete kar sakte hain.").`;
+    // Create a context-aware system prompt for Agentic AI
+    const systemInstruction = `You are Shree, the sweet and polite female Agentic AI manager of the Wealth Plus bookkeeping web application.
+Your goal is to parse user intents and execute matching actions in the system while responding politely in sweet Hinglish.
+
+You MUST respond ONLY with a JSON object in this exact schema (do NOT wrap in markdown backticks or formatting, just plain text JSON):
+{
+  "speech": "Polite response in Hinglish/Hindi explaining what you are doing (e.g. 'Ji, main abhi clients page par jaa rahi hoon.' or 'Jai Hari! Maine star labs client register kar diya hai.')",
+  "action": "ACTION_NAME_OR_NULL",
+  "params": {
+     "pageId": "string (dashboard, clients, expenses, reports, master)",
+     "name": "string (client name)",
+     "monthlyPay": "number",
+     "amount": "number",
+     "category": "string (Food, Shopping, Bills, Transport, Rent, Others)",
+     "description": "string (expense details)",
+     "clientName": "string",
+     "date": "string (YYYY-MM-DD)",
+     "mode": "string (Main Cash, HDFC Bank)",
+     "commitMessage": "string"
+  }
+}
+
+Actions you can trigger:
+1. "NAVIGATE_PAGE": When user asks to change screen/view. Params: { "pageId": "dashboard" | "clients" | "expenses" | "reports" | "master" }
+2. "ADD_CLIENT": Register new client. Params: { "name": "client name", "monthlyPay": number }
+3. "DELETE_CLIENT": Remove client. Params: { "name": "client name to search and delete" }
+4. "ADD_EXPENSE": Log a purchase/spend. Params: { "amount": number, "description": "reason", "category": "Food" | "Transport" | "Rent" | "Bills" | "Shopping" | "Others", "clientName": "optional client association", "mode": "Main Cash" | "HDFC Bank" }
+5. "DELETE_EXPENSE": Delete recent matching transaction. Params: { "amount": number (optional), "description": "substring search (optional)" }
+6. "ADD_INCOME": Log received payment from a client. Params: { "amount": number, "clientName": "client name", "description": "details", "mode": "Main Cash" | "HDFC Bank" }
+7. "EXPORT_EXCEL": Export bookkeeping sheets to Excel file. Params: {}
+8. "GITHUB_DEPLOY": Push/Deploy the app files to GitHub. Params: { "commitMessage": "optional custom commit message" }
+
+If the user request is just general greeting/chat and doesn't match any system actions, set "action" to null.
+Keep the "speech" Hinglish responses very natural, polite, and short (1-2 sentences max).
+
+Current App State:
+- Clients count: ${state.clients.length} (Registered: ${state.clients.map(c=>c.name).join(', ')})
+- Transactions count: ${state.transactions.length}
+- Cash/Bank accounts: ${state.accounts.map(a=>a.name).join(', ')}`;
 
     const requestBody = {
         contents: [{
@@ -710,8 +763,9 @@ Your character:
             }]
         }],
         generationConfig: {
-            maxOutputTokens: 250,
-            temperature: 0.7
+            maxOutputTokens: 350,
+            temperature: 0.2,
+            responseMimeType: "application/json"
         }
     };
 
@@ -1414,4 +1468,137 @@ function convertHindiNumberWordsToDigits(text) {
     result = result.replace(/\bदस\b/g, "10");
 
     return result;
+}
+
+// executeAgentAction maps structured actions to application controllers
+function executeAgentAction(action, params) {
+    console.log("Agent executing action:", action, params);
+    if (!params) params = {};
+
+    switch (action) {
+        case 'NAVIGATE_PAGE':
+            if (params.pageId && typeof navigateToPage === 'function') {
+                navigateToPage(params.pageId);
+            }
+            break;
+
+        case 'ADD_CLIENT':
+            if (params.name && typeof addClientDirect === 'function') {
+                const monthlyPay = Number(params.monthlyPay) || 0;
+                const newClient = {
+                    id: 'c_' + Date.now(),
+                    name: params.name,
+                    monthlyPay: monthlyPay,
+                    yearlyPay: monthlyPay * 12
+                };
+                addClientDirect(newClient);
+                if (typeof renderMasterClients === 'function') renderMasterClients();
+                if (typeof renderClientsPage === 'function') renderClientsPage();
+            }
+            break;
+
+        case 'DELETE_CLIENT':
+            if (params.name && typeof deleteClientDirect === 'function') {
+                const name = params.name.toLowerCase();
+                const client = state.clients.find(c => c.name.toLowerCase().includes(name));
+                if (client) {
+                    deleteClientDirect(client.id);
+                    if (typeof renderMasterClients === 'function') renderMasterClients();
+                    if (typeof renderClientsPage === 'function') renderClientsPage();
+                } else {
+                    console.warn("Client not found for deletion:", params.name);
+                }
+            }
+            break;
+
+        case 'ADD_EXPENSE':
+            if (params.amount && typeof addExpenseDirect === 'function') {
+                const amount = Number(params.amount) || 0;
+                let category = params.category || 'Others';
+                // capitalize category first letter
+                category = category.charAt(0).toUpperCase() + category.slice(1);
+                
+                let clientId = "";
+                if (params.clientName) {
+                    const client = state.clients.find(c => c.name.toLowerCase().includes(params.clientName.toLowerCase()));
+                    if (client) clientId = client.id;
+                }
+                
+                const newTx = {
+                    id: 't_' + Date.now(),
+                    description: params.description || category,
+                    category: category,
+                    amount: amount,
+                    date: params.date || new Date().toISOString().split('T')[0],
+                    mode: params.mode || (state.accounts[0]?.name || 'Main Cash'),
+                    clientId: clientId
+                };
+                addExpenseDirect(newTx);
+                if (typeof renderDashboard === 'function') renderDashboard();
+                if (typeof renderExpensesPage === 'function') renderExpensesPage();
+            }
+            break;
+
+        case 'DELETE_EXPENSE':
+            if (typeof deleteExpenseDirect === 'function') {
+                const amount = Number(params.amount);
+                const desc = params.description ? params.description.toLowerCase() : "";
+                const txIndex = state.transactions.findIndex(t => {
+                    const matchAmount = amount ? t.amount === amount : true;
+                    const matchDesc = desc ? t.description.toLowerCase().includes(desc) : true;
+                    return matchAmount && matchDesc;
+                });
+                if (txIndex !== -1) {
+                    const tx = state.transactions[txIndex];
+                    deleteExpenseDirect(tx.id);
+                    if (typeof renderDashboard === 'function') renderDashboard();
+                    if (typeof renderExpensesPage === 'function') renderExpensesPage();
+                } else {
+                    console.warn("Expense not found for deletion:", params);
+                }
+            }
+            break;
+
+        case 'ADD_INCOME':
+            if (params.amount && typeof addIncomeDirect === 'function') {
+                const amount = Number(params.amount) || 0;
+                let clientId = "";
+                if (params.clientName) {
+                    const client = state.clients.find(c => c.name.toLowerCase().includes(params.clientName.toLowerCase()));
+                    if (client) clientId = client.id;
+                }
+                if (!clientId && state.clients.length > 0) {
+                    clientId = state.clients[0].id;
+                }
+                const newIncome = {
+                    id: 'inc_' + Date.now(),
+                    clientId: clientId,
+                    amount: amount,
+                    date: params.date || new Date().toISOString().split('T')[0],
+                    mode: params.mode || (state.accounts[0]?.name || 'Main Cash'),
+                    description: params.description || "Received payment"
+                };
+                addIncomeDirect(newIncome);
+                if (typeof renderDashboard === 'function') renderDashboard();
+                if (typeof renderClientsPage === 'function') renderClientsPage();
+            }
+            break;
+
+        case 'EXPORT_EXCEL':
+            if (typeof exportToExcel === 'function') {
+                exportToExcel();
+            }
+            break;
+
+        case 'GITHUB_DEPLOY':
+            if (typeof deployAppToGitHub === 'function') {
+                const commitMsgInput = document.getElementById('github-commit-message');
+                if (commitMsgInput) commitMsgInput.value = params.commitMessage || "Update via Shree Agentic AI";
+                deployAppToGitHub();
+            }
+            break;
+
+        default:
+            console.warn("Unknown agent action:", action);
+    }
 }
