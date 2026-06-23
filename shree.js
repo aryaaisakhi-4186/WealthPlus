@@ -450,6 +450,104 @@ function processShreeCommand(commandText) {
         return;
     }
 
+    // 2.5 READ SCREEN/PAGE COMMANDS (e.g., "श्री एक्सपेंस पढ़कर बताओ", "इसे पढ़ो", "पेज सुनाओ")
+    const isReadCommand = cmd.includes("read") || cmd.includes("पढ़") || cmd.includes("पढ़") || cmd.includes("सुनाओ") || cmd.includes("सुनाए") || cmd.includes("बोलकर बताओ") || cmd.includes("बताओ क्या है");
+    if (isReadCommand) {
+        let vocalReply = "";
+        let textReply = "";
+        const formatCur = v => '₹' + Math.round(v).toLocaleString('en-IN');
+        const formatCurVocal = v => Math.round(v) + ' रुपये';
+
+        // Check if specific section is mentioned
+        const mentionsExpense = cmd.includes("expense") || cmd.includes("kharch") || cmd.includes("खर्च") || cmd.includes("भुगतान") || cmd.includes("एक्सपेंस") || cmd.includes("एक्सपेंसेस");
+        const mentionsClient = cmd.includes("client") || cmd.includes("grahak") || cmd.includes("ग्राहक") || cmd.includes("क्लाइंट") || cmd.includes("पेमेंट") || cmd.includes("आमदनी") || cmd.includes("income");
+        const mentionsDashboard = cmd.includes("dashboard") || cmd.includes("home") || cmd.includes("मुख्य पेज") || cmd.includes("होम") || cmd.includes("डैशबोर्ड") || cmd.includes("बैलेंस") || cmd.includes("balance") || cmd.includes("पैसे") || cmd.includes("पैसा");
+
+        if (mentionsExpense) {
+            // Read Expenses list
+            const recentTxs = state.transactions.slice().reverse().slice(0, 5); // last 5
+            vocalReply = "Haal hi ke kharche hain: ";
+            textReply = "<strong>Recent Expenses Summary:</strong><br>";
+            if (recentTxs.length > 0) {
+                recentTxs.forEach((tx, idx) => {
+                    const categoryLabel = tx.category || 'Others';
+                    const desc = tx.description || categoryLabel;
+                    vocalReply += `${desc} ke liye ${formatCurVocal(tx.amount)}. `;
+                    textReply += `${idx + 1}. ${desc}: <strong>${formatCur(tx.amount)}</strong> (${tx.date})<br>`;
+                });
+            } else {
+                vocalReply = "Abhi koi kharcha darj nahi kiya gaya hai.";
+                textReply += "No expenses logged yet.";
+            }
+        } else if (mentionsClient) {
+            // Read Clients list
+            const totalClients = state.clients.length;
+            vocalReply = `Aapke total ${totalClients} client hain. `;
+            textReply = `<strong>Client Page Summary:</strong><br>👥 Total Clients: <strong>${totalClients}</strong><br>`;
+            if (state.clients.length > 0) {
+                vocalReply += "Udaharan ke liye, ";
+                const list = state.clients.slice(0, 3);
+                list.forEach(c => {
+                    vocalReply += `${c.name} ka retainer ${formatCurVocal(c.monthlyPay)} hai. `;
+                    textReply += `&bull; ${c.name}: <strong>${formatCur(c.monthlyPay)}</strong>/month<br>`;
+                });
+            }
+        } else if (mentionsDashboard) {
+            // Read Dashboard
+            const stats = getGlobalStats();
+            vocalReply = `Aapka cash balance ${formatCurVocal(stats.cashBalance)} hai, bank balance ${formatCurVocal(stats.bankBalance)} hai, aur total kharche ${formatCurVocal(stats.periodExpenses)} hain.`;
+            textReply = `<strong>Dashboard Summary:</strong><br>💵 Cash Balance: <strong>${formatCur(stats.cashBalance)}</strong><br>🏦 Bank Balance: <strong>${formatCur(stats.bankBalance)}</strong><br>📉 Period Expenses: <strong>${formatCur(stats.periodExpenses)}</strong>`;
+        } else {
+            // Read based on active page
+            const activePage = state.activePage || 'dashboard';
+            if (activePage === 'dashboard') {
+                const stats = getGlobalStats();
+                vocalReply = `Dashboard par aapka cash balance ${formatCurVocal(stats.cashBalance)} hai, bank balance ${formatCurVocal(stats.bankBalance)} hai, aur total kharche ${formatCurVocal(stats.periodExpenses)} hain.`;
+                textReply = `<strong>Dashboard Summary:</strong><br>💵 Cash Balance: <strong>${formatCur(stats.cashBalance)}</strong><br>🏦 Bank Balance: <strong>${formatCur(stats.bankBalance)}</strong><br>📉 Period Expenses: <strong>${formatCur(stats.periodExpenses)}</strong>`;
+            } else if (activePage === 'clients') {
+                const totalClients = state.clients.length;
+                vocalReply = `Client page par aapke total ${totalClients} client hain. `;
+                textReply = `<strong>Client Page Summary:</strong><br>👥 Total Clients: <strong>${totalClients}</strong><br>`;
+                if (state.clients.length > 0) {
+                    vocalReply += "Udaharan ke liye, ";
+                    const list = state.clients.slice(0, 3);
+                    list.forEach(c => {
+                        vocalReply += `${c.name} ka retainer ${formatCurVocal(c.monthlyPay)} hai. `;
+                        textReply += `&bull; ${c.name}: <strong>${formatCur(c.monthlyPay)}</strong>/month<br>`;
+                    });
+                }
+            } else if (activePage === 'expenses') {
+                const recentTxs = state.transactions.slice().reverse().slice(0, 5); // last 5
+                vocalReply = "Expenses page par haal hi ke kharche hain: ";
+                textReply = "<strong>Recent Expenses Summary:</strong><br>";
+                if (recentTxs.length > 0) {
+                    recentTxs.forEach((tx, idx) => {
+                        const categoryLabel = tx.category || 'Others';
+                        const desc = tx.description || categoryLabel;
+                        vocalReply += `${desc} ke liye ${formatCurVocal(tx.amount)}. `;
+                        textReply += `${idx + 1}. ${desc}: <strong>${formatCur(tx.amount)}</strong> (${tx.date})<br>`;
+                    });
+                } else {
+                    vocalReply = "Abhi koi kharcha darj nahi kiya gaya hai.";
+                    textReply += "No expenses logged yet.";
+                }
+            } else if (activePage === 'reports') {
+                vocalReply = "Reports page par aap alag-alag ledgers aur statements check kar sakte hain.";
+                textReply = "<strong>Reports Summary:</strong><br>You can check client ledgers and financial reports on this page.";
+            } else if (activePage === 'master') {
+                vocalReply = "Master settings page par aap configuration aur settings settings check kar sakte hain.";
+                textReply = "<strong>Master Settings Summary:</strong><br>Manage accounts, budgets, and configurations here.";
+            } else {
+                vocalReply = "Main page ke content ko read kar sakti hoon. Kripya page open karein.";
+                textReply = "I can read page content when you navigate to a specific page.";
+            }
+        }
+
+        addMessageToShreeChat("shree", textReply);
+        speakShreeText(vocalReply);
+        return;
+    }
+
     // 3. PAGE NAVIGATION
     const navMatch = matchNavigation(cmd);
     if (navMatch) {
