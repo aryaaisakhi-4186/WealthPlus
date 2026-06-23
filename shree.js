@@ -2,7 +2,7 @@
    SHREE AI FEMALE BOOKKEEPER ASSISTANT - ENGINE (HINDI)
    ========================================================================== */
 
-let isShreeVoiceEnabled = true;
+let isShreeVoiceEnabled = false; // Voice output is disabled. Shree will remain silent and only output text.
 let recognition = null;
 let isListening = false;
 let selectedVoice = null;
@@ -1410,32 +1410,7 @@ function handleLogExpense(expenseData) {
 // --- DOM REGISTRATIONS ---
 
 document.addEventListener('DOMContentLoaded', () => {
-    initShreeVoices();
     initShreeSpeech();
-
-    // Voice selection listener
-    const voiceSelect = document.getElementById('shree-voice-select');
-    if (voiceSelect) {
-        voiceSelect.addEventListener('change', (e) => {
-            const val = e.target.value;
-            if (val === 'AUTO_DETECT') {
-                localStorage.removeItem('shree_selected_voice_name');
-                const voices = window.speechSynthesis.getVoices();
-                let voice = voices.find(v => {
-                    const name = v.name.toLowerCase();
-                    const lang = v.lang.toLowerCase();
-                    return lang.includes('hi-in') && (name.includes('female') || name.includes('swara') || name.includes('kalpana') || name.includes('google'));
-                });
-                if (!voice) voice = voices.find(v => v.lang.includes('hi-IN'));
-                selectedVoice = voice || voices[0];
-            } else {
-                localStorage.setItem('shree_selected_voice_name', val);
-                const voices = window.speechSynthesis.getVoices();
-                selectedVoice = voices.find(v => v.name === val) || selectedVoice;
-            }
-            speakShreeText("जय हरी! आवाज़ बदल दी गई है।");
-        });
-    }
 
     // Toggle Chat window bubble
     const toggleBtn = document.getElementById('btn-shree-toggle');
