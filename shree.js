@@ -9,6 +9,10 @@ document.addEventListener('DOMContentLoaded', () => {
 let isShreeListening = false;
 let shreeRecognition = null;
 
+let attachedFileBase64 = null;
+let attachedFileMimeType = null;
+let attachedFileName = null;
+
 function initShreeWidget() {
     const toggleBtn = document.getElementById('btn-shree-toggle');
     const chatWindow = document.getElementById('shree-chat-window');
@@ -94,6 +98,33 @@ function initShreeWidget() {
 
     // 4. Voice Input (Web Speech Recognition)
     initSpeechRecognition(micBtn, textInput);
+
+    // 5. File upload & paste listeners
+    const attachBtn = document.getElementById('btn-shree-attach');
+    const fileInput = document.getElementById('shree-file-input');
+
+    if (attachBtn && fileInput) {
+        attachBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                processAttachedFile(e.target.files[0]);
+            }
+        });
+    }
+
+    if (textInput) {
+        textInput.addEventListener('paste', (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (const item of items) {
+                if (item.kind === 'file') {
+                    const blob = item.getAsFile();
+                    processAttachedFile(blob);
+                    e.preventDefault();
+                    break;
+                }
+            }
+        });
+    }
 }
 
 function scrollMessagesToBottom() {
@@ -196,35 +227,64 @@ function speakShreeText(text) {
 async function processTextCommand() {
     const textInput = document.getElementById('shree-text-input');
     const query = textInput.value.trim();
-    if (!query) return;
+    if (!query && !attachedFileBase64) return;
 
     // Display user message
-    appendChatMessage('user', query);
+    if (attachedFileBase64) {
+        appendChatMessage('user', `Attached: ${attachedFileName} ${query ? `\n"${query}"` : ''}`);
+        if (attachedFileMimeType.startsWith('image/')) {
+            const lastMsg = document.getElementById('shree-messages-container').lastElementChild;
+            if (lastMsg) {
+                const img = document.createElement('img');
+                img.src = `data:${attachedFileMimeType};base64,${attachedFileBase64}`;
+                img.style.maxWidth = '100%';
+                img.style.maxHeight = '150px';
+                img.style.borderRadius = '4px';
+                img.style.marginTop = '6px';
+                img.style.display = 'block';
+                lastMsg.querySelector('p').appendChild(img);
+            }
+        }
+    } else {
+        appendChatMessage('user', query);
+    }
     textInput.value = '';
 
     // Set status to thinking
     document.getElementById('shree-status-text').innerText = 'Processing...';
 
-    // 1. Try local NLP Regex Parser
-    let parsedAction = parseLocalCommand(query);
-    
-    // 2. Try Gemini AI if local match failed AND Gemini API Key is available
-    if ((!parsedAction || parsedAction.fallback) && state.geminiApiKey) {
-        try {
-            const geminiResult = await callGeminiAI(query);
-            if (geminiResult && geminiResult.success) {
-                parsedAction = geminiResult;
+    let parsedAction = null;
+    let replyText = "";
+
+    if (attachedFileBase64) {
+        if (!state.geminiApiKey) {
+            replyText = "माफ़ कीजिये, स्क्रीनशॉट या फ़ाइल प्रोसेस करने के लिए जेमिनी ए आई की चाबी (API Key) सेटिंग्स में सेव होनी चाहिए।";
+        } else {
+            try {
+                parsedAction = await callGeminiMultimodal(query, attachedFileBase64, attachedFileMimeType);
+            } catch (err) {
+                console.error("Gemini Multimodal error:", err);
             }
-        } catch (err) {
-            console.error("Gemini parsing error fallback:", err);
+        }
+        clearAttachment();
+    } else {
+        parsedAction = parseLocalCommand(query);
+        if ((!parsedAction || parsedAction.fallback) && state.geminiApiKey) {
+            try {
+                parsedAction = await callGeminiAI(query);
+                if (parsedAction && parsedAction.success) {
+                    // parsedAction ok
+                }
+            } catch (err) {
+                console.error("Gemini parsing error fallback:", err);
+            }
         }
     }
 
-    // 3. Execute the parsed action
-    let replyText = "";
+    // Execute the parsed action
     if (parsedAction) {
         replyText = await executeAgentAction(parsedAction);
-    } else {
+    } else if (!replyText) {
         replyText = "माफ़ कीजिये, मैं इस कमांड को समझ नहीं पाई। क्या आप कृपया दोबारा स्पष्ट रूप से बताएंगे? (जैसे: 'Shree naya client add karo...')";
     }
 
@@ -722,6 +782,148 @@ ${fileContent}
         return JSON.parse(jsonText);
     } catch (e) {
         console.error("Gemini Code Editor API call failed:", e);
+        return null;
+    }
+}
+
+function processAttachedFile(file) {
+    if (!file) return;
+    
+    if (file.size > 5 * 1024 * 1024) {
+        alert("File size exceeds 5MB limit.");
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        attachedFileBase64 = e.target.result.split(',')[1];
+        attachedFileMimeType = file.type;
+        attachedFileName = file.name || "Pasted Image";
+        
+        showAttachmentPreview(attachedFileName, e.target.result);
+    };
+    reader.readAsDataURL(file);
+}
+
+function showAttachmentPreview(fileName, dataUrl) {
+    const container = document.getElementById('shree-preview-container');
+    if (!container) return;
+    
+    container.style.display = 'flex';
+    
+    const isImage = attachedFileMimeType.startsWith('image/');
+    
+    container.innerHTML = `
+        <div style="position:relative; display:flex; align-items:center; gap:8px; background:rgba(0,0,0,0.05); padding:4px 8px; border-radius:4px; max-width:100%;">
+            ${isImage ? `<img src="${dataUrl}" style="height:32px; width:32px; object-fit:cover; border-radius:3px;">` : `<i data-lucide="file-text" style="width:24px; height:24px; color:var(--primary);"></i>`}
+            <span style="font-size:11px; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-primary);">${fileName}</span>
+            <button type="button" id="btn-clear-shree-attach" style="background:transparent; border:none; color:var(--danger); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:2px;"><i data-lucide="x" style="width:14px; height:14px;"></i></button>
+        </div>
+    `;
+    
+    lucide.createIcons();
+    
+    document.getElementById('btn-clear-shree-attach').addEventListener('click', clearAttachment);
+}
+
+function clearAttachment() {
+    attachedFileBase64 = null;
+    attachedFileMimeType = null;
+    attachedFileName = null;
+    
+    const container = document.getElementById('shree-preview-container');
+    if (container) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+    }
+    
+    const fileInput = document.getElementById('shree-file-input');
+    if (fileInput) fileInput.value = '';
+}
+
+async function callGeminiMultimodal(userText, base64Data, mimeType) {
+    const apiKey = state.geminiApiKey;
+    if (!apiKey) return null;
+
+    const cleanClients = state.clients.map(c => ({ id: c.id, name: c.name }));
+    const cleanAccounts = state.accounts.map(a => ({ name: a.name, type: a.type }));
+    const activeCategories = Object.keys(state.categoriesConfig);
+
+    const systemInstruction = `
+You are "Shree", a smart agentic AI Munim (bookkeeper) and developer assistant for the "Wealth Plus" application.
+Your task is to analyze the attached image/document receipt along with any user request, extract transaction details, and parse them into a structured JSON action object.
+
+Analyze the image/document and return ONLY a valid JSON object. Do not include markdown code block syntax (like \`\`\`json) or any extra text.
+
+Active Categories config: ${JSON.stringify(activeCategories)}
+Active Accounts configuration: ${JSON.stringify(cleanAccounts)}
+Active Clients registered list: ${JSON.stringify(cleanClients)}
+
+Today's Date: ${new Date().toISOString().split('T')[0]} (Year is 2026).
+Parse any date in the request to YYYY-MM-DD format.
+
+You must return JSON in this exact structure:
+{
+  "success": true,
+  "action": "addClient" | "addExpense" | "addIncome",
+  "data": {
+    // for addClient:
+    "name": "extracted client name"
+    
+    // for addExpense:
+    "description": "expense details (e.g. Mithai, Tea, AWS Server)",
+    "category": "category name (Food, Shopping, Bills, Transport, Rent, or Others)",
+    "amount": number,
+    "date": "YYYY-MM-DD",
+    "mode": "account name (e.g. Main Cash, HDFC Bank)",
+    "clientId": "client id if specified, otherwise empty string"
+
+    // for addIncome:
+    "clientName": "client name",
+    "clientId": "client id if matches, otherwise empty string",
+    "amount": number,
+    "date": "YYYY-MM-DD",
+    "mode": "destination account name"
+  },
+  "reply": "Hindi/Hinglish vocal confirmation message summarizing the action taken."
+}
+`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const payload = {
+        contents: [
+            {
+                role: "user",
+                parts: [
+                    { text: userText || "Extract details from this transaction receipt or document and log it." },
+                    {
+                        inlineData: {
+                            mimeType: mimeType,
+                            data: base64Data
+                        }
+                    }
+                ]
+            }
+        ],
+        systemInstruction: {
+            parts: [{ text: systemInstruction }]
+        },
+        generationConfig: {
+            responseMimeType: "application/json"
+        }
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        const jsonText = data.candidates[0].content.parts[0].text;
+        return JSON.parse(jsonText);
+    } catch (e) {
+        console.error("Gemini Multimodal call failed:", e);
         return null;
     }
 }

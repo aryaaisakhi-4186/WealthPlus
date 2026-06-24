@@ -821,7 +821,10 @@ function renderDashboard() {
         if (catAmounts[tx.category] !== undefined) {
             catAmounts[tx.category] += Number(tx.amount);
         } else {
-            catAmounts['Others'] += Number(tx.amount);
+            const firstCat = Object.keys(state.categoriesConfig)[0] || 'Others';
+            if (catAmounts[firstCat] !== undefined) {
+                catAmounts[firstCat] += Number(tx.amount);
+            }
         }
     });
 
@@ -841,7 +844,8 @@ function renderDashboard() {
         latestTx.forEach(tx => {
             const client = state.clients.find(c => c.id === tx.clientId);
             const clientLabel = client ? client.name : 'General';
-            const catMeta = state.categoriesConfig[tx.category] || state.categoriesConfig['Others'];
+            const firstCat = Object.keys(state.categoriesConfig)[0] || 'Others';
+            const catMeta = state.categoriesConfig[tx.category] || state.categoriesConfig[firstCat] || { color: '#64748b', icon: 'tag' };
             
             const item = document.createElement('div');
             item.className = 'recent-item';
@@ -1726,7 +1730,7 @@ function renderMasterBudgetsEditor() {
     Object.keys(state.categoriesConfig).forEach(cat => {
         const val = state.budgets[cat] || 0;
         const color = state.categoriesConfig[cat].color || '#64748b';
-        const isOthers = cat === 'Others';
+        const isOthers = false;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -1834,11 +1838,6 @@ function addCategoryPrompt() {
 }
 
 function renameCategoryPrompt(oldCat) {
-    if (oldCat === 'Others') {
-        alert("The 'Others' category is a system default and cannot be renamed.");
-        return;
-    }
-    
     const newCat = prompt(`Enter new name for category "${oldCat}":`, oldCat);
     if (!newCat) return;
     const cleanNewCat = newCat.trim();
@@ -1887,12 +1886,16 @@ function renameCategoryPrompt(oldCat) {
 }
 
 function deleteCategoryPrompt(cat) {
-    if (cat === 'Others') {
-        alert("The 'Others' category is a system default and cannot be deleted.");
+    const categoriesCount = Object.keys(state.categoriesConfig).length;
+    if (categoriesCount <= 1) {
+        alert("You must keep at least one category.");
         return;
     }
 
-    if (!confirm(`Are you sure you want to delete category "${cat}"? All existing transactions in this category will be re-categorized as "Others".`)) {
+    const remainingCats = Object.keys(state.categoriesConfig).filter(c => c !== cat);
+    const fallbackCat = remainingCats[0] || 'Others';
+
+    if (!confirm(`Are you sure you want to delete category "${cat}"? All existing transactions in this category will be re-categorized as "${fallbackCat}".`)) {
         return;
     }
 
@@ -1904,7 +1907,7 @@ function deleteCategoryPrompt(cat) {
     let updatedTxCount = 0;
     state.transactions.forEach(tx => {
         if (tx.category === cat) {
-            tx.category = 'Others';
+            tx.category = fallbackCat;
             updatedTxCount++;
             if (state.cloudSyncEnabled && firebaseDb) {
                 firebaseWrite('transactions', tx.id, tx);
@@ -1917,7 +1920,7 @@ function deleteCategoryPrompt(cat) {
         firebaseWriteSettings();
     }
 
-    alert(`Successfully deleted category "${cat}" and moved ${updatedTxCount} transactions to "Others".`);
+    alert(`Successfully deleted category "${cat}" and moved ${updatedTxCount} transactions to "${fallbackCat}".`);
     renderPage('master');
 }
 

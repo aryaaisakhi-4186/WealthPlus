@@ -1003,13 +1003,7 @@
             <!-- Chat View Messages -->
             <div class="shree-messages" id="shree-messages-container">
                 <div class="shree-msg msg-shree">
-                    <p>नमस्ते! मैं श्री हूँ, आपकी AI मुनीम। मैं आपकी आवाज़ सुनकर या टेक्स्ट पढ़कर काम कर सकती हूँ। बोलकर या लिखकर प्रयास करें:</p>
-                    <p style="margin-top: 8px; font-style: italic; font-size: 11px; color: var(--text-secondary);">
-                        - "Shree naya client add kar do Balkrishna Premnarayan"<br>
-                        - "Shree misc. expenses me 100 mithai kharch ke add kar do"<br>
-                        - "Rakhi Agency client me 10000 cash received kar do"<br>
-                        - "Balkrishna Premnarayan client me 25000 BOI-0308 me add kar do date 24-06-26 me"
-                    </p>
+                    <p>नमस्ते! मैं "श्री" हूँ, आपकी AI मुनीम। मैं आपकी आवाज़ सुनकर, टेक्स्ट पढ़कर, या आपके द्वारा पेस्ट किए गए बिल/स्क्रीनशॉट देखकर तुरंत लेजर एंट्री कर सकती हूँ।</p>
                     <span class="msg-time">सक्रिय (Active)</span>
                 </div>
             </div>
@@ -1030,12 +1024,21 @@
                 </div>
             </div>
 
+            <!-- Preview Container -->
+            <div id="shree-preview-container" style="display:none; padding:8px 12px; background:var(--bg-tertiary); border-top:1px solid var(--border-color); align-items:center; gap:8px; border-bottom: 1px solid var(--border-color);">
+                <!-- Appended dynamically -->
+            </div>
+
             <!-- Footer controls -->
             <div class="shree-footer" id="shree-footer-container">
+                <input type="file" id="shree-file-input" style="display:none;" accept="image/*,application/pdf">
+                <button type="button" id="btn-shree-attach" class="btn-mic" title="Attach file or screenshot" style="color:var(--text-secondary);">
+                    <i data-lucide="paperclip"></i>
+                </button>
                 <button id="btn-shree-mic" class="btn-mic" title="Speak to Shree (Hindi)">
                     <i data-lucide="mic"></i>
                 </button>
-                <input type="text" id="shree-text-input" placeholder="कमांड टाइप करें (जैसे श्री naya client...)" autocomplete="off">
+                <input type="text" id="shree-text-input" placeholder="कमांड टाइप करें या स्क्रीनशॉट पेस्ट करें..." autocomplete="off">
                 <button id="btn-shree-send" class="btn-send" title="Send Command">
                     <i data-lucide="send"></i>
                 </button>
