@@ -17,7 +17,7 @@ let state = {
     firebaseConfig: null,    // Firebase Config JSON
     geminiApiKey: null,      // Gemini AI API Key
     githubToken: null,       // GitHub Personal Access Token
-    githubRepo: null,        // GitHub repo path (owner/repo)
+    githubRepo: "aryaaisakhi-4186/WealthPlus",        // GitHub repo path (owner/repo)
     githubBranch: 'main',    // GitHub branch (defaults to main)
     activePage: 'dashboard',
     activeReportTab: 'client',
