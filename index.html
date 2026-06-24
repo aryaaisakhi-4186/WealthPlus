@@ -80,7 +80,7 @@
             </nav>
             <div class="sidebar-footer">
                 <p>&copy; 2026 Wealth Plus</p>
-                <p>v3.5 (Shree AI & Logins)</p>
+                <p>v3.6 (Cloud Sync & Member Logins)</p>
             </div>
         </aside>
 
@@ -604,20 +604,7 @@
                                     </form>
                                 </div>
 
-                                <!-- Gemini AI API Config Form -->
-                                <div class="card" style="padding: 20px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color); margin-top: 20px;">
-                                    <h5 style="margin-top: 0; margin-bottom: 5px;">Gemini AI API Settings (Optional)</h5>
-                                    <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 15px;">Enter your Gemini API Key to enable general knowledge chat & smart Hinglish conversations with Shree AI.</p>
-                                    <form id="form-gemini-config">
-                                        <div class="form-group" style="margin-bottom: 15px;">
-                                            <label for="gemini-api-key" style="display:block; margin-bottom:6px; font-size:12px; font-weight:600;">Gemini API Key</label>
-                                            <input type="password" id="gemini-api-key" placeholder="Enter Gemini API Key..." style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
-                                        </div>
-                                        <div style="display: flex; justify-content: flex-end;">
-                                            <button type="submit" class="btn btn-primary" id="btn-gemini-save">Save AI Key</button>
-                                        </div>
-                                    </form>
-                                </div>
+
                             </div>
                         </div>
 
@@ -939,58 +926,11 @@
         </div>
     </div>
 
-    <!-- ==========================================
-         SHREE AI FEMALE VOICE/TEXT ASSISTANT CHAT WIDGET
-         ========================================== -->
-    <div id="shree-chat-widget" class="shree-widget">
-        <button id="btn-shree-toggle" class="shree-toggle-btn" title="Ask Shree (AI Assistant)">
-            <i data-lucide="message-square"></i>
-            <span class="pulse-indicator"></span>
-        </button>
-        <div id="shree-chat-window" class="shree-chat-window">
-            <div class="shree-header">
-                <div class="shree-header-info">
-                    <div class="shree-avatar">S</div>
-                    <div>
-                        <h4 style="margin:0; font-size:14px;">Shree</h4>
-                        <span id="shree-status-text" style="font-size:10px; color:rgba(255,255,255,0.75);">AI Assistant &bull; Idle</span>
-                    </div>
-                </div>
-                <div class="shree-header-actions">
-                    <button id="btn-shree-mic-toggle" class="btn-shree-action" title="Toggle Auto-Listening (Microphone)">
-                        <i data-lucide="mic-off"></i>
-                    </button>
-                    <button id="btn-shree-close" class="btn-shree-action" title="Minimize Chat">
-                        <i data-lucide="minimize-2"></i>
-                    </button>
-                </div>
-            </div>
-
-            <div class="shree-messages" id="shree-messages-container">
-                <!-- Welcome Message -->
-                <div class="shree-msg msg-shree">
-                    <p>नमस्ते! मैं श्री हूँ, आपकी AI मुनीम। मैं आपकी आवाज़ सुनकर खर्च दर्ज कर सकती हूँ। बोलकर प्रयास करें: <em>"श्री जय हरि, मिसलेनियस एक्सपेंसेस में 100 रुपये खर्च हुए ऑफिस रिफ्रमेंट के लिए"</em></p>
-                    <span class="msg-time">सक्रिय</span>
-                </div>
-            </div>
-            <div class="shree-footer">
-                <button id="btn-shree-mic" class="btn-mic" title="Speak to Shree (Hindi)">
-                    <i data-lucide="mic"></i>
-                </button>
-                <input type="text" id="shree-text-input" placeholder="कमांड टाइप करें (जैसे श्री जय हरि...)..." autocomplete="off">
-                <button id="btn-shree-send" class="btn-send" title="Send Command">
-                    <i data-lucide="send"></i>
-                </button>
-            </div>
-        </div>
-    </div>
-
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="app.js?v=3.1"></script>
-    <script src="shree.js?v=3.1"></script>
+    <script src="app.js?v=3.4"></script>
 </body>
 </html>

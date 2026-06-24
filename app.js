@@ -457,10 +457,7 @@ function handleLoginSubmit(e) {
         // Refresh page view
         renderPage(state.activePage);
         
-        // Voice greeting by Shree
-        if (window.speakShreeText) {
-            speakShreeText(`Welcome back, ${member.name}. Shree is ready for your commands.`);
-        }
+
     } else {
         errorMsg.style.display = 'block';
         errorMsg.innerText = "Access Denied: Mobile number or PIN is incorrect.";
@@ -1462,11 +1459,7 @@ function renderMasterCloudSync() {
         saveBtn.innerText = 'Enable & Sync Cloud';
     }
     
-    // Populate Gemini API Key
-    const geminiInput = document.getElementById('gemini-api-key');
-    if (geminiInput) {
-        geminiInput.value = state.geminiApiKey || '';
-    }
+
     
     lucide.createIcons();
 }
@@ -1537,12 +1530,11 @@ async function deployAppToGitHub() {
     logDeployProgress("Starting deployment process...");
 
     const filesToDeploy = [
-        'index.html',
-        'app.js',
-        'shree.js',
-        'style.css',
-        'server.py',
-        'README.md'
+        { name: 'index.html', required: true },
+        { name: 'app.js', required: true },
+        { name: 'style.css', required: true },
+        { name: 'server.py', required: false },
+        { name: 'README.md', required: false }
     ];
 
     const ownerRepo = state.githubRepo.replace(/^\/|\/$/g, '');
@@ -1552,7 +1544,9 @@ async function deployAppToGitHub() {
     const commitMessage = userCommitMsg || `Update via Wealth Plus AI Developer (${new Date().toLocaleString()})`;
 
     try {
-        for (const filename of filesToDeploy) {
+        for (const file of filesToDeploy) {
+            const filename = file.name;
+            const isRequired = file.required;
             logDeployProgress(`Fetching local file: ${filename}...`);
             let fileContentText = '';
             try {
@@ -1562,8 +1556,13 @@ async function deployAppToGitHub() {
                 }
                 fileContentText = await localFetch.text();
             } catch (err) {
-                logDeployProgress(`Local fetch error for ${filename}: ${err.message}`, true);
-                continue;
+                if (isRequired) {
+                    logDeployProgress(`Local fetch error for ${filename}: ${err.message}`, true);
+                    continue;
+                } else {
+                    logDeployProgress(`[WARNING] Optional file ${filename} skipped: ${err.message}`);
+                    continue;
+                }
             }
 
             logDeployProgress(`Checking file existence in GitHub repo: ${filename}...`);
@@ -1635,14 +1634,8 @@ async function deployAppToGitHub() {
         }
 
         logDeployProgress("Deployment process completed!");
-        if (window.speakShreeText) {
-            speakShreeText("जय हरी! सभी फ़ाइलें गिटहब पर अपलोड कर दी गई हैं।");
-        }
     } catch (globalErr) {
         logDeployProgress(`Critical Deployment Failure: ${globalErr.message}`, true);
-        if (window.speakShreeText) {
-            speakShreeText("माफ़ कीजियेगा, गिटहब पर फ़ाइलें अपलोड करने में कोई त्रुटि आई है।");
-        }
     } finally {
         if (deployBtn) {
             deployBtn.disabled = false;
@@ -2577,11 +2570,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-cloud-disable').addEventListener('click', handleCloudDisableClick);
     document.getElementById('btn-cloud-upload-data').addEventListener('click', handleCloudUploadClick);
 
-    // Gemini Config Handlers
-    const geminiForm = document.getElementById('form-gemini-config');
-    if (geminiForm) {
-        geminiForm.addEventListener('submit', handleGeminiConfigSubmit);
-    }
+
 
     // GitHub Deploy Handlers
     const githubForm = document.getElementById('form-github-config');
@@ -2600,16 +2589,7 @@ document.addEventListener('DOMContentLoaded', () => {
     lucide.createIcons();
 });
 
-function handleGeminiConfigSubmit(e) {
-    e.preventDefault();
-    const key = document.getElementById('gemini-api-key').value.trim();
-    state.geminiApiKey = key || null;
-    saveState();
-    alert("Gemini AI API Key saved successfully!");
-    if (key && window.speakShreeText) {
-        speakShreeText("जय हरी! जेमिनी ए आई की चाबी सुरक्षित कर ली गई है।");
-    }
-}
+
 
 // Cloud Sync Helpers
 function handleCloudConfigSubmit(e) {
