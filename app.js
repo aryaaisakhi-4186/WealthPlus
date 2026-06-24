@@ -2690,12 +2690,46 @@ async function uploadLocalDataToFirebase() {
 }
 
 async function handleResetAppClick() {
-    if (!confirm("⚠️ WARNING: Are you sure you want to perform a full reset of the application? This will permanently delete all local transactions, clients, custom fields, and configurations. This cannot be undone!")) {
+    if (!confirm("⚠️ WARNING: Are you sure you want to perform a full reset of the ledger and transactions? This will permanently delete all local and cloud expense entries and income logs. Member Directory, Settings, and GitHub configuration will remain untouched. This cannot be undone!")) {
         return;
     }
 
-    // Reset local data
-    localStorage.removeItem('wealth_plus_state');
-    alert("Application data reset successfully! Reloading page...");
+    const resetBtn = document.getElementById('btn-reset-app-now');
+
+    if (state.cloudSyncEnabled && firebaseDb) {
+        try {
+            resetBtn.disabled = true;
+            resetBtn.innerText = "Clearing Cloud Ledger...";
+
+            // Wipe transactions from Firestore
+            const txSnapshot = await firebaseDb.collection('transactions').get();
+            for (const doc of txSnapshot.docs) {
+                await doc.ref.delete();
+            }
+
+            // Wipe income logs from Firestore
+            const incomeSnapshot = await firebaseDb.collection('incomeLogs').get();
+            for (const doc of incomeSnapshot.docs) {
+                await doc.ref.delete();
+            }
+
+            alert("Cloud database transactions and income logs cleared successfully!");
+        } catch (e) {
+            console.error("Cloud reset error:", e);
+            alert("Error clearing cloud database: " + e.message);
+        } finally {
+            resetBtn.disabled = false;
+            resetBtn.innerText = "Reset Application Now";
+        }
+    }
+
+    // Reset local data arrays for ledger
+    state.transactions = [];
+    state.incomeLogs = [];
+    
+    // Save state
+    saveState();
+    
+    alert("Local ledger data reset successfully! Reloading page...");
     window.location.reload();
 }
