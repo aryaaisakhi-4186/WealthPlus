@@ -19,6 +19,14 @@ let state = {
     githubToken: null,       // GitHub Personal Access Token
     githubRepo: "aryaaisakhi-4186/WealthPlus",        // GitHub repo path (owner/repo)
     githubBranch: 'main',    // GitHub branch (defaults to main)
+    categoriesConfig: {
+        Food: { color: '#f59e0b', icon: 'utensils' },
+        Shopping: { color: '#ec4899', icon: 'shopping-bag' },
+        Bills: { color: '#3b82f6', icon: 'credit-card' },
+        Transport: { color: '#06b6d4', icon: 'car' },
+        Rent: { color: '#8b5cf6', icon: 'home' },
+        Others: { color: '#64748b', icon: 'more-horizontal' }
+    },
     activePage: 'dashboard',
     activeReportTab: 'client',
     activeMasterTab: 'accounts',
@@ -68,7 +76,7 @@ const defaultTransactions = [
     { id: "t6", description: "Electricity Bill", category: "Bills", amount: 6200, date: "2026-05-10", mode: "HDFC Bank", clientId: "" }
 ];
 
-const categoriesConfig = {
+const defaultCategoriesConfig = {
     Food: { color: '#f59e0b', icon: 'utensils' },
     Shopping: { color: '#ec4899', icon: 'shopping-bag' },
     Bills: { color: '#3b82f6', icon: 'credit-card' },
@@ -99,6 +107,7 @@ function loadState() {
     } else {
         seedState();
     }
+    populateCategoryDropdowns();
 }
 
 // Seed initial state
@@ -112,6 +121,7 @@ function seedState() {
     state.transactions = [...defaultTransactions];
     state.customClientFields = [];
     state.customTxFields = [];
+    state.categoriesConfig = { ...defaultCategoriesConfig };
     state.activePage = 'dashboard';
     state.activeReportTab = 'client';
     state.activeMasterTab = 'accounts';
@@ -130,6 +140,7 @@ function runStateMigrations() {
     if (!state.customClientFields) { state.customClientFields = []; updated = true; }
     if (!state.customTxFields) { state.customTxFields = []; updated = true; }
     if (!state.activeMasterTab) { state.activeMasterTab = 'accounts'; updated = true; }
+    if (!state.categoriesConfig) { state.categoriesConfig = { ...defaultCategoriesConfig }; updated = true; }
 
     state.incomeLogs.forEach(log => {
         if (log.mode === 'Cash') { log.mode = 'Main Cash'; updated = true; }
@@ -206,7 +217,8 @@ function firebaseWriteSettings() {
         firebaseDb.collection('settings').doc('config').set({
             budgets: state.budgets,
             customClientFields: state.customClientFields,
-            customTxFields: state.customTxFields
+            customTxFields: state.customTxFields,
+            categoriesConfig: state.categoriesConfig
         }).catch(e => console.error("Firebase settings write error:", e));
     }
 }
@@ -299,6 +311,11 @@ function initFirebaseSyncListeners() {
         if (data.customTxFields && !isSame(state.customTxFields, data.customTxFields)) {
             state.customTxFields = data.customTxFields;
             changed = true;
+        }
+        if (data.categoriesConfig && !isSame(state.categoriesConfig, data.categoriesConfig)) {
+            state.categoriesConfig = data.categoriesConfig;
+            changed = true;
+            populateCategoryDropdowns();
         }
         if (changed) {
             saveStateLocalOnly();
@@ -411,11 +428,13 @@ function saveCustomFieldsDirect(customClientFields, customTxFields, syncToCloud 
 function initLoginSession() {
     const loginOverlay = document.getElementById('login-screen');
     const userBadge = document.getElementById('current-user-badge');
+    const shreeWidget = document.getElementById('shree-chat-widget');
 
     if (state.currentUser) {
         // Logged in
         loginOverlay.classList.add('hidden');
         userBadge.innerText = `${state.currentUser.name} (${state.currentUser.role})`;
+        if (shreeWidget) shreeWidget.style.display = 'block';
         
         // Dynamic Role access checks: Hide Master link for Staff
         const masterLinks = document.querySelectorAll('[data-page="master"]');
@@ -430,6 +449,7 @@ function initLoginSession() {
     } else {
         // Not logged in
         loginOverlay.classList.remove('hidden');
+        if (shreeWidget) shreeWidget.style.display = 'none';
     }
 }
 
@@ -722,6 +742,7 @@ function renderPage(pageId) {
 
     updateDateDisplay();
     updateGlobalStatsUI();
+    populateCategoryDropdowns();
 
     switch (pageId) {
         case 'dashboard':
@@ -795,7 +816,7 @@ function renderDashboard() {
 
     // 2. Category chart
     const catAmounts = {};
-    Object.keys(categoriesConfig).forEach(cat => catAmounts[cat] = 0);
+    Object.keys(state.categoriesConfig).forEach(cat => catAmounts[cat] = 0);
     filteredTx.forEach(tx => {
         if (catAmounts[tx.category] !== undefined) {
             catAmounts[tx.category] += Number(tx.amount);
@@ -820,7 +841,7 @@ function renderDashboard() {
         latestTx.forEach(tx => {
             const client = state.clients.find(c => c.id === tx.clientId);
             const clientLabel = client ? client.name : 'General';
-            const catMeta = categoriesConfig[tx.category] || categoriesConfig['Others'];
+            const catMeta = state.categoriesConfig[tx.category] || state.categoriesConfig['Others'];
             
             const item = document.createElement('div');
             item.className = 'recent-item';
@@ -875,7 +896,7 @@ function renderDashboard() {
     const budgetCatList = document.getElementById('dash-budget-category-list');
     budgetCatList.innerHTML = '';
 
-    Object.keys(categoriesConfig).forEach(cat => {
+    Object.keys(state.categoriesConfig).forEach(cat => {
         const monthlyB = Number(state.budgets[cat]) || 0;
         const yearlyB = monthlyB * 12;
         const spentY = fyTx.filter(tx => tx.category === cat).reduce((sum, tx) => sum + Number(tx.amount), 0);
@@ -908,7 +929,7 @@ function renderCategoryChart(dataObj) {
 
     const labels = Object.keys(dataObj);
     const datasetData = Object.values(dataObj);
-    const colors = labels.map(l => categoriesConfig[l].color);
+    const colors = labels.map(l => state.categoriesConfig[l].color);
     const hasData = datasetData.some(v => v > 0);
 
     if (!hasData) {
@@ -1176,7 +1197,7 @@ function renderExpensesPage() {
         tr.innerHTML = `
             <td>${formatDbDate(tx.date)}</td>
             <td style="font-weight:600;">${tx.description}</td>
-            <td><span class="cat-pill" style="background:${categoriesConfig[tx.category]?.color || '#64748b'}">${tx.category}</span></td>
+            <td><span class="cat-pill" style="background:${state.categoriesConfig[tx.category]?.color || '#64748b'}">${tx.category}</span></td>
             <td><span class="badge-acctype">${tx.mode}</span></td>
             <td>${clientLabel}</td>
             <td style="font-weight:700;">-₹${Number(tx.amount).toLocaleString('en-IN')}</td>
@@ -1270,15 +1291,15 @@ function renderClientReportDetails(clientId) {
 
     const clientTx = state.transactions.filter(t => t.clientId === clientId);
     const catTotals = {};
-    Object.keys(categoriesConfig).forEach(cat => catTotals[cat] = 0);
+    Object.keys(state.categoriesConfig).forEach(cat => catTotals[cat] = 0);
     clientTx.forEach(t => {
         if (catTotals[t.category] !== undefined) catTotals[t.category] += Number(t.amount);
     });
 
-    Object.keys(categoriesConfig).forEach(cat => {
+    Object.keys(state.categoriesConfig).forEach(cat => {
         const amt = catTotals[cat];
         const pct = stats.totalSpent > 0 ? (amt / stats.totalSpent) * 100 : 0;
-        const color = categoriesConfig[cat].color;
+        const color = state.categoriesConfig[cat].color;
 
         const pItem = document.createElement('div');
         pItem.innerHTML = `
@@ -1302,7 +1323,7 @@ function renderClientReportDetails(clientId) {
             tr.innerHTML = `
                 <td>${formatDbDate(tx.date)}</td>
                 <td style="font-weight:600;">${tx.description}</td>
-                <td><span class="cat-pill" style="font-size:10px; padding:2px 6px; background:${categoriesConfig[tx.category]?.color || '#64748b'}">${tx.category}</span></td>
+                <td><span class="cat-pill" style="font-size:10px; padding:2px 6px; background:${state.categoriesConfig[tx.category]?.color || '#64748b'}">${tx.category}</span></td>
                 <td>${tx.mode}</td>
                 <td style="font-weight:700;">-₹${Number(tx.amount).toLocaleString('en-IN')}</td>
             `;
@@ -1367,7 +1388,7 @@ function renderBudgetAnalysisReport() {
     else if (state.selectedPeriod === 'this-quarter') scaleMonths = 3;
     else if (state.selectedPeriod === 'custom') scaleMonths = Math.max(1, Math.round(diffDays / 30));
 
-    Object.keys(categoriesConfig).forEach(cat => {
+    Object.keys(state.categoriesConfig).forEach(cat => {
         const monthlyB = Number(state.budgets[cat]) || 0;
         const targetBudget = monthlyB * scaleMonths;
         const actualSpent = periodTx.filter(t => t.category === cat).reduce((sum, t) => sum + Number(t.amount), 0);
@@ -1699,24 +1720,205 @@ function renderMasterClients() {
 
 function renderMasterBudgetsEditor() {
     const container = document.getElementById('budget-inputs-container');
+    if (!container) return;
     container.innerHTML = '';
 
-    Object.keys(categoriesConfig).forEach(cat => {
+    Object.keys(state.categoriesConfig).forEach(cat => {
         const val = state.budgets[cat] || 0;
-        
-        const div = document.createElement('div');
-        div.className = 'form-group budget-form-group';
-        div.innerHTML = `
-            <label for="budget-input-${cat}">${cat} Monthly Budget (INR) *</label>
-            <input type="number" id="budget-input-${cat}" name="${cat}" min="0" value="${val}" required placeholder="e.g. 5000">
-            <span class="field-helper-text">Yearly: ₹${(val * 12).toLocaleString('en-IN')}</span>
+        const color = state.categoriesConfig[cat].color || '#64748b';
+        const isOthers = cat === 'Others';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="cat-pill" style="background:${color}; padding: 4px 8px; border-radius: 4px; color: white; font-weight: 500; font-size: 12px;">${cat}</span>
+                </div>
+            </td>
+            <td>
+                <input type="color" class="color-picker-input" value="${color}" data-cat="${cat}" style="width:40px; height:28px; border:none; padding:0; background:transparent; cursor:pointer;">
+            </td>
+            <td>
+                <div class="form-group" style="margin-bottom:0; display:flex; align-items:center; gap:8px;">
+                    <input type="number" name="${cat}" min="0" value="${val}" required style="padding:6px 10px; font-size:13px; width:100%; max-width:120px;" placeholder="e.g. 5000">
+                    <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); white-space:nowrap;">Yearly: ₹${(val * 12).toLocaleString('en-IN')}</span>
+                </div>
+            </td>
+            <td style="text-align:right;">
+                <div class="table-actions" style="display:flex; justify-content:flex-end; gap:8px;">
+                    <button type="button" class="btn-icon-only edit-btn" onclick="renameCategoryPrompt('${cat}')" title="Rename Head" style="padding:6px; cursor:pointer;"><i data-lucide="edit-3"></i></button>
+                    ${isOthers ? '' : `<button type="button" class="btn-icon-only delete-btn" onclick="deleteCategoryPrompt('${cat}')" title="Delete Head" style="padding:6px; cursor:pointer;"><i data-lucide="trash-2"></i></button>`}
+                </div>
+            </td>
         `;
-        div.querySelector('input').addEventListener('input', function() {
+        
+        tr.querySelector('input[type="number"]').addEventListener('input', function() {
             const v = Number(this.value) || 0;
-            div.querySelector('.field-helper-text').innerText = `Yearly: ₹${(v * 12).toLocaleString('en-IN')}`;
+            tr.querySelector('.field-helper-text').innerText = `Yearly: ₹${(v * 12).toLocaleString('en-IN')}`;
         });
-        container.appendChild(div);
+        
+        container.appendChild(tr);
     });
+    
+    lucide.createIcons();
+}
+
+function populateCategoryDropdowns() {
+    const dropdown = document.getElementById('expense-category');
+    if (!dropdown) return;
+    
+    const currentVal = dropdown.value;
+    dropdown.innerHTML = '';
+    
+    Object.keys(state.categoriesConfig).forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat;
+        option.innerText = cat;
+        dropdown.appendChild(option);
+    });
+    
+    if (currentVal && state.categoriesConfig[currentVal]) {
+        dropdown.value = currentVal;
+    }
+}
+
+function saveCurrentBudgetsFromUI() {
+    const form = document.getElementById('form-category-budgets');
+    if (!form) return;
+    const colorPickers = form.querySelectorAll('.color-picker-input');
+    colorPickers.forEach(picker => {
+        const cat = picker.getAttribute('data-cat');
+        const color = picker.value;
+        if (state.categoriesConfig[cat]) {
+            state.categoriesConfig[cat].color = color;
+        }
+    });
+
+    Object.keys(state.categoriesConfig).forEach(cat => {
+        const input = form.querySelector(`input[name="${cat}"]`);
+        if (input) {
+            state.budgets[cat] = Number(input.value) || 0;
+        }
+    });
+}
+
+function addCategoryPrompt() {
+    const catName = prompt("Enter new category (head) name:");
+    if (!catName) return;
+    const cleanCatName = catName.trim();
+    if (!cleanCatName) return;
+
+    const exists = Object.keys(state.categoriesConfig).some(c => c.toLowerCase() === cleanCatName.toLowerCase());
+    if (exists) {
+        alert(`Category "${cleanCatName}" already exists.`);
+        return;
+    }
+
+    saveCurrentBudgetsFromUI();
+
+    const colors = ['#f59e0b', '#ec4899', '#3b82f6', '#06b6d4', '#8b5cf6', '#10b981', '#ef4444', '#6366f1'];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
+    state.categoriesConfig[cleanCatName] = {
+        color: randomColor,
+        icon: 'tag'
+    };
+    state.budgets[cleanCatName] = 0;
+
+    saveStateLocalOnly();
+    if (state.cloudSyncEnabled) {
+        firebaseWriteSettings();
+    }
+
+    renderPage('master');
+}
+
+function renameCategoryPrompt(oldCat) {
+    if (oldCat === 'Others') {
+        alert("The 'Others' category is a system default and cannot be renamed.");
+        return;
+    }
+    
+    const newCat = prompt(`Enter new name for category "${oldCat}":`, oldCat);
+    if (!newCat) return;
+    const cleanNewCat = newCat.trim();
+    if (!cleanNewCat) return;
+
+    if (cleanNewCat.toLowerCase() === oldCat.toLowerCase()) {
+        return;
+    }
+
+    if (state.categoriesConfig[cleanNewCat]) {
+        alert(`Category "${cleanNewCat}" already exists.`);
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to rename category "${oldCat}" to "${cleanNewCat}"? This will update all existing transactions in this category.`)) {
+        return;
+    }
+
+    saveCurrentBudgetsFromUI();
+
+    const catConfig = state.categoriesConfig[oldCat];
+    state.categoriesConfig[cleanNewCat] = catConfig;
+    delete state.categoriesConfig[oldCat];
+
+    state.budgets[cleanNewCat] = state.budgets[oldCat] || 0;
+    delete state.budgets[oldCat];
+
+    let updatedTxCount = 0;
+    state.transactions.forEach(tx => {
+        if (tx.category === oldCat) {
+            tx.category = cleanNewCat;
+            updatedTxCount++;
+            if (state.cloudSyncEnabled && firebaseDb) {
+                firebaseWrite('transactions', tx.id, tx);
+            }
+        }
+    });
+
+    saveStateLocalOnly();
+    if (state.cloudSyncEnabled) {
+        firebaseWriteSettings();
+    }
+
+    alert(`Successfully renamed category and updated ${updatedTxCount} transactions.`);
+    renderPage('master');
+}
+
+function deleteCategoryPrompt(cat) {
+    if (cat === 'Others') {
+        alert("The 'Others' category is a system default and cannot be deleted.");
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to delete category "${cat}"? All existing transactions in this category will be re-categorized as "Others".`)) {
+        return;
+    }
+
+    saveCurrentBudgetsFromUI();
+
+    delete state.categoriesConfig[cat];
+    delete state.budgets[cat];
+
+    let updatedTxCount = 0;
+    state.transactions.forEach(tx => {
+        if (tx.category === cat) {
+            tx.category = 'Others';
+            updatedTxCount++;
+            if (state.cloudSyncEnabled && firebaseDb) {
+                firebaseWrite('transactions', tx.id, tx);
+            }
+        }
+    });
+
+    saveStateLocalOnly();
+    if (state.cloudSyncEnabled) {
+        firebaseWriteSettings();
+    }
+
+    alert(`Successfully deleted category "${cat}" and moved ${updatedTxCount} transactions to "Others".`);
+    renderPage('master');
 }
 
 function renderMasterCustomColumns() {
@@ -1929,6 +2131,12 @@ function initEventHandlers() {
 
     // Excel Export trigger
     document.getElementById('btn-export-excel').addEventListener('click', exportToExcel);
+
+    // Add Category Button Trigger
+    const btnAddCategory = document.getElementById('btn-add-category');
+    if (btnAddCategory) {
+        btnAddCategory.addEventListener('click', addCategoryPrompt);
+    }
 }
 
 // --- 8. MODALS CRUD LOGIC (MEMBERS SETUP & DYNAMIC COLUMNS) ---
@@ -2429,16 +2637,34 @@ window.deleteCustomField = function(scope, fieldId) {
 function handleCategoryBudgetsSubmit(e) {
     e.preventDefault();
     const form = document.getElementById('form-category-budgets');
-    const formData = new FormData(form);
-
+    
+    // Save Budgets and Colors
     let budgetsObj = {};
-    Object.keys(categoriesConfig).forEach(cat => {
-        const val = Number(formData.get(cat)) || 0;
-        budgetsObj[cat] = val;
+    const colorPickers = form.querySelectorAll('.color-picker-input');
+    colorPickers.forEach(picker => {
+        const cat = picker.getAttribute('data-cat');
+        const color = picker.value;
+        if (state.categoriesConfig[cat]) {
+            state.categoriesConfig[cat].color = color;
+        }
     });
 
-    saveBudgetsDirect(budgetsObj);
-    alert("Category budgets saved successfully!");
+    Object.keys(state.categoriesConfig).forEach(cat => {
+        const input = form.querySelector(`input[name="${cat}"]`);
+        if (input) {
+            budgetsObj[cat] = Number(input.value) || 0;
+        } else {
+            budgetsObj[cat] = state.budgets[cat] || 0;
+        }
+    });
+
+    state.budgets = budgetsObj;
+    saveStateLocalOnly();
+    if (state.cloudSyncEnabled) {
+        firebaseWriteSettings();
+    }
+
+    alert("Category configuration saved successfully!");
     renderPage('master');
 }
 
@@ -2504,7 +2730,7 @@ function exportToExcel() {
     else if (state.selectedPeriod === 'this-quarter') scaleMonths = 3;
     else if (state.selectedPeriod === 'custom') scaleMonths = Math.max(1, Math.round(diffDays / 30));
 
-    const budgetData = Object.keys(categoriesConfig).map(cat => {
+    const budgetData = Object.keys(state.categoriesConfig).map(cat => {
         const monthlyB = Number(state.budgets[cat]) || 0;
         const targetBudget = monthlyB * scaleMonths;
         const actualSpent = periodTx.filter(t => t.category === cat).reduce((sum, t) => sum + Number(t.amount), 0);
@@ -2685,7 +2911,8 @@ async function uploadLocalDataToFirebase() {
     await firebaseDb.collection('settings').doc('config').set({
         budgets: state.budgets,
         customClientFields: state.customClientFields,
-        customTxFields: state.customTxFields
+        customTxFields: state.customTxFields,
+        categoriesConfig: state.categoriesConfig
     });
 }
 

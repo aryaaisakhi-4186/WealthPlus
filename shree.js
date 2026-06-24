@@ -1,0 +1,593 @@
+/* ==========================================================================
+   WEALTH PLUS - SHREE AI AGENT MODULE (shree.js)
+   ========================================================================== */
+
+document.addEventListener('DOMContentLoaded', () => {
+    initShreeWidget();
+});
+
+let isShreeListening = false;
+let shreeRecognition = null;
+
+function initShreeWidget() {
+    const toggleBtn = document.getElementById('btn-shree-toggle');
+    const chatWindow = document.getElementById('shree-chat-window');
+    const closeBtn = document.getElementById('btn-shree-close');
+    const sendBtn = document.getElementById('btn-shree-send');
+    const micBtn = document.getElementById('btn-shree-mic');
+    const textInput = document.getElementById('shree-text-input');
+    
+    const settingsToggleBtn = document.getElementById('btn-shree-settings-toggle');
+    const settingsContainer = document.getElementById('shree-settings-container');
+    const messagesContainer = document.getElementById('shree-messages-container');
+    const footerContainer = document.getElementById('shree-footer-container');
+    
+    const settingsBackBtn = document.getElementById('btn-shree-settings-back');
+    const settingsSaveBtn = document.getElementById('btn-shree-settings-save');
+    const apiKeyInput = document.getElementById('gemini-api-key');
+
+    // 1. Toggle Chat Window
+    toggleBtn.addEventListener('click', () => {
+        chatWindow.classList.toggle('active');
+        if (chatWindow.classList.contains('active')) {
+            textInput.focus();
+            scrollMessagesToBottom();
+        }
+    });
+
+    closeBtn.addEventListener('click', () => {
+        chatWindow.classList.remove('active');
+    });
+
+    // 2. Settings Toggle (Gear button)
+    settingsToggleBtn.addEventListener('click', () => {
+        if (settingsContainer.style.display === 'flex' || settingsContainer.classList.contains('active')) {
+            // Close settings
+            settingsContainer.style.display = 'none';
+            settingsContainer.classList.remove('active');
+            messagesContainer.style.display = 'flex';
+            footerContainer.style.display = 'flex';
+            textInput.focus();
+        } else {
+            // Open settings
+            apiKeyInput.value = state.geminiApiKey || '';
+            settingsContainer.style.display = 'flex';
+            settingsContainer.classList.add('active');
+            messagesContainer.style.display = 'none';
+            footerContainer.style.display = 'none';
+        }
+    });
+
+    settingsBackBtn.addEventListener('click', () => {
+        settingsContainer.style.display = 'none';
+        settingsContainer.classList.remove('active');
+        messagesContainer.style.display = 'flex';
+        footerContainer.style.display = 'flex';
+        textInput.focus();
+    });
+
+    settingsSaveBtn.addEventListener('click', () => {
+        const key = apiKeyInput.value.trim();
+        state.geminiApiKey = key || null;
+        saveState();
+        alert("Gemini AI API Key saved!");
+        speakShreeText("जय हरी! जेमिनी ए आई की चाबी सुरक्षित कर ली गई है।");
+        
+        // Go back
+        settingsContainer.style.display = 'none';
+        settingsContainer.classList.remove('active');
+        messagesContainer.style.display = 'flex';
+        footerContainer.style.display = 'flex';
+        textInput.focus();
+    });
+
+    // 3. Send Text Command
+    sendBtn.addEventListener('click', () => {
+        processTextCommand();
+    });
+
+    textInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            processTextCommand();
+        }
+    });
+
+    // 4. Voice Input (Web Speech Recognition)
+    initSpeechRecognition(micBtn, textInput);
+}
+
+function scrollMessagesToBottom() {
+    const container = document.getElementById('shree-messages-container');
+    if (container) {
+        container.scrollTop = container.scrollHeight;
+    }
+}
+
+function appendChatMessage(sender, text, timeText = "अभी") {
+    const container = document.getElementById('shree-messages-container');
+    if (!container) return;
+
+    const div = document.createElement('div');
+    div.className = `shree-msg msg-${sender}`;
+    div.innerHTML = `
+        <p>${text}</p>
+        <span class="msg-time">${timeText}</span>
+    `;
+    container.appendChild(div);
+    scrollMessagesToBottom();
+}
+
+// --- VOICE RECOGNITION (Speech-to-Text) ---
+function initSpeechRecognition(micBtn, textInput) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        micBtn.style.display = 'none';
+        console.warn("Speech Recognition API not supported in this browser.");
+        return;
+    }
+
+    shreeRecognition = new SpeechRecognition();
+    shreeRecognition.continuous = false;
+    shreeRecognition.lang = 'hi-IN'; // Default to Hindi
+    shreeRecognition.interimResults = false;
+    shreeRecognition.maxAlternatives = 1;
+
+    micBtn.addEventListener('click', () => {
+        if (isShreeListening) {
+            shreeRecognition.stop();
+        } else {
+            try {
+                shreeRecognition.start();
+            } catch (e) {
+                console.error("Speech recognition start error:", e);
+            }
+        }
+    });
+
+    shreeRecognition.onstart = () => {
+        isShreeListening = true;
+        micBtn.classList.add('active');
+        document.getElementById('shree-status-text').innerText = 'Listening voice...';
+    };
+
+    shreeRecognition.onend = () => {
+        isShreeListening = false;
+        micBtn.classList.remove('active');
+        document.getElementById('shree-status-text').innerText = 'AI Assistant • Idle';
+    };
+
+    shreeRecognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        isShreeListening = false;
+        micBtn.classList.remove('active');
+        document.getElementById('shree-status-text').innerText = 'AI Assistant • Idle';
+    };
+
+    shreeRecognition.onresult = (event) => {
+        const textResult = event.results[0][0].transcript;
+        textInput.value = textResult;
+        processTextCommand();
+    };
+}
+
+// --- VOICE SYNTHESIS (Text-to-Speech) ---
+function speakShreeText(text) {
+    if (!window.speechSynthesis) return;
+    
+    // Stop any ongoing speech
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'hi-IN'; // Speak in Hindi
+    utterance.rate = 1.0;
+    utterance.pitch = 1.1; // Slightly sweet tone
+
+    // Try to find a sweet female Hindi voice
+    const voices = window.speechSynthesis.getVoices();
+    const hindiVoice = voices.find(v => v.lang.includes('hi') || v.lang.includes('IN'));
+    if (hindiVoice) {
+        utterance.voice = hindiVoice;
+    }
+    
+    window.speechSynthesis.speak(utterance);
+}
+
+// --- COMMAND INTERPRETER ENGINE ---
+async function processTextCommand() {
+    const textInput = document.getElementById('shree-text-input');
+    const query = textInput.value.trim();
+    if (!query) return;
+
+    // Display user message
+    appendChatMessage('user', query);
+    textInput.value = '';
+
+    // Set status to thinking
+    document.getElementById('shree-status-text').innerText = 'Processing...';
+
+    // 1. Try local NLP Regex Parser
+    let parsedAction = parseLocalCommand(query);
+    
+    // 2. Try Gemini AI if local match failed AND Gemini API Key is available
+    if ((!parsedAction || parsedAction.fallback) && state.geminiApiKey) {
+        try {
+            const geminiResult = await callGeminiAI(query);
+            if (geminiResult && geminiResult.success) {
+                parsedAction = geminiResult;
+            }
+        } catch (err) {
+            console.error("Gemini parsing error fallback:", err);
+        }
+    }
+
+    // 3. Execute the parsed action
+    let replyText = "";
+    if (parsedAction) {
+        replyText = executeAgentAction(parsedAction);
+    } else {
+        replyText = "माफ़ कीजिये, मैं इस कमांड को समझ नहीं पाई। क्या आप कृपया दोबारा स्पष्ट रूप से बताएंगे? (जैसे: 'Shree naya client add karo...')";
+    }
+
+    // Show Shree response & vocal feedback
+    appendChatMessage('shree', replyText);
+    speakShreeText(replyText);
+    document.getElementById('shree-status-text').innerText = 'AI Assistant • Idle';
+}
+
+// --- LOCAL PARSER (Offline Regex NLP Rules) ---
+function parseLocalCommand(text) {
+    const cleanText = text.toLowerCase().trim();
+
+    // 1. Client Registration
+    // E.g. "Shree naya client add kar do client ka name hai Balkrishna Premnarayan"
+    // E.g. "Balkrishna Premnarayan client register karo"
+    if (cleanText.includes("client") && (cleanText.includes("add") || cleanText.includes("register") || cleanText.includes("banao") || cleanText.includes("bana do") || cleanText.includes("naya") || cleanText.includes("naye"))) {
+        let name = "";
+        const nameIndicators = ["name hai", "naam hai", "name is", "naam is", "client ka name", "client ka naam"];
+        for (const ind of nameIndicators) {
+            if (cleanText.includes(ind)) {
+                const parts = text.split(new RegExp(ind, "i"));
+                if (parts[1]) {
+                    name = parts[1].replace(/add|kar|do|karo|please|shree|ai/gi, "").trim();
+                    break;
+                }
+            }
+        }
+        if (!name) {
+            // Extract using regex
+            const match = text.match(/(?:add\s+client|register\s+client|client|naya\s+client)\s+([a-zA-Z0-9\s]+)/i);
+            if (match && match[1]) {
+                name = match[1].replace(/add|kar|do|karo|please|shree|ai/gi, "").trim();
+            }
+        }
+
+        name = name.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").replace(/\s+/g, " ").trim();
+        if (name && name.length > 2) {
+            return {
+                action: "addClient",
+                data: { name: name }
+            };
+        }
+    }
+
+    // 2. Extract Amount (numbers between 10 and 9,999,999)
+    const amountMatch = cleanText.match(/\b\d{2,7}\b/);
+    if (!amountMatch) return null;
+    const amount = parseInt(amountMatch[0]);
+
+    // 3. Extract Date (optional)
+    // E.g. "date 24-06-26 me" or "24-06-2026"
+    let dateStr = new Date().toISOString().split('T')[0]; // Default to today
+    const dateMatch = cleanText.match(/(\d{2,4})[-\/](\d{2})[-\/](\d{2,4})/);
+    if (dateMatch) {
+        let part1 = dateMatch[1];
+        let part2 = dateMatch[2];
+        let part3 = dateMatch[3];
+        let year = "2026";
+        let month = part2;
+        let day = "01";
+        
+        if (part1.length === 4) {
+            year = part1;
+            day = part3;
+        } else if (part3.length === 4) {
+            year = part3;
+            day = part1;
+        } else {
+            // Both are 2 digits
+            if (part1 === "26" || part1 === "2026") {
+                year = "2026";
+                day = part3;
+            } else if (part3 === "26" || part3 === "2026") {
+                year = "2026";
+                day = part1;
+            } else {
+                year = "20" + part3;
+                day = part1;
+            }
+        }
+        month = month.padStart(2, '0');
+        day = day.padStart(2, '0');
+        dateStr = `${year}-${month}-${day}`;
+    }
+
+    // 4. Extract Account/Mode
+    // Search in state.accounts
+    let mode = "";
+    for (const acc of state.accounts) {
+        if (cleanText.includes(acc.name.toLowerCase())) {
+            mode = acc.name;
+            break;
+        }
+    }
+    
+    // Check if user specified a specific bank code like "boi-0308" or "boi-1234"
+    if (!mode) {
+        const accountCodeMatch = cleanText.match(/\b([a-z]{2,5}[-\s]?\d{2,6})\b/);
+        if (accountCodeMatch && accountCodeMatch[1]) {
+            const potentialAccName = accountCodeMatch[1].toUpperCase();
+            if (!potentialAccName.match(/^\d{2,4}[-\s]?\d{2}$/)) { // avoid matching dates like 24-06
+                const exists = state.accounts.find(a => a.name.toLowerCase() === potentialAccName.toLowerCase());
+                if (exists) {
+                    mode = exists.name;
+                } else {
+                    const newAcc = {
+                        id: "acc_" + Date.now(),
+                        name: potentialAccName,
+                        type: "Bank"
+                    };
+                    addAccountDirect(newAcc);
+                    mode = newAcc.name;
+                }
+            }
+        }
+    }
+
+    if (!mode) {
+        // Fallback checks
+        if (cleanText.includes("cash") || cleanText.includes("nagad")) {
+            mode = state.accounts.find(a => a.type === "Cash")?.name || "Main Cash";
+        } else if (cleanText.includes("bank") || cleanText.includes("online") || cleanText.includes("boi") || cleanText.includes("hdfc")) {
+            mode = state.accounts.find(a => a.type === "Bank")?.name || "HDFC Bank";
+        } else {
+            mode = state.accounts[0]?.name || "Main Cash";
+        }
+    }
+
+    // 5. Extract Client
+    let clientObj = null;
+    for (const c of state.clients) {
+        if (cleanText.includes(c.name.toLowerCase())) {
+            clientObj = c;
+            break;
+        }
+    }
+
+    let clientName = "Walk-in Client";
+    let clientId = "";
+    
+    if (clientObj) {
+        clientName = clientObj.name;
+        clientId = clientObj.id;
+    } else {
+        // Try to extract client name using regex: "[Name] client" or "[Name] clinet"
+        const clientMatch = cleanText.match(/([a-z0-9\s\.\-]+?)\s+(?:client|clinet)/i);
+        if (clientMatch && clientMatch[1]) {
+            let extractedName = clientMatch[1].replace(/shree|ai|karo|please|add|received|cash|date/gi, "").trim();
+            // Capitalize first letter of each word
+            extractedName = extractedName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            if (extractedName.length > 2) {
+                clientName = extractedName;
+            }
+        }
+    }
+
+    // 6. Action Detection (Income vs Expense)
+    const isIncome = cleanText.includes("received") || cleanText.includes("mile") || cleanText.includes("mila") || cleanText.includes("aaye") || cleanText.includes("income") || (clientName !== "Walk-in Client" && cleanText.includes("received")) || (clientName !== "Walk-in Client" && cleanText.includes("add") && !cleanText.includes("kharch") && !cleanText.includes("expense"));
+    
+    if (isIncome) {
+        return {
+            action: "addIncome",
+            data: {
+                clientName: clientName,
+                clientId: clientId,
+                amount: amount,
+                date: dateStr,
+                mode: mode
+            }
+        };
+    } else {
+        // Expense Action
+        // Find category from text
+        let category = "Others";
+        for (const cat of Object.keys(state.categoriesConfig)) {
+            if (cleanText.includes(cat.toLowerCase()) || (cat === "Others" && cleanText.includes("misc"))) {
+                category = cat;
+                break;
+            }
+        }
+        
+        // Description clean
+        let desc = text.replace(/shree|ai|karo|karein|add|kar do|kar\s+do|me|par|under|date|kharch|expense|exp|rupees|rs|rupay/gi, "");
+        desc = desc.replace(new RegExp(amount, 'g'), "");
+        desc = desc.replace(new RegExp(category, 'gi'), "");
+        if (category === "Others") desc = desc.replace(/misc\.?\s*expenses?/gi, "");
+        desc = desc.replace(new RegExp(mode, 'gi'), "");
+        if (dateMatch) desc = desc.replace(new RegExp(dateMatch[0], 'g'), "");
+        
+        desc = desc.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").replace(/\s+/g, " ").trim();
+        if (!desc) desc = "Expense Entry";
+
+        return {
+            action: "addExpense",
+            data: {
+                description: desc,
+                category: category,
+                amount: amount,
+                date: dateStr,
+                mode: mode,
+                clientId: clientId
+            }
+        };
+    }
+}
+
+// --- ACTION EXECUTER ENGINE ---
+function executeAgentAction(actionObj) {
+    if (!actionObj || !actionObj.action) return "माफ़ कीजिये, मैं इसे समझ नहीं पाई।";
+    
+    if (actionObj.action === "addClient") {
+        const clientName = actionObj.data.name;
+        const exists = state.clients.find(c => c.name.toLowerCase() === clientName.toLowerCase());
+        if (exists) {
+            return `क्लाइंट "${clientName}" पहले से ही registered है।`;
+        }
+        const clientObj = {
+            id: "c_" + Date.now(),
+            name: clientName,
+            monthlyPay: 0,
+            yearlyPay: 0
+        };
+        addClientDirect(clientObj);
+        renderPage(state.activePage);
+        return `जय हरी! नया क्लाइंट "${clientName}" सफलतापूर्वक जोड़ दिया गया है।`;
+    }
+    
+    if (actionObj.action === "addIncome") {
+        const { clientName, clientId, amount, date, mode } = actionObj.data;
+        let finalClientId = clientId;
+        let finalClientName = clientName;
+        
+        if (!finalClientId && clientName && clientName !== "Walk-in Client") {
+            const found = state.clients.find(c => c.name.toLowerCase().includes(clientName.toLowerCase()) || clientName.toLowerCase().includes(c.name.toLowerCase()));
+            if (found) {
+                finalClientId = found.id;
+                finalClientName = found.name;
+            } else {
+                // Register client on the fly
+                const newClientObj = {
+                    id: "c_" + Date.now(),
+                    name: clientName,
+                    monthlyPay: 0,
+                    yearlyPay: 0
+                };
+                addClientDirect(newClientObj);
+                finalClientId = newClientObj.id;
+                finalClientName = newClientObj.name;
+            }
+        }
+        
+        const incomeObj = {
+            id: "i_" + Date.now(),
+            clientId: finalClientId,
+            amount: amount,
+            date: date,
+            mode: mode
+        };
+        addIncomeDirect(incomeObj);
+        renderPage(state.activePage);
+        return `जय हरी! क्लाइंट "${finalClientName}" से ₹${amount.toLocaleString('en-IN')} का भुगतान ${mode} में दिनांक ${date} को दर्ज कर लिया गया है।`;
+    }
+    
+    if (actionObj.action === "addExpense") {
+        const { description, category, amount, date, mode, clientId } = actionObj.data;
+        const txObj = {
+            id: "t_" + Date.now(),
+            description: description,
+            category: category,
+            amount: amount,
+            date: date,
+            mode: mode,
+            clientId: clientId || ""
+        };
+        addExpenseDirect(txObj);
+        renderPage(state.activePage);
+        return `जय हरी! ₹${amount.toLocaleString('en-IN')} का खर्च "${description}" (श्रेणी: ${category}) ${mode} से दिनांक ${date} को दर्ज कर दिया गया है।`;
+    }
+    
+    return "माफ़ कीजिये, यह एक्शन अभी सपोर्टेड नहीं है।";
+}
+
+// --- GEMINI SMART PARSER Fallback ---
+async function callGeminiAI(userText) {
+    const apiKey = state.geminiApiKey;
+    if (!apiKey) return null;
+
+    // Filter dynamic lists for context
+    const cleanClients = state.clients.map(c => ({ id: c.id, name: c.name }));
+    const cleanAccounts = state.accounts.map(a => ({ name: a.name, type: a.type }));
+    const activeCategories = Object.keys(state.categoriesConfig);
+
+    const systemInstruction = `
+You are "Shree", a smart agentic AI Munim (bookkeeper) for the "Wealth Plus" application.
+Your task is to parse the user's transaction/ledger requests (written in Hinglish, Hindi, or English) into a structured JSON action object.
+
+Analyze the request and return ONLY a valid JSON object. Do not include markdown code block syntax (like \`\`\`json) or any extra text.
+
+Active Categories config: ${JSON.stringify(activeCategories)}
+Active Accounts configuration: ${JSON.stringify(cleanAccounts)}
+Active Clients registered list: ${JSON.stringify(cleanClients)}
+
+Today's Date: ${new Date().toISOString().split('T')[0]} (Year is 2026).
+Parse any date in the request to YYYY-MM-DD format.
+
+You must return JSON in this exact structure:
+{
+  "success": true,
+  "action": "addClient" | "addExpense" | "addIncome",
+  "data": {
+    // for addClient:
+    "name": "extracted client name"
+    
+    // for addExpense:
+    "description": "expense details",
+    "category": "category name (Food, Shopping, Bills, Transport, Rent, or Others)",
+    "amount": number,
+    "date": "YYYY-MM-DD",
+    "mode": "account name",
+    "clientId": "client id if specified, otherwise empty string"
+
+    // for addIncome:
+    "clientName": "client name",
+    "clientId": "client id if matches, otherwise empty string",
+    "amount": number,
+    "date": "YYYY-MM-DD",
+    "mode": "destination account name"
+  },
+  "reply": "Hindi/Hinglish vocal confirmation message summarizing the action taken."
+}
+
+If you cannot parse it, return:
+{
+  "success": false,
+  "reply": "माफ़ कीजिये, मैं इसे समझ नहीं पाई। क्या आप कृपया स्पष्ट रूप से बताएंगे?"
+}
+`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const payload = {
+        contents: [
+            { role: "user", parts: [{ text: userText }] }
+        ],
+        systemInstruction: {
+            parts: [{ text: systemInstruction }]
+        },
+        generationConfig: {
+            responseMimeType: "application/json"
+        }
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        const jsonText = data.candidates[0].content.parts[0].text;
+        return JSON.parse(jsonText);
+    } catch (e) {
+        console.error("Gemini API call failed:", e);
+        return null;
+    }
+}

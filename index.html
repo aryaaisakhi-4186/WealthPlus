@@ -467,17 +467,34 @@
 
                         <!-- Panel C: Budgets Setup -->
                         <div id="master-panel-budgets" class="master-sub-panel">
-                            <div class="panel-action-header">
-                                <h4>Category Budgets Editor</h4>
-                                <p style="font-size:12px; color:var(--text-secondary);">Set expected Monthly budgets. Dashboard multiplies values by 12 for Yearly analysis.</p>
+                            <div class="panel-action-header" style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
+                                <div>
+                                    <h4>Category Budgets & Heads Editor</h4>
+                                    <p style="font-size:12px; color:var(--text-secondary);">Manage budget limits, category colors, and rename or delete heads dynamically.</p>
+                                </div>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="btn-add-category" style="display:inline-flex; align-items:center; gap:6px;">
+                                    <i data-lucide="plus"></i> Add Category
+                                </button>
                             </div>
                             <div class="budgets-editor-form-box">
-                                <form id="form-category-budgets" class="inline-grid-form">
-                                    <div class="budgets-inputs-grid" id="budget-inputs-container">
-                                        <!-- Category budget inputs rendered dynamically -->
+                                <form id="form-category-budgets">
+                                    <div class="table-container">
+                                        <table class="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Category (Head) Name</th>
+                                                    <th style="width:120px;">Color</th>
+                                                    <th>Monthly Budget (INR)</th>
+                                                    <th style="width:150px; text-align:right;">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="budget-inputs-container">
+                                                <!-- Dynamic rows -->
+                                            </tbody>
+                                        </table>
                                     </div>
                                     <div style="margin-top:20px; display:flex; justify-content:flex-end;">
-                                        <button type="submit" class="btn btn-primary">Save Category Budgets</button>
+                                        <button type="submit" class="btn btn-primary">Save Changes</button>
                                     </div>
                                 </form>
                             </div>
@@ -955,11 +972,83 @@
         </div>
     </div>
 
+    <!-- ==========================================
+         SHREE AI ASSISTANT CHAT WIDGET
+         ========================================== -->
+    <div id="shree-chat-widget" class="shree-widget" style="display: none;">
+        <button id="btn-shree-toggle" class="shree-toggle-btn" title="Ask Shree (AI Assistant)">
+            <i data-lucide="message-square"></i>
+            <span class="pulse-indicator"></span>
+        </button>
+        <div id="shree-chat-window" class="shree-chat-window">
+            <!-- Header -->
+            <div class="shree-header">
+                <div class="shree-header-info">
+                    <div class="shree-avatar">S</div>
+                    <div>
+                        <h4 style="margin:0; font-size:14px; font-weight: 700;">Shree AI</h4>
+                        <span id="shree-status-text" style="font-size:10px; color:rgba(255,255,255,0.75);">AI Assistant &bull; Idle</span>
+                    </div>
+                </div>
+                <div class="shree-header-actions">
+                    <button id="btn-shree-settings-toggle" class="btn-shree-action" title="Gemini API Key Settings">
+                        <i data-lucide="settings"></i>
+                    </button>
+                    <button id="btn-shree-close" class="btn-shree-action" title="Minimize Chat">
+                        <i data-lucide="minimize-2"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chat View Messages -->
+            <div class="shree-messages" id="shree-messages-container">
+                <div class="shree-msg msg-shree">
+                    <p>नमस्ते! मैं श्री हूँ, आपकी AI मुनीम। मैं आपकी आवाज़ सुनकर या टेक्स्ट पढ़कर काम कर सकती हूँ। बोलकर या लिखकर प्रयास करें:</p>
+                    <p style="margin-top: 8px; font-style: italic; font-size: 11px; color: var(--text-secondary);">
+                        - "Shree naya client add kar do Balkrishna Premnarayan"<br>
+                        - "Shree misc. expenses me 100 mithai kharch ke add kar do"<br>
+                        - "Rakhi Agency client me 10000 cash received kar do"<br>
+                        - "Balkrishna Premnarayan client me 25000 BOI-0308 me add kar do date 24-06-26 me"
+                    </p>
+                    <span class="msg-time">सक्रिय (Active)</span>
+                </div>
+            </div>
+
+            <!-- Settings View (Toggled by Gear Icon) -->
+            <div class="shree-settings" id="shree-settings-container">
+                <h5 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary);">Gemini AI API Key (Optional)</h5>
+                <p style="font-size: 11px; color: var(--text-secondary); margin: 0; line-height: 1.4;">
+                    Enter your Gemini API Key to enable general knowledge chat & smart Hinglish conversations with Shree AI.
+                </p>
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
+                    <label for="gemini-api-key" style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">API Key</label>
+                    <input type="password" id="gemini-api-key" placeholder="Paste Gemini Key here..." style="padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 12px;">
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
+                    <button type="button" class="btn btn-outline btn-sm" id="btn-shree-settings-back">Back</button>
+                    <button type="button" class="btn btn-primary btn-sm" id="btn-shree-settings-save">Save Key</button>
+                </div>
+            </div>
+
+            <!-- Footer controls -->
+            <div class="shree-footer" id="shree-footer-container">
+                <button id="btn-shree-mic" class="btn-mic" title="Speak to Shree (Hindi)">
+                    <i data-lucide="mic"></i>
+                </button>
+                <input type="text" id="shree-text-input" placeholder="कमांड टाइप करें (जैसे श्री naya client...)" autocomplete="off">
+                <button id="btn-shree-send" class="btn-send" title="Send Command">
+                    <i data-lucide="send"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
     <script src="app.js?v=3.6.2"></script>
+    <script src="shree.js?v=3.6.2"></script>
 </body>
 </html>
