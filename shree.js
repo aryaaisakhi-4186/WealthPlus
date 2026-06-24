@@ -223,7 +223,7 @@ async function processTextCommand() {
     // 3. Execute the parsed action
     let replyText = "";
     if (parsedAction) {
-        replyText = executeAgentAction(parsedAction);
+        replyText = await executeAgentAction(parsedAction);
     } else {
         replyText = "माफ़ कीजिये, मैं इस कमांड को समझ नहीं पाई। क्या आप कृपया दोबारा स्पष्ट रूप से बताएंगे? (जैसे: 'Shree naya client add karo...')";
     }
@@ -237,6 +237,12 @@ async function processTextCommand() {
 // --- LOCAL PARSER (Offline Regex NLP Rules) ---
 function parseLocalCommand(text) {
     const cleanText = text.toLowerCase().trim();
+
+    // Check if the query is a request to edit code/design/UI
+    const codeKeywords = ["edit", "update", "change", "modify", "updation", "theme", "style", "css", "html", "design", "color", "title", "heading"];
+    if (codeKeywords.some(kw => cleanText.includes(kw))) {
+        return { fallback: true };
+    }
 
     // 1. Client Registration
     // E.g. "Shree naya client add kar do client ka name hai Balkrishna Premnarayan"
@@ -422,18 +428,7 @@ function parseLocalCommand(text) {
             action: "addExpense",
             data: {
                 description: desc,
-                category: category,
-                amount: amount,
-                date: dateStr,
-                mode: mode,
-                clientId: clientId
-            }
-        };
-    }
-}
-
-// --- ACTION EXECUTER ENGINE ---
-function executeAgentAction(actionObj) {
+async function executeAgentAction(actionObj) {
     if (!actionObj || !actionObj.action) return "माफ़ कीजिये, मैं इसे समझ नहीं पाई।";
     
     if (actionObj.action === "addClient") {
@@ -504,6 +499,78 @@ function executeAgentAction(actionObj) {
         renderPage(state.activePage);
         return `जय हरी! ₹${amount.toLocaleString('en-IN')} का खर्च "${description}" (श्रेणी: ${category}) ${mode} से दिनांक ${date} को दर्ज कर दिया गया है।`;
     }
+
+    if (actionObj.action === "modifyCode") {
+        const { file, instruction, commitMessage } = actionObj.data;
+        
+        // 1. Fetch current file content
+        appendChatMessage('shree', `Fetching current content of ${file}...`);
+        let currentContent = "";
+        try {
+            const resp = await fetch(file);
+            if (!resp.ok) throw new Error(`Fetch failed: ${resp.statusText}`);
+            currentContent = await resp.text();
+        } catch (err) {
+            console.error("Fetch local file error:", err);
+            return `माफ़ कीजिये, मैं ${file} को लोड नहीं कर पाई। क्या आप लोकल पाइथन सर्वर चला रहे हैं?`;
+        }
+
+        // 2. Call Gemini Code Editor
+        appendChatMessage('shree', `Analyzing edit instruction with Gemini AI...`);
+        const editResult = await callGeminiCodeEditor(file, currentContent, instruction);
+        if (!editResult || !editResult.replacements || editResult.replacements.length === 0) {
+            return `माफ़ कीजिये, मैं ${file} के लिए एडिट्स जनरेट नहीं कर पाई।`;
+        }
+
+        // 3. Apply replacements
+        let updatedContent = currentContent;
+        let successCount = 0;
+        for (const rep of editResult.replacements) {
+            if (updatedContent.includes(rep.search)) {
+                updatedContent = updatedContent.replace(rep.search, rep.replace);
+                successCount++;
+            } else {
+                console.warn(`Search block not found in file:\n${rep.search}`);
+            }
+        }
+
+        if (successCount === 0) {
+            return `माफ़ कीजिये, एडिट के लिए चुने गए कोड ब्लॉक्स ${file} में नहीं मिले।`;
+        }
+
+        // 4. Save file locally using POST /api/write-file
+        appendChatMessage('shree', `Writing modifications back to local disk...`);
+        try {
+            const writeResp = await fetch('/api/write-file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: file, content: updatedContent })
+            });
+            const writeData = await writeResp.json();
+            if (writeData.error) {
+                throw new Error(writeData.error);
+            }
+        } catch (err) {
+            console.error("Local write error:", err);
+            return `माफ़ कीजिये, मैं एडिट्स को डिस्क पर सेव नहीं कर पाई: ${err.message}`;
+        }
+
+        // 5. Trigger auto-deploy if git configs are present
+        if (state.githubToken && state.githubRepo) {
+            appendChatMessage('shree', `Successfully wrote changes to disk! Initiating GitHub Auto-Deployment...`);
+            
+            const commitInput = document.getElementById('github-commit-message');
+            if (commitInput) {
+                commitInput.value = commitMessage || `Edit ${file} via Shree AI`;
+            }
+            
+            deployAppToGitHub();
+            
+            return `जय हरी! मैंने ${file} में बदलाव कर दिए हैं और गिटहब पर डिप्लॉयमेंट शुरू कर दिया है। 1 मिनट में लाइव हो जाएगा!`;
+        } else {
+            return `जय हरी! मैंने ${file} में बदलाव डिस्क पर लोकल रूप से कर दिए हैं। (गिटहब डिप्लॉयमेंट के लिए कृपया मास्टर सेटिंग्स में टोकन कॉन्फ़िगर करें)`;
+        }
+    }
     
     return "माफ़ कीजिये, यह एक्शन अभी सपोर्टेड नहीं है।";
 }
@@ -519,8 +586,8 @@ async function callGeminiAI(userText) {
     const activeCategories = Object.keys(state.categoriesConfig);
 
     const systemInstruction = `
-You are "Shree", a smart agentic AI Munim (bookkeeper) for the "Wealth Plus" application.
-Your task is to parse the user's transaction/ledger requests (written in Hinglish, Hindi, or English) into a structured JSON action object.
+You are "Shree", a smart agentic AI Munim (bookkeeper) and developer assistant for the "Wealth Plus" application.
+Your task is to parse the user's requests (written in Hinglish, Hindi, or English) into a structured JSON action object.
 
 Analyze the request and return ONLY a valid JSON object. Do not include markdown code block syntax (like \`\`\`json) or any extra text.
 
@@ -534,7 +601,7 @@ Parse any date in the request to YYYY-MM-DD format.
 You must return JSON in this exact structure:
 {
   "success": true,
-  "action": "addClient" | "addExpense" | "addIncome",
+  "action": "addClient" | "addExpense" | "addIncome" | "modifyCode",
   "data": {
     // for addClient:
     "name": "extracted client name"
@@ -553,6 +620,11 @@ You must return JSON in this exact structure:
     "amount": number,
     "date": "YYYY-MM-DD",
     "mode": "destination account name"
+
+    // for modifyCode:
+    "file": "index.html" | "app.js" | "style.css" | "shree.js",
+    "instruction": "clear precise instruction of what to edit in the file",
+    "commitMessage": "commit message summarizing the change"
   },
   "reply": "Hindi/Hinglish vocal confirmation message summarizing the action taken."
 }
@@ -588,6 +660,68 @@ If you cannot parse it, return:
         return JSON.parse(jsonText);
     } catch (e) {
         console.error("Gemini API call failed:", e);
+        return null;
+    }
+}
+
+async function callGeminiCodeEditor(fileName, fileContent, instruction) {
+    const apiKey = state.geminiApiKey;
+    if (!apiKey) return null;
+
+    const systemInstruction = `
+You are a highly precise code editing assistant.
+Your task is to analyze the provided file content and generate a list of search-and-replace replacements to implement the user's requested edit.
+
+You must only return a valid JSON object. Do not include markdown code block syntax (like \`\`\`json) or any extra text.
+
+Return JSON in this structure:
+{
+  "replacements": [
+    {
+      "search": "exact block of lines to find in the original file",
+      "replace": "new block of lines to replace it with"
+    }
+  ]
+}
+
+CRITICAL RULES:
+1. The 'search' string must match the target code EXACTLY, including leading/trailing whitespace, punctuation, and structure.
+2. Provide enough context lines in the 'search' block to ensure it is unique within the file.
+3. Only modify what is requested in the instruction. Do not rewrite unrelated code.
+`;
+
+    const promptText = `
+Target File: ${fileName}
+Edit Instruction: ${instruction}
+
+--- CURRENT FILE CONTENT ---
+${fileContent}
+`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const payload = {
+        contents: [
+            { role: "user", parts: [{ text: promptText }] }
+        ],
+        systemInstruction: {
+            parts: [{ text: systemInstruction }]
+        },
+        generationConfig: {
+            responseMimeType: "application/json"
+        }
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        const jsonText = data.candidates[0].content.parts[0].text;
+        return JSON.parse(jsonText);
+    } catch (e) {
+        console.error("Gemini Code Editor API call failed:", e);
         return null;
     }
 }
