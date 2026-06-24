@@ -13,6 +13,8 @@ let attachedFileBase64 = null;
 let attachedFileMimeType = null;
 let attachedFileName = null;
 
+let isSpeakingGlobally = false;
+
 function initShreeWidget() {
     const toggleBtn = document.getElementById('btn-shree-toggle');
     const chatWindow = document.getElementById('shree-chat-window');
@@ -185,6 +187,19 @@ function initSpeechRecognition(micBtn, textInput) {
         isShreeListening = false;
         micBtn.classList.remove('active');
         document.getElementById('shree-status-text').innerText = 'AI Assistant • Idle';
+        
+        // Auto-restart if currentUser exists and we are not speaking!
+        if (state.currentUser && !isSpeakingGlobally) {
+            setTimeout(() => {
+                if (state.currentUser && !isSpeakingGlobally && !isShreeListening) {
+                    try {
+                        shreeRecognition.start();
+                    } catch (e) {
+                        console.error("Auto-restart mic onend failed:", e);
+                    }
+                }
+            }, 300);
+        }
     };
 
     shreeRecognition.onerror = (event) => {
@@ -199,6 +214,17 @@ function initSpeechRecognition(micBtn, textInput) {
         textInput.value = textResult;
         processTextCommand();
     };
+
+    // Continuous voice check loop to keep microphone alive after user logs in
+    setInterval(() => {
+        if (state.currentUser && shreeRecognition && !isShreeListening && !isSpeakingGlobally) {
+            try {
+                shreeRecognition.start();
+            } catch (e) {
+                // Ignore errors
+            }
+        }
+    }, 3000);
 }
 
 // --- VOICE SYNTHESIS (Text-to-Speech) ---
@@ -210,15 +236,40 @@ function speakShreeText(text) {
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'hi-IN'; // Speak in Hindi
-    utterance.rate = 1.0;
-    utterance.pitch = 1.1; // Slightly sweet tone
+    utterance.rate = 0.95; // Warm, sweet, natural lady tone speed
+    utterance.pitch = 1.25; // Slightly higher pitch for sweet female voice
 
     // Try to find a sweet female Hindi voice
     const voices = window.speechSynthesis.getVoices();
-    const hindiVoice = voices.find(v => v.lang.includes('hi') || v.lang.includes('IN'));
+    let hindiVoice = voices.find(v => (v.lang.includes('hi') || v.lang.includes('IN')) && (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('kalpana') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('zira')));
+    if (!hindiVoice) {
+        hindiVoice = voices.find(v => v.lang.includes('hi') || v.lang.includes('IN'));
+    }
     if (hindiVoice) {
         utterance.voice = hindiVoice;
     }
+
+    utterance.onstart = () => {
+        isSpeakingGlobally = true;
+        if (shreeRecognition && isShreeListening) {
+            try {
+                shreeRecognition.abort(); // Stop listening to avoid hearing herself speak
+            } catch (e) {
+                console.error("Error stopping recognition on speak start:", e);
+            }
+        }
+    };
+
+    utterance.onend = utterance.onerror = () => {
+        isSpeakingGlobally = false;
+        if (state.currentUser && shreeRecognition && !isShreeListening) {
+            try {
+                shreeRecognition.start();
+            } catch (e) {
+                console.error("Error restarting recognition on speak end:", e);
+            }
+        }
+    };
     
     window.speechSynthesis.speak(utterance);
 }
@@ -649,6 +700,10 @@ async function callGeminiAI(userText) {
 You are "Shree", a smart agentic AI Munim (bookkeeper) and developer assistant for the "Wealth Plus" application.
 Your task is to parse the user's requests (written in Hinglish, Hindi, or English) into a structured JSON action object.
 
+CRITICAL TRANSLATION RULE:
+Even if the user request or voice command is in Hindi (Devanagari script), you MUST translate or transliterate all extracted data fields (such as client name, description, category, and account mode) to English (Latin characters) in the output JSON. For example, "बालकृष्ण प्रेमनारायण" must be transliterated as "Balkrishna Premnarayan", "मिठाई" as "Mithai", "नकद" as "Cash", and "बैंक" as "Bank".
+The spoken "reply" field in the output JSON MUST be in warm, sweet, human-like Hindi (written in Devanagari script) to sound like a polite lady bookkeeper (Munim), starting with "जय हरी!".
+
 Analyze the request and return ONLY a valid JSON object. Do not include markdown code block syntax (like \`\`\`json) or any extra text.
 
 Active Categories config: ${JSON.stringify(activeCategories)}
@@ -852,6 +907,10 @@ async function callGeminiMultimodal(userText, base64Data, mimeType) {
     const systemInstruction = `
 You are "Shree", a smart agentic AI Munim (bookkeeper) and developer assistant for the "Wealth Plus" application.
 Your task is to analyze the attached image/document receipt along with any user request, extract transaction details, and parse them into a structured JSON action object.
+
+CRITICAL TRANSLATION RULE:
+Even if the receipt, document, or user request is in Hindi (Devanagari script), you MUST translate or transliterate all extracted data fields (such as client name, description, category, and account mode) to English (Latin characters) in the output JSON. For example, "बालकृष्ण प्रेमनारायण" must be transliterated as "Balkrishna Premnarayan", "मिठाई" as "Mithai", "नकद" as "Cash", and "बैंक" as "Bank".
+The spoken "reply" field in the output JSON MUST be in warm, sweet, human-like Hindi (written in Devanagari script) to sound like a polite lady bookkeeper (Munim), starting with "जय हरी!".
 
 Analyze the image/document and return ONLY a valid JSON object. Do not include markdown code block syntax (like \`\`\`json) or any extra text.
 
