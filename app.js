@@ -2694,46 +2694,6 @@ async function handleResetAppClick() {
         return;
     }
 
-    const includeCloud = document.getElementById('reset-include-cloud').checked;
-    const resetBtn = document.getElementById('btn-reset-app-now');
-
-    if (includeCloud) {
-        if (!state.cloudSyncEnabled || !firebaseDb) {
-            alert("Cloud Sync is not enabled or Firebase is not connected. Resetting local data only.");
-        } else {
-            if (!confirm("🚨 DANGER: You selected to wipe the Cloud Database. This will delete all synced data for ALL devices connected to this Firebase project. Are you absolutely sure?")) {
-                return;
-            }
-
-            try {
-                resetBtn.disabled = true;
-                resetBtn.innerText = "Wiping Cloud Database...";
-
-                const collections = ['clients', 'incomeLogs', 'transactions', 'accounts', 'members'];
-                for (const col of collections) {
-                    const snapshot = await firebaseDb.collection(col).get();
-                    for (const doc of snapshot.docs) {
-                        await doc.ref.delete();
-                    }
-                }
-                
-                // Restore default logins on the cloud so they can log back in
-                for (let m of defaultMembers) {
-                    await firebaseDb.collection('members').doc(m.id).set(m);
-                }
-
-                await firebaseDb.collection('settings').doc('config').delete();
-                alert("Cloud database successfully wiped!");
-            } catch (e) {
-                console.error("Cloud wipe error:", e);
-                alert("Error wiping cloud database: " + e.message);
-            } finally {
-                resetBtn.disabled = false;
-                resetBtn.innerText = "Reset Application Now";
-            }
-        }
-    }
-
     // Reset local data
     localStorage.removeItem('wealth_plus_state');
     alert("Application data reset successfully! Reloading page...");
