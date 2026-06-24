@@ -414,6 +414,7 @@
                         <button class="master-tab" data-master-sub="members" id="tab-master-members">Member Directory</button>
                         <button class="master-tab" data-master-sub="cloud-sync" id="tab-master-cloud-sync">Cloud Sync (Firebase)</button>
                         <button class="master-tab" data-master-sub="ai-developer" id="tab-master-ai-developer"><i data-lucide="github" style="width:14px; height:14px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> AI & GitHub Deploy</button>
+                        <button class="master-tab" data-master-sub="reset-app" id="tab-master-reset-app" style="color: var(--danger);"><i data-lucide="trash-2" style="width:14px; height:14px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> Reset App</button>
                     </div>
 
                     <div class="master-content-panel">
@@ -662,6 +663,42 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel H: Reset App -->
+                        <div id="master-panel-reset-app" class="master-sub-panel">
+                            <div class="panel-action-header">
+                                <h4>Reset Application Data</h4>
+                                <p style="font-size:12px; color:var(--text-secondary);">Perform a full reset of the application. This action cannot be undone.</p>
+                            </div>
+                            
+                            <div class="card" style="padding: 24px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color); max-width: 600px; margin-top: 15px;">
+                                <div style="display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px;">
+                                    <div style="background: rgba(225, 29, 72, 0.1); color: var(--danger); padding: 12px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                        <i data-lucide="alert-triangle" style="width: 28px; height: 28px;"></i>
+                                    </div>
+                                    <div>
+                                        <h5 style="margin-top: 0; margin-bottom: 8px; color: var(--danger); font-size: 15px; font-weight: 700;">Critical Action Required</h5>
+                                        <p style="font-size: 13px; margin: 0; line-height: 1.5; color: var(--text-secondary);">
+                                            Resetting the application will restore all default clients, accounts, budgets, and member logins. All custom transactions and settings will be permanently deleted.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="form-group" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 4px;">
+                                    <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; cursor: pointer; color: var(--text-primary);">
+                                        <input type="checkbox" id="reset-include-cloud" style="width: 16px; height: 16px;">
+                                        Also wipe cloud database (Firebase Firestore)
+                                    </label>
+                                    <p style="font-size: 11px; color: var(--text-muted); margin-left: 24px; margin-top: 0;">
+                                        If checked, this will clear all documents from your Firebase database collections and reset it to default logins for all sync'd devices.
+                                    </p>
+                                </div>
+
+                                <button type="button" class="btn btn-danger" id="btn-reset-app-now" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: 600;">
+                                    <i data-lucide="trash-2"></i> Reset Application Now
+                                </button>
                             </div>
                         </div>
                     </div>

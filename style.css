@@ -795,6 +795,12 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2);
 }
 
+.btn-danger { background: var(--danger); color: #ffffff; }
+.btn-danger:hover {
+    background: #be123c;
+    box-shadow: 0 4px 12px rgba(225, 29, 72, 0.2);
+}
+
 .btn-outline {
     background: transparent;
     border: 1px solid var(--border-color);
