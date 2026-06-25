@@ -320,11 +320,13 @@ async function processTextCommand() {
         clearAttachment();
     } else {
         parsedAction = parseLocalCommand(query);
-        if ((!parsedAction || parsedAction.fallback) && state.geminiApiKey) {
+        const hasDevanagari = /[\u0900-\u097F]/.test(query);
+        const needsTranslation = hasDevanagari && state.geminiApiKey;
+        if ((!parsedAction || parsedAction.fallback || needsTranslation) && state.geminiApiKey) {
             try {
-                parsedAction = await callGeminiAI(query);
-                if (parsedAction && parsedAction.success) {
-                    // parsedAction ok
+                const geminiResult = await callGeminiAI(query);
+                if (geminiResult) {
+                    parsedAction = geminiResult;
                 }
             } catch (err) {
                 console.error("Gemini parsing error fallback:", err);
@@ -333,10 +335,17 @@ async function processTextCommand() {
     }
 
     // Execute the parsed action
-    if (parsedAction) {
+    if (parsedAction && parsedAction.success !== false && parsedAction.action) {
         replyText = await executeAgentAction(parsedAction);
+    } else if (parsedAction && parsedAction.reply) {
+        replyText = parsedAction.reply;
     } else if (!replyText) {
-        replyText = "माफ़ कीजिये, मैं इस कमांड को समझ नहीं पाई। क्या आप कृपया दोबारा स्पष्ट रूप से बताएंगे? (जैसे: 'Shree naya client add karo...')";
+        const hasDevanagari = /[\u0900-\u097F]/.test(query);
+        if (hasDevanagari && !state.geminiApiKey) {
+            replyText = "माफ़ कीजिये, हिंदी कमांड्स और स्मार्ट बातचीत के लिए सेटिंग्स (⚙️) में जेमिनी ए.आई. चाबी (Gemini API Key) सेट होना ज़रूरी है। कृपया सेटिंग्स में सही चाबी सेव करें।";
+        } else {
+            replyText = "माफ़ कीजिये, मैं इस कमांड को समझ नहीं पाई। क्या आप कृपया दोबारा स्पष्ट रूप से बताएंगे? (जैसे: 'Shree naya client add karo...')";
+        }
     }
 
     // Show Shree response & vocal feedback
@@ -358,23 +367,29 @@ function parseLocalCommand(text) {
     // 1. Client Registration
     // E.g. "Shree naya client add kar do client ka name hai Balkrishna Premnarayan"
     // E.g. "Balkrishna Premnarayan client register karo"
-    if (cleanText.includes("client") && (cleanText.includes("add") || cleanText.includes("register") || cleanText.includes("banao") || cleanText.includes("bana do") || cleanText.includes("naya") || cleanText.includes("naye"))) {
+    const hasClientKw = cleanText.includes("client") || cleanText.includes("क्लाइंट") || cleanText.includes("ग्राहक") || cleanText.includes("कस्टमर");
+    const hasAddKw = cleanText.includes("add") || cleanText.includes("register") || cleanText.includes("banao") || cleanText.includes("bana do") || cleanText.includes("naya") || cleanText.includes("naye") || cleanText.includes("ऐड") || cleanText.includes("एड") || cleanText.includes("जोड़ो") || cleanText.includes("जोड़ो") || cleanText.includes("जोड़") || cleanText.includes("बना");
+
+    if (hasClientKw && hasAddKw) {
         let name = "";
-        const nameIndicators = ["name hai", "naam hai", "name is", "naam is", "client ka name", "client ka naam"];
+        const nameIndicators = [
+            "name hai", "naam hai", "name is", "naam is", "client ka name", "client ka naam",
+            "नाम है", "नाम", "नाम:"
+        ];
         for (const ind of nameIndicators) {
             if (cleanText.includes(ind)) {
                 const parts = text.split(new RegExp(ind, "i"));
                 if (parts[1]) {
-                    name = parts[1].replace(/add|kar|do|karo|please|shree|ai/gi, "").trim();
+                    name = parts[1].replace(/add|kar|do|karo|please|shree|ai|जोड़ो|जोड़ो|करो|कर|दो/gi, "").trim();
                     break;
                 }
             }
         }
         if (!name) {
             // Extract using regex
-            const match = text.match(/(?:add\s+client|register\s+client|client|naya\s+client)\s+([a-zA-Z0-9\s]+)/i);
+            const match = text.match(/(?:add\s+client|register\s+client|client|naya\s+client|क्लाइंट|ग्राहक)\s+([a-zA-Z0-9\s\u0900-\u097F]+)/i);
             if (match && match[1]) {
-                name = match[1].replace(/add|kar|do|karo|please|shree|ai/gi, "").trim();
+                name = match[1].replace(/add|kar|do|karo|please|shree|ai|जोड़ो|जोड़ो|करो|कर|दो/gi, "").trim();
             }
         }
 
@@ -383,6 +398,11 @@ function parseLocalCommand(text) {
             return {
                 action: "addClient",
                 data: { name: name }
+            };
+        } else {
+            return {
+                success: false,
+                reply: "कृपया क्लाइंट का नाम बताएं। (जैसे: 'श्री नया क्लाइंट जोड़ो क्लाइंट का नाम बालकृष्ण प्रेमनारायण है')"
             };
         }
     }
@@ -782,11 +802,21 @@ If you cannot parse it, return:
             body: JSON.stringify(payload)
         });
         const data = await response.json();
+        if (data.error) {
+            console.error("Gemini API Error:", data.error);
+            return {
+                success: false,
+                reply: `माफ़ कीजिये, जेमिनी ए.आई. एरर: ${data.error.message} (कृपया सेटिंग्स ⚙️ में सही चाबी चेक करें)`
+            };
+        }
         const jsonText = data.candidates[0].content.parts[0].text;
         return JSON.parse(jsonText);
     } catch (e) {
         console.error("Gemini API call failed:", e);
-        return null;
+        return {
+            success: false,
+            reply: `माफ़ कीजिये, जेमिनी ए.आई. कनेक्शन फेल हो गया: ${e.message}`
+        };
     }
 }
 
@@ -990,10 +1020,20 @@ You must return JSON in this exact structure:
             body: JSON.stringify(payload)
         });
         const data = await response.json();
+        if (data.error) {
+            console.error("Gemini Multimodal Error:", data.error);
+            return {
+                success: false,
+                reply: `माफ़ कीजिये, जेमिनी ए.आई. एरर: ${data.error.message} (कृपया सेटिंग्स ⚙️ में सही चाबी चेक करें)`
+            };
+        }
         const jsonText = data.candidates[0].content.parts[0].text;
         return JSON.parse(jsonText);
     } catch (e) {
         console.error("Gemini Multimodal call failed:", e);
-        return null;
+        return {
+            success: false,
+            reply: `माफ़ कीजिये, जेमिनी ए.आई. कनेक्शन फेल हो गया: ${e.message}`
+        };
     }
 }
