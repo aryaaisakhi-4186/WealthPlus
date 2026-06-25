@@ -14,6 +14,7 @@ let attachedFileMimeType = null;
 let attachedFileName = null;
 
 let isSpeakingGlobally = false;
+let cachedGeminiEndpoint = localStorage.getItem('wealth_plus_gemini_endpoint') || "v1beta/models/gemini-1.5-flash:generateContent";
 
 function initShreeWidget() {
     const toggleBtn = document.getElementById('btn-shree-toggle');
@@ -760,12 +761,84 @@ async function executeAgentAction(actionObj) {
     return "माफ़ कीजिये, यह एक्शन अभी सपोर्टेड नहीं है।";
 }
 
+// --- DYNAMIC GEMINI ENDPOINT DISCOVERY & FALLBACK ENGINE ---
+async function fetchGeminiWithFallback(userText, base64Data = null, mimeType = null, systemInstruction = "") {
+    const apiKey = state.geminiApiKey;
+    if (!apiKey) return { error: { message: "API key is not configured." } };
+
+    const candidates = [
+        "v1/models/gemini-1.5-flash:generateContent",
+        "v1beta/models/gemini-1.5-flash:generateContent",
+        "v1/models/gemini-1.5-flash-latest:generateContent",
+        "v1beta/models/gemini-1.5-flash-latest:generateContent",
+        "v1/models/gemini-2.5-flash:generateContent",
+        "v1beta/models/gemini-2.5-flash:generateContent",
+        "v1/models/gemini-3.5-flash:generateContent",
+        "v1beta/models/gemini-3.5-flash:generateContent"
+    ];
+
+    const queue = [cachedGeminiEndpoint, ...candidates.filter(c => c !== cachedGeminiEndpoint)];
+    let lastError = null;
+
+    for (const endpoint of queue) {
+        const url = `https://generativelanguage.googleapis.com/${endpoint}?key=${apiKey}`;
+        let parts = [{ text: userText }];
+        if (base64Data && mimeType) {
+            parts = [
+                { text: userText || "Extract details from this transaction receipt or document." },
+                { inlineData: { mimeType: mimeType, data: base64Data } }
+            ];
+        }
+
+        const payload = {
+            contents: [{ role: "user", parts: parts }],
+            generationConfig: { responseMimeType: "application/json" }
+        };
+
+        if (systemInstruction) {
+            payload.systemInstruction = { parts: [{ text: systemInstruction }] };
+        }
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+
+            if (data.error) {
+                // If this endpoint model is not found/supported, try the next candidate
+                if (data.error.status === "INVALID_ARGUMENT" || data.error.message.includes("not found") || data.error.message.includes("not supported")) {
+                    lastError = data.error;
+                    continue;
+                } else {
+                    return { error: data.error };
+                }
+            }
+
+            if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
+                if (cachedGeminiEndpoint !== endpoint) {
+                    cachedGeminiEndpoint = endpoint;
+                    localStorage.setItem('wealth_plus_gemini_endpoint', endpoint);
+                    console.log("Cached working Gemini endpoint:", endpoint);
+                }
+                return { data: data };
+            }
+        } catch (e) {
+            console.warn(`Endpoint ${endpoint} failed:`, e);
+            lastError = e;
+        }
+    }
+
+    return { error: lastError || { message: "All API endpoint attempts failed." } };
+}
+
 // --- GEMINI SMART PARSER Fallback ---
 async function callGeminiAI(userText) {
     const apiKey = state.geminiApiKey;
     if (!apiKey) return null;
 
-    // Filter dynamic lists for context
     const cleanClients = state.clients.map(c => ({ id: c.id, name: c.name }));
     const cleanAccounts = state.accounts.map(a => ({ name: a.name, type: a.type }));
     const activeCategories = Object.keys(state.categoriesConfig);
@@ -792,25 +865,18 @@ You must return JSON in this exact structure:
   "success": true,
   "action": "addClient" | "addExpense" | "addIncome" | "modifyCode",
   "data": {
-    // for addClient:
-    "name": "extracted client name"
-    
-    // for addExpense:
+    "name": "extracted client name",
     "description": "expense details",
     "category": "category name (Food, Shopping, Bills, Transport, Rent, or Others)",
     "amount": number,
     "date": "YYYY-MM-DD",
     "mode": "account name",
-    "clientId": "client id if specified, otherwise empty string"
-
-    // for addIncome:
+    "clientId": "client id if specified, otherwise empty string",
     "clientName": "client name",
     "clientId": "client id if matches, otherwise empty string",
     "amount": number,
     "date": "YYYY-MM-DD",
-    "mode": "destination account name"
-
-    // for modifyCode:
+    "mode": "destination account name",
     "file": "index.html" | "app.js" | "style.css" | "shree.js",
     "instruction": "clear precise instruction of what to edit in the file",
     "commitMessage": "commit message summarizing the change"
@@ -825,40 +891,23 @@ If you cannot parse it, return:
 }
 `;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    const payload = {
-        contents: [
-            { role: "user", parts: [{ text: userText }] }
-        ],
-        systemInstruction: {
-            parts: [{ text: systemInstruction }]
-        },
-        generationConfig: {
-            responseMimeType: "application/json"
-        }
-    };
-
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const data = await response.json();
-        if (data.error) {
-            console.error("Gemini API Error:", data.error);
+    const result = await fetchGeminiWithFallback(userText, null, null, systemInstruction);
+    if (result && result.data) {
+        try {
+            const jsonText = result.data.candidates[0].content.parts[0].text;
+            return JSON.parse(jsonText);
+        } catch (e) {
+            console.error("Failed to parse Gemini response JSON:", e);
             return {
                 success: false,
-                reply: `माफ़ कीजिये, जेमिनी ए.आई. एरर: ${data.error.message} (कृपया सेटिंग्स ⚙️ में सही चाबी चेक करें)`
+                reply: "माफ़ कीजिये, मैं रिस्पॉन्स को पार्स नहीं कर पाई।"
             };
         }
-        const jsonText = data.candidates[0].content.parts[0].text;
-        return JSON.parse(jsonText);
-    } catch (e) {
-        console.error("Gemini API call failed:", e);
+    } else {
+        const errMsg = result && result.error ? result.error.message : "API Call failed";
         return {
             success: false,
-            reply: `माफ़ कीजिये, जेमिनी ए.आई. कनेक्शन फेल हो गया: ${e.message}`
+            reply: `माफ़ कीजिये, जेमिनी ए.आई. एरर: ${errMsg} (कृपया सेटिंग्स ⚙️ में सही चाबी चेक करें)`
         };
     }
 }
@@ -897,7 +946,8 @@ Edit Instruction: ${instruction}
 ${fileContent}
 `;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const endpoint = cachedGeminiEndpoint || "v1beta/models/gemini-1.5-flash:generateContent";
+    const url = `https://generativelanguage.googleapis.com/${endpoint}?key=${apiKey}`;
     const payload = {
         contents: [
             { role: "user", parts: [{ text: promptText }] }
@@ -990,13 +1040,13 @@ async function callGeminiMultimodal(userText, base64Data, mimeType) {
 
     const systemInstruction = `
 You are "Shree", a smart agentic AI Munim (bookkeeper) and developer assistant for the "Wealth Plus" application.
-Your task is to analyze the attached image/document receipt along with any user request, extract transaction details, and parse them into a structured JSON action object.
+Your task is to parse the user's requests (written in Hinglish, Hindi, or English) into a structured JSON action object.
 
 CRITICAL TRANSLATION RULE:
-Even if the receipt, document, or user request is in Hindi (Devanagari script), you MUST translate or transliterate all extracted data fields (such as client name, description, category, and account mode) to English (Latin characters) in the output JSON. For example, "बालकृष्ण प्रेमनारायण" must be transliterated as "Balkrishna Premnarayan", "मिठाई" as "Mithai", "नकद" as "Cash", and "बैंक" as "Bank".
+Even if the user request or voice command is in Hindi (Devanagari script), you MUST translate or transliterate all extracted data fields (such as client name, description, category, and account mode) to English (Latin characters) in the output JSON. For example, "बालकृष्ण प्रेमनारायण" must be transliterated as "Balkrishna Premnarayan", "मिठाई" as "Mithai", "नकद" as "Cash", and "बैंक" as "Bank".
 The spoken "reply" field in the output JSON MUST be in warm, sweet, human-like Hindi (written in Devanagari script) to sound like a polite lady bookkeeper (Munim), starting with "जय हरी!".
 
-Analyze the image/document and return ONLY a valid JSON object. Do not include markdown code block syntax (like \`\`\`json) or any extra text.
+Analyze the request and return ONLY a valid JSON object. Do not include markdown code block syntax (like \`\`\`json) or any extra text.
 
 Active Categories config: ${JSON.stringify(activeCategories)}
 Active Accounts configuration: ${JSON.stringify(cleanAccounts)}
@@ -1010,18 +1060,13 @@ You must return JSON in this exact structure:
   "success": true,
   "action": "addClient" | "addExpense" | "addIncome",
   "data": {
-    // for addClient:
-    "name": "extracted client name"
-    
-    // for addExpense:
+    "name": "extracted client name",
     "description": "expense details (e.g. Mithai, Tea, AWS Server)",
     "category": "category name (Food, Shopping, Bills, Transport, Rent, or Others)",
     "amount": number,
     "date": "YYYY-MM-DD",
     "mode": "account name (e.g. Main Cash, HDFC Bank)",
-    "clientId": "client id if specified, otherwise empty string"
-
-    // for addIncome:
+    "clientId": "client id if specified, otherwise empty string",
     "clientName": "client name",
     "clientId": "client id if matches, otherwise empty string",
     "amount": number,
@@ -1032,56 +1077,26 @@ You must return JSON in this exact structure:
 }
 `;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    const payload = {
-        contents: [
-            {
-                role: "user",
-                parts: [
-                    { text: userText || "Extract details from this transaction receipt or document and log it." },
-                    {
-                        inlineData: {
-                            mimeType: mimeType,
-                            data: base64Data
-                        }
-                    }
-                ]
-            }
-        ],
-        systemInstruction: {
-            parts: [{ text: systemInstruction }]
-        },
-        generationConfig: {
-            responseMimeType: "application/json"
-        }
-    };
-
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const data = await response.json();
-        if (data.error) {
-            console.error("Gemini Multimodal Error:", data.error);
+    const result = await fetchGeminiWithFallback(userText || "Extract details from this transaction receipt or document and log it.", base64Data, mimeType, systemInstruction);
+    if (result && result.data) {
+        try {
+            const jsonText = result.data.candidates[0].content.parts[0].text;
+            return JSON.parse(jsonText);
+        } catch (e) {
+            console.error("Failed to parse Gemini Multimodal response JSON:", e);
             return {
                 success: false,
-                reply: `माफ़ कीजिये, जेमिनी ए.आई. एरर: ${data.error.message} (कृपया सेटिंग्स ⚙️ में सही चाबी चेक करें)`
+                reply: "माफ़ कीजिये, मैं रिस्पॉन्स को पार्स नहीं कर पाई।"
             };
         }
-        const jsonText = data.candidates[0].content.parts[0].text;
-        return JSON.parse(jsonText);
-    } catch (e) {
-        console.error("Gemini Multimodal call failed:", e);
+    } else {
+        const errMsg = result && result.error ? result.error.message : "API Call failed";
         return {
             success: false,
-            reply: `माफ़ कीजिये, जेमिनी ए.आई. कनेक्शन फेल हो गया: ${e.message}`
+            reply: `माफ़ कीजिये, जेमिनी ए.आई. एरर: ${errMsg} (कृपया सेटिंग्स ⚙️ में सही चाबी चेक करें)`
         };
     }
-}
-
-// --- HELPER FUNCTIONS FOR OFFLINE HINDI PARSING ---
+}\n\n// --- HELPER FUNCTIONS FOR OFFLINE HINDI PARSING ---
 function cleanClientName(rawName) {
     const stopwords = [
         "add", "kar", "do", "karo", "please", "shree", "ai", "जोड़ो", "जोड़ो", "करो", "कर", "दो", "नए", "नया", "नाम", "है", "को", "से", "के", "client", "क्लाइंट", "ग्राहक", "कस्टमर", "register",
