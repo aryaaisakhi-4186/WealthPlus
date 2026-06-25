@@ -925,7 +925,7 @@ async function callGeminiCodeEditor(fileName, fileContent, instruction) {
 You are a highly precise code editing assistant.
 Your task is to analyze the provided file content and generate a list of search-and-replace replacements to implement the user's requested edit.
 
-You must only return a valid JSON object. Do not include markdown code block syntax (like \`\`\`json) or any extra text.
+Analyze the request and return ONLY a valid JSON object. Do not include markdown code block syntax (like \`\`\`json) or any extra text.
 
 Return JSON in this structure:
 {
