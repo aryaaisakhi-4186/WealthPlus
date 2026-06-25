@@ -539,6 +539,17 @@ function parseLocalCommand(text) {
             action: "addExpense",
             data: {
                 description: desc,
+                category: category,
+                amount: amount,
+                date: dateStr,
+                mode: mode,
+                clientId: clientId
+            }
+        };
+    }
+}
+
+// --- ACTION EXECUTER ENGINE ---
 async function executeAgentAction(actionObj) {
     if (!actionObj || !actionObj.action) return "माफ़ कीजिये, मैं इसे समझ नहीं पाई।";
     
