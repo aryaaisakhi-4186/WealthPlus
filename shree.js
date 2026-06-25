@@ -809,7 +809,12 @@ async function fetchGeminiWithFallback(userText, base64Data = null, mimeType = n
 
             if (data.error) {
                 // If this endpoint model is not found/supported, try the next candidate
-                if (data.error.status === "INVALID_ARGUMENT" || data.error.message.includes("not found") || data.error.message.includes("not supported")) {
+                const errMsgLower = (data.error.message || "").toLowerCase();
+                const isNotFound = data.error.status === "NOT_FOUND" || data.error.code === 404 || errMsgLower.includes("not found");
+                const isNotSupported = errMsgLower.includes("not supported") || errMsgLower.includes("unsupported");
+                const isInvalidArgument = data.error.status === "INVALID_ARGUMENT" || errMsgLower.includes("invalid");
+                
+                if (isNotFound || isNotSupported || isInvalidArgument) {
                     lastError = data.error;
                     continue;
                 } else {
