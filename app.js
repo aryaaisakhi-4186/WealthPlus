@@ -1590,7 +1590,7 @@ async function deployAppToGitHub() {
             logDeployProgress(`Fetching local file: ${filename}...`);
             let fileContentText = '';
             try {
-                const localFetch = await fetch(`/${filename}?cb=${Date.now()}`);
+                const localFetch = await fetch(`${filename}?cb=${Date.now()}`);
                 if (!localFetch.ok) {
                     throw new Error(`Failed to fetch ${filename} from local server (Status: ${localFetch.status})`);
                 }
