@@ -87,14 +87,19 @@ const defaultCategoriesConfig = {
 
 // Load state & run format migrations
 function loadState() {
-    let saved = localStorage.getItem('wealth_plus_state');
-    if (!saved) {
-        // Fallback migration for existing users
-        saved = localStorage.getItem('kharcha_ledger_state');
-        if (saved) {
-            localStorage.setItem('wealth_plus_state', saved);
-            localStorage.removeItem('kharcha_ledger_state');
+    let saved = null;
+    try {
+        saved = localStorage.getItem('wealth_plus_state');
+        if (!saved) {
+            // Fallback migration for existing users
+            saved = localStorage.getItem('kharcha_ledger_state');
+            if (saved) {
+                localStorage.setItem('wealth_plus_state', saved);
+                localStorage.removeItem('kharcha_ledger_state');
+            }
         }
+    } catch (e) {
+        console.warn("localStorage is not accessible:", e);
     }
     if (saved) {
         try {
@@ -171,11 +176,19 @@ function runStateMigrations() {
 
 // Save state to local storage
 function saveState() {
-    localStorage.setItem('wealth_plus_state', JSON.stringify(state));
+    try {
+        localStorage.setItem('wealth_plus_state', JSON.stringify(state));
+    } catch (e) {
+        console.warn("Failed to save state to localStorage:", e);
+    }
 }
 
 function saveStateLocalOnly() {
-    localStorage.setItem('wealth_plus_state', JSON.stringify(state));
+    try {
+        localStorage.setItem('wealth_plus_state', JSON.stringify(state));
+    } catch (e) {
+        console.warn("Failed to save state to localStorage:", e);
+    }
 }
 
 // --- FIREBASE SYNC ENGINE ---

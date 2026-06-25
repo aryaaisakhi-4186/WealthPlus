@@ -14,7 +14,13 @@ let attachedFileMimeType = null;
 let attachedFileName = null;
 
 let isSpeakingGlobally = false;
-let cachedGeminiEndpoint = localStorage.getItem('wealth_plus_gemini_endpoint') || "v1beta/models/gemini-1.5-flash:generateContent";
+let cachedGeminiEndpoint = "v1beta/models/gemini-1.5-flash:generateContent";
+try {
+    const cached = localStorage.getItem('wealth_plus_gemini_endpoint');
+    if (cached) cachedGeminiEndpoint = cached;
+} catch (e) {
+    console.warn("localStorage is not accessible:", e);
+}
 
 function initShreeWidget() {
     const toggleBtn = document.getElementById('btn-shree-toggle');
@@ -100,7 +106,12 @@ function initShreeWidget() {
     });
 
     // 4. Voice Input (Web Speech Recognition)
-    initSpeechRecognition(micBtn, textInput);
+    try {
+        initSpeechRecognition(micBtn, textInput);
+    } catch (err) {
+        console.error("Failed to initialize Speech Recognition:", err);
+        if (micBtn) micBtn.style.display = 'none';
+    }
 
     // 5. File upload & paste listeners
     const attachBtn = document.getElementById('btn-shree-attach');
@@ -825,7 +836,11 @@ async function fetchGeminiWithFallback(userText, base64Data = null, mimeType = n
             if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
                 if (cachedGeminiEndpoint !== endpoint) {
                     cachedGeminiEndpoint = endpoint;
-                    localStorage.setItem('wealth_plus_gemini_endpoint', endpoint);
+                    try {
+                        localStorage.setItem('wealth_plus_gemini_endpoint', endpoint);
+                    } catch (err) {
+                        console.warn("Failed to cache Gemini endpoint:", err);
+                    }
                     console.log("Cached working Gemini endpoint:", endpoint);
                 }
                 return { data: data };
