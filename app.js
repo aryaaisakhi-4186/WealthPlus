@@ -2774,7 +2774,7 @@ function exportToExcel() {
                 "Running Balance (INR)": row.balance
             };
         });
-        const sheetName = acc.name.replace(/[\\*\?:/\[\]]/g, "").slice(0, 30);
+        const sheetName = acc.name.replace(/[\\*\?:\/\[\]]/g, "").slice(0, 30);
         addSheet(ledgerRows, sheetName);
     });
 
