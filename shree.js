@@ -236,18 +236,47 @@ function speakShreeText(text) {
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'hi-IN'; // Speak in Hindi
-    utterance.rate = 0.95; // Warm, sweet, natural lady tone speed
-    utterance.pitch = 1.25; // Slightly higher pitch for sweet female voice
+    
+    let pitch = 1.0; // default natural pitch
+    let rate = 0.95;  // natural speed for normal lady tone
 
-    // Try to find a sweet female Hindi voice
     const voices = window.speechSynthesis.getVoices();
-    let hindiVoice = voices.find(v => (v.lang.includes('hi') || v.lang.includes('IN')) && (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('kalpana') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('zira')));
-    if (!hindiVoice) {
-        hindiVoice = voices.find(v => v.lang.includes('hi') || v.lang.includes('IN'));
+    let selectedVoice = null;
+    
+    // 1. Look for a high-quality Hindi female voice (Google Hindi, Microsoft Kalpana, Swara, Heera)
+    selectedVoice = voices.find(v => 
+        (v.lang.includes('hi') || v.lang.includes('IN')) && 
+        (v.name.toLowerCase().includes('female') || 
+         v.name.toLowerCase().includes('kalpana') || 
+         v.name.toLowerCase().includes('swara') || 
+         v.name.toLowerCase().includes('google') ||
+         v.name.toLowerCase().includes('heera'))
+    );
+    
+    // 2. If not found, look for any Hindi voice (Hemant etc.)
+    if (!selectedVoice) {
+        selectedVoice = voices.find(v => v.lang.includes('hi') || v.lang.includes('IN'));
     }
-    if (hindiVoice) {
-        utterance.voice = hindiVoice;
+    
+    // 3. If still not found, look for any female voice as a fallback
+    if (!selectedVoice) {
+        selectedVoice = voices.find(v => v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('zira'));
     }
+
+    if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        
+        // Tune pitch dynamically: Hemant (male) or male fallbacks should NOT have high pitch
+        const nameLower = selectedVoice.name.toLowerCase();
+        if (nameLower.includes('female') || nameLower.includes('kalpana') || nameLower.includes('swara') || nameLower.includes('heera') || nameLower.includes('google')) {
+            pitch = 1.05; // Slightly sweet, natural female pitch
+        } else if (nameLower.includes('male') || nameLower.includes('hemant')) {
+            pitch = 1.0;  // Normal pitch for male voice (avoids robot/squeak)
+        }
+    }
+    
+    utterance.pitch = pitch;
+    utterance.rate = rate;
 
     utterance.onstart = () => {
         isSpeakingGlobally = true;
@@ -372,32 +401,46 @@ function parseLocalCommand(text) {
 
     if (hasClientKw && hasAddKw) {
         let name = "";
-        const nameIndicators = [
-            "name hai", "naam hai", "name is", "naam is", "client ka name", "client ka naam",
-            "नाम है", "नाम", "नाम:"
-        ];
-        for (const ind of nameIndicators) {
-            if (cleanText.includes(ind)) {
-                const parts = text.split(new RegExp(ind, "i"));
-                if (parts[1]) {
-                    name = parts[1].replace(/add|kar|do|karo|please|shree|ai|जोड़ो|जोड़ो|करो|कर|दो/gi, "").trim();
-                    break;
+        
+        // 1. Check if the user specified "नाम से" or "name se" (e.g. "Balkrishna ke naam se new client add kro")
+        if (cleanText.includes("नाम से") || cleanText.includes("name se")) {
+            const separator = cleanText.includes("के नाम से") ? "के नाम से" : (cleanText.includes("name se") ? "name se" : "नाम से");
+            const parts = text.split(new RegExp(separator, "i"));
+            if (parts[0]) {
+                name = cleanClientName(parts[0]);
+            }
+        }
+        
+        // 2. Indicators (e.g. "client ka name Balkrishna hai")
+        if (!name) {
+            const nameIndicators = [
+                "name hai", "naam hai", "name is", "naam is", "client ka name", "client ka naam",
+                "नाम है", "नाम", "नाम:"
+            ];
+            for (const ind of nameIndicators) {
+                if (cleanText.includes(ind)) {
+                    const parts = text.split(new RegExp(ind, "i"));
+                    if (parts[1]) {
+                        name = cleanClientName(parts[1]);
+                        break;
+                    }
                 }
             }
         }
+        
+        // 3. Fallback to cleaning the entire string if indicators don't match
         if (!name) {
-            // Extract using regex
-            const match = text.match(/(?:add\s+client|register\s+client|client|naya\s+client|क्लाइंट|ग्राहक)\s+([a-zA-Z0-9\s\u0900-\u097F]+)/i);
-            if (match && match[1]) {
-                name = match[1].replace(/add|kar|do|karo|please|shree|ai|जोड़ो|जोड़ो|करो|कर|दो/gi, "").trim();
-            }
+            name = cleanClientName(text);
         }
 
-        name = name.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").replace(/\s+/g, " ").trim();
         if (name && name.length > 2) {
+            // Transliterate Devanagari to English character name offline
+            const isHindi = /[\u0900-\u097F]/.test(name);
+            const finalName = isHindi ? transliterateHindiToEnglish(name) : name;
+            
             return {
                 action: "addClient",
-                data: { name: name }
+                data: { name: finalName }
             };
         } else {
             return {
@@ -1037,3 +1080,55 @@ You must return JSON in this exact structure:
         };
     }
 }
+
+// --- HELPER FUNCTIONS FOR OFFLINE HINDI PARSING ---
+function cleanClientName(rawName) {
+    const stopwords = [
+        "add", "kar", "do", "karo", "please", "shree", "ai", "जोड़ो", "जोड़ो", "करो", "कर", "दो", "नए", "नया", "नाम", "है", "को", "से", "के", "client", "क्लाइंट", "ग्राहक", "कस्टमर", "register",
+        "श्री", "shri", "hai", "banao", "बनाओ", "बना", "ka", "का", "naam", "se", "ke"
+    ];
+    const words = rawName.split(/\s+/);
+    const filtered = words.filter(w => !stopwords.includes(w.toLowerCase()));
+    let name = filtered.join(" ").trim();
+    name = name.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").trim();
+    return name.replace(/\s+/g, " ");
+}
+
+function transliterateHindiToEnglish(str) {
+    if (!str) return "";
+    const mapping = {
+        'अ': 'a', 'आ': 'a', 'इ': 'i', 'ई': 'ee', 'उ': 'u', 'ऊ': 'oo', 'ऋ': 'ri',
+        'ए': 'e', 'ऐ': 'ai', 'ओ': 'o', 'औ': 'au', 'अं': 'an', 'अः': 'ah',
+        'क': 'k', 'ख': 'kh', 'ग': 'g', 'घ': 'gh', 'ङ': 'n',
+        'च': 'ch', 'छ': 'chh', 'ज': 'j', 'झ': 'jh', 'ञ': 'n',
+        'ट': 't', 'ठ': 'th', 'ड': 'd', 'ढ': 'dh', 'ण': 'n',
+        'त': 't', 'थ': 'th', 'द': 'd', 'ध': 'dh', 'न': 'n',
+        'प': 'p', 'फ': 'ph', 'ब': 'b', 'भ': 'bh', 'म': 'm',
+        'य': 'y', 'र': 'r', 'ल': 'l', 'व': 'v', 'श': 'sh', 'ष': 'sh', 'स': 's', 'ह': 'h',
+        'क्ष': 'ksh', 'त्र': 'tr', 'ज्ञ': 'gy',
+        'ा': 'a', 'ि': 'i', 'ी': 'ee', 'ु': 'u', 'ू': 'oo', 'ृ': 'ri',
+        'े': 'e', 'ै': 'ai', 'ो': 'o', 'ौ': 'au', 'ं': 'n', 'ः': 'h', 'ँ': 'n',
+        '्': ''
+    };
+
+    let result = "";
+    for (let i = 0; i < str.length; i++) {
+        const char = str[i];
+        const nextChar = str[i+1];
+        if (mapping[char] !== undefined) {
+            let eng = mapping[char];
+            const isConsonant = "कखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसह".includes(char);
+            if (isConsonant) {
+                const nextIsMatraOrHalant = nextChar && "ािीुूृेैोौं्".includes(nextChar);
+                if (!nextIsMatraOrHalant && nextChar !== " " && nextChar !== undefined) {
+                    eng += "a";
+                }
+            }
+            result += eng;
+        } else {
+            result += char;
+        }
+    }
+    return result.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
