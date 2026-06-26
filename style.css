@@ -1829,3 +1829,32 @@ h1, h2, h3, h4, h5, h6 {
 .sindhu-settings.active {
     display: flex;
 }
+
+/* Transitions for main workspace content when side-by-side chat drawer opens */
+.main-content {
+    transition: margin-right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (min-width: 992px) {
+    body.sindhu-chat-active .sindhu-chat-window {
+        position: fixed !important;
+        top: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        left: auto !important;
+        width: 380px !important;
+        height: 100vh !important;
+        border-radius: 0 !important;
+        border: none !important;
+        border-left: 1px solid var(--border-color) !important;
+        box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08) !important;
+        background: var(--bg-secondary) !important;
+        z-index: 9999 !important;
+        transform: none !important;
+        animation: none !important;
+    }
+    
+    body.sindhu-chat-active .main-content {
+        margin-right: 380px;
+    }
+}

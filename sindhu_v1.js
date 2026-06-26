@@ -26,6 +26,7 @@
             if (chatWindow) {
                 chatWindow.classList.remove('active');
             }
+            document.body.classList.remove("sindhu-chat-active");
             if (window.speechSynthesis) {
                 window.speechSynthesis.cancel();
             }
@@ -781,10 +782,19 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
             voiceReplyCheckbox.checked = localStorage.getItem("sindhu_voice_reply") === "true";
         }
 
+        function syncBodyChatClass() {
+            if (chatWindow && chatWindow.classList.contains("active")) {
+                document.body.classList.add("sindhu-chat-active");
+            } else {
+                document.body.classList.remove("sindhu-chat-active");
+            }
+        }
+
         // Toggle chat window
         if (toggleBtn && chatWindow) {
             toggleBtn.addEventListener("click", () => {
                 chatWindow.classList.toggle("active");
+                syncBodyChatClass();
                 if (chatWindow.classList.contains("active")) {
                     chatInput.focus();
                     if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -795,6 +805,7 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
         if (closeBtn && chatWindow) {
             closeBtn.addEventListener("click", () => {
                 chatWindow.classList.remove("active");
+                syncBodyChatClass();
                 if (window.speechSynthesis) window.speechSynthesis.cancel();
                 // Clear session buffer on close
                 sindhuSessionBuffer = "";
