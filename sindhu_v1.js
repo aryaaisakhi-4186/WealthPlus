@@ -844,6 +844,114 @@ Return the output as raw text (no markdown code blocks, just the file content).`
             micBtn.style.display = "none";
         }
 
+        // Mouse and Touch dragging logic for the Sindhu widget
+        function makeWidgetDraggable() {
+            const widget = document.getElementById("sindhu-chat-widget");
+            if (!widget || !toggleBtn) return;
+
+            let isDragging = false;
+            let startX = 0;
+            let startY = 0;
+            let initialX = 0;
+            let initialY = 0;
+            let dragThreshold = 6;
+            let hasDragged = false;
+
+            toggleBtn.addEventListener("mousedown", dragStart);
+            toggleBtn.addEventListener("touchstart", dragStart, { passive: true });
+
+            function dragStart(e) {
+                hasDragged = false;
+                
+                let clientX = e.type === "touchstart" ? e.touches[0].clientX : e.clientX;
+                let clientY = e.type === "touchstart" ? e.touches[0].clientY : e.clientY;
+
+                startX = clientX;
+                startY = clientY;
+
+                const rect = widget.getBoundingClientRect();
+                initialX = rect.left;
+                initialY = rect.top;
+
+                // Switch to absolute coordinates
+                widget.style.bottom = "auto";
+                widget.style.right = "auto";
+                widget.style.left = `${initialX}px`;
+                widget.style.top = `${initialY}px`;
+
+                isDragging = true;
+
+                document.addEventListener("mousemove", dragMove);
+                document.addEventListener("touchmove", dragMove, { passive: false });
+                document.addEventListener("mouseup", dragEnd);
+                document.addEventListener("touchend", dragEnd);
+            }
+
+            function dragMove(e) {
+                if (!isDragging) return;
+                
+                let clientX = e.type === "touchmove" ? e.touches[0].clientX : e.clientX;
+                let clientY = e.type === "touchmove" ? e.touches[0].clientY : e.clientY;
+
+                let dx = clientX - startX;
+                let dy = clientY - startY;
+
+                if (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold) {
+                    hasDragged = true;
+                }
+
+                let newX = initialX + dx;
+                let newY = initialY + dy;
+
+                const maxX = window.innerWidth - widget.offsetWidth;
+                const maxY = window.innerHeight - widget.offsetHeight;
+
+                newX = Math.max(0, Math.min(newX, maxX));
+                newY = Math.max(0, Math.min(newY, maxY));
+
+                widget.style.left = `${newX}px`;
+                widget.style.top = `${newY}px`;
+
+                // Adjust the alignment of the chat window dynamically
+                if (chatWindow) {
+                    const middleOfScreen = window.innerWidth / 2;
+                    if (newX + widget.offsetWidth / 2 < middleOfScreen) {
+                        // Left side of the screen - align chat window to left edge
+                        chatWindow.style.left = "0";
+                        chatWindow.style.right = "auto";
+                        chatWindow.style.transformOrigin = "bottom left";
+                    } else {
+                        // Right side of the screen - align chat window to right edge
+                        chatWindow.style.right = "0";
+                        chatWindow.style.left = "auto";
+                        chatWindow.style.transformOrigin = "bottom right";
+                    }
+                }
+
+                if (e.type === "touchmove") {
+                    e.preventDefault();
+                }
+            }
+
+            function dragEnd() {
+                isDragging = false;
+                document.removeEventListener("mousemove", dragMove);
+                document.removeEventListener("touchmove", dragMove);
+                document.removeEventListener("mouseup", dragEnd);
+                document.removeEventListener("touchend", dragEnd);
+            }
+
+            // Intercept click if drag occurred
+            toggleBtn.addEventListener("click", (e) => {
+                if (hasDragged) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            }, true);
+        }
+
+        makeWidgetDraggable();
+
         // Initial visibility check when DOM is ready
         updateSindhuVisibility();
     }

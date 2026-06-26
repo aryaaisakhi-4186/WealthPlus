@@ -1609,9 +1609,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sindhu-chat-window {
-    position: fixed;
-    bottom: 92px;
-    right: 24px;
+    position: absolute;
+    bottom: 68px;
+    right: 0;
     width: 360px;
     height: 500px;
     border-radius: var(--radius-md);
