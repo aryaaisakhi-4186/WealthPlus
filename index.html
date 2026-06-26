@@ -976,6 +976,73 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="app.js?v=3.6.9"></script>
+    <script src="app.js?v=4.0.0"></script>
+    <script src="sindhu_v1.js?v=4.0.0"></script>
+
+    <!-- Sindhu AI Assistant Widget -->
+    <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">
+        <button id="sindhu-toggle-btn" class="sindhu-toggle-btn" title="Ask Sindhu">
+            <i data-lucide="bot"></i>
+            <span class="pulse-indicator"></span>
+        </button>
+        <div id="sindhu-chat-window" class="sindhu-chat-window">
+            <div class="sindhu-header">
+                <div class="sindhu-header-info">
+                    <div class="sindhu-avatar">S</div>
+                    <div>
+                        <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: #ffffff;">Sindhu</h4>
+                        <span style="font-size: 10px; opacity: 0.8; color: #ffffff;">AI Assistant</span>
+                    </div>
+                </div>
+                <div class="sindhu-header-actions">
+                    <button class="btn-sindhu-action" id="sindhu-btn-settings" title="Settings">
+                        <i data-lucide="settings"></i>
+                    </button>
+                    <button class="btn-sindhu-action" id="sindhu-btn-close" title="Close">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Chat Messages View -->
+            <div id="sindhu-messages" class="sindhu-messages">
+                <div class="sindhu-msg msg-sindhu">
+                    <p>नमस्ते! मैं हूँ सिन्धु (Sindhu), आपकी AI मुनीम। मैं आपकी आवाज़ या लिखित निर्देश से नए क्लाइंट जोड़ सकती हूँ या ख़र्चों का हिसाब रख सकती हूँ।</p>
+                    <span class="msg-time">Just now</span>
+                </div>
+            </div>
+
+            <!-- Settings View (Toggled) -->
+            <div id="sindhu-settings" class="sindhu-settings">
+                <h5 style="margin: 0 0 10px 0; font-size: 13px; font-weight: 700; color: var(--text-primary);">Sindhu Settings</h5>
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 6px; font-size: 11px; font-weight: 600; color: var(--text-secondary);">Voice Settings</label>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="sindhu-voice-reply" checked style="width: auto;">
+                        <span style="font-size: 12px; color: var(--text-primary);">Enable Voice Responses</span>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label for="sindhu-gemini-key" style="display: block; margin-bottom: 6px; font-size: 11px; font-weight: 600; color: var(--text-secondary);">Gemini API Key (Optional)</label>
+                    <input type="password" id="sindhu-gemini-key" placeholder="AIzaSy..." style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 12px; background: var(--bg-primary); color: var(--text-primary);">
+                    <span style="font-size: 9px; color: var(--text-secondary); display: block; margin-top: 4px;">Leave blank to use offline regex parsing.</span>
+                </div>
+                <div style="margin-top: auto; display: flex; justify-content: flex-end;">
+                    <button type="button" class="btn btn-primary" id="sindhu-settings-back" style="padding: 6px 12px; font-size: 12px;">Back to Chat</button>
+                </div>
+            </div>
+
+            <!-- Chat Footer Input -->
+            <div class="sindhu-footer">
+                <button id="sindhu-mic-btn" class="btn-mic-sindhu" title="Speak to Sindhu">
+                    <i data-lucide="mic"></i>
+                </button>
+                <input type="text" id="sindhu-input" placeholder="Type a command...">
+                <button id="sindhu-send-btn" class="btn-send-sindhu" title="Send">
+                    <i data-lucide="send"></i>
+                </button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

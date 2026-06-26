@@ -461,6 +461,8 @@ function initLoginSession() {
         // Not logged in
         loginOverlay.classList.remove('hidden');
     }
+
+    if (typeof updateSindhuVisibility === 'function') updateSindhuVisibility();
 }
 
 function handleLoginSubmit(e) {
@@ -748,7 +750,10 @@ function setMasterTab(tabId) {
 // --- 6. RENDER LOGIC ---
 
 function renderPage(pageId) {
-    if (!state.currentUser) return; // Wait for login
+    if (!state.currentUser) {
+        if (typeof updateSindhuVisibility === 'function') updateSindhuVisibility();
+        return; // Wait for login
+    }
 
     updateDateDisplay();
     updateGlobalStatsUI();
@@ -771,6 +776,8 @@ function renderPage(pageId) {
             renderMasterPage();
             break;
     }
+
+    if (typeof updateSindhuVisibility === 'function') updateSindhuVisibility();
 }
 
 function updateDateDisplay() {
@@ -1570,6 +1577,7 @@ async function deployAppToGitHub() {
         { name: 'index.html', required: true },
         { name: 'app.js', required: true },
         { name: 'style.css', required: true },
+        { name: 'sindhu_v1.js', required: true },
         { name: 'server.py', required: false },
         { name: 'README.md', required: false }
     ];
