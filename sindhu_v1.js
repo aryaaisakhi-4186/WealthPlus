@@ -385,8 +385,8 @@
         const cats = (typeof state !== 'undefined' && state.categoriesConfig) ? Object.keys(state.categoriesConfig) : ["Food", "Shopping", "Bills", "Transport", "Rent", "Others"];
         const accs = (typeof state !== 'undefined' && state.accounts) ? state.accounts.map(a => `${a.name} (ID: ${a.id}, type: ${a.type})`).join(', ') : "Main Cash (ID: acc_1), HDFC Bank (ID: acc_2)";
         
-        const systemPrompt = `You are Sindhu (सिन्धु), a warm, female AI financial assistant and bookkeeper for the Wealth Plus app.
-Your task is to parse the user's voice or text command (which will be in Hindi, English, or Hinglish) and structure it into a database action.
+        const systemPrompt = `You are Sindhu (सिन्धु), a warm, female AI financial assistant, bookkeeper, and developer helper for the Wealth Plus app.
+Your task is to parse the user's voice or text command (which will be in Hindi, English, or Hinglish) and structure it into a database action or an application code modification action.
 
 Available Categories: ${cats.join(', ')}
 Available Accounts: ${accs}
@@ -401,9 +401,12 @@ Guidelines:
 3. For Income logging (e.g. "received 50000 from Balkrishna Premnarayan via bank"):
    Identify amount, source client, and mode (account ID).
    -> action: "addIncome", amount: 50000, clientName: "Balkrishna Premnarayan", mode: "acc_2".
-4. If a field is not found or not specified, leave it null or omit it.
-5. Generate a warm Hindi spoken confirmation (replyHindi). It MUST start with "जय हरी!" (e.g., "जय हरी! मैंने बालकृष्ण प्रेमनारायण को 25000 रुपये के मासिक भुगतान के साथ नए क्लाइंट के रूप में जोड़ दिया है।").
-6. The database inputs (name, description, clientName, category) MUST be in English (Latin script). Only replyHindi must be in Devanagari Hindi.`;
+4. For Application code updates/modifications (e.g., "change UI styling to purple", "change dashboard title in index.html", "modify app.js to add custom logging"):
+   Identify the target file and the instruction for change.
+   -> action: "updateApp", targetFile: "style.css" or "index.html" or "app.js" or "sindhu_v1.js", instructionForChange: "The user instructions details".
+5. If a field is not found or not specified, leave it null or omit it.
+6. Generate a warm Hindi spoken confirmation (replyHindi). It MUST start with "जय हरी!" (e.g., "जय हरी! मैंने बालकृष्ण प्रेमनारायण को 25000 रुपये के मासिक भुगतान के साथ नए क्लाइंट के रूप में जोड़ दिया है।" or "जय हरी! मैं आपके निर्देशानुसार ऐप के कोड में बदलाव शुरू कर रही हूँ।").
+7. The database inputs (name, description, clientName, category) MUST be in English (Latin script). Only replyHindi must be in Devanagari Hindi.`;
 
         const requestBody = {
             contents: [
@@ -420,7 +423,7 @@ Guidelines:
                     properties: {
                         action: {
                             type: "STRING",
-                            enum: ["addClient", "addExpense", "addIncome", "unknown"]
+                            enum: ["addClient", "addExpense", "addIncome", "updateApp", "unknown"]
                         },
                         name: { type: "STRING" },
                         monthlyPay: { type: "INTEGER" },
@@ -429,6 +432,8 @@ Guidelines:
                         amount: { type: "INTEGER" },
                         mode: { type: "STRING" },
                         clientName: { type: "STRING" },
+                        targetFile: { type: "STRING" },
+                        instructionForChange: { type: "STRING" },
                         replyHindi: { type: "STRING" }
                     },
                     required: ["action", "replyHindi"]
@@ -479,6 +484,61 @@ Guidelines:
         }
         
         window.speechSynthesis.speak(utterance);
+    }
+
+    // Advanced: Generate modified code for app files using Gemini API
+    async function generateModifiedCode(fileName, currentCode, instructions, apiKey) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+        const prompt = `You are a professional web developer agent.
+Your task is to modify the file "${fileName}" based on the following instructions:
+"${instructions}"
+
+Return the COMPLETE modified code for the file "${fileName}".
+Do NOT truncate, do NOT omit any existing functions, and do NOT use placeholders. Keep all unrelated code exactly as it is.
+Return the output as raw text (no markdown code blocks, just the file content).`;
+
+        const requestBody = {
+            contents: [
+                {
+                    parts: [
+                        { text: prompt },
+                        { text: `Current Code of ${fileName}:\n\n${currentCode}` }
+                    ]
+                }
+            ]
+        };
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Gemini API Error: Status ${response.status}`);
+        }
+
+        const data = await response.json();
+        let result = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!result) {
+            throw new Error("Empty response from Gemini");
+        }
+        
+        result = result.trim();
+        if (result.startsWith("```")) {
+            const lines = result.split("\n");
+            if (lines[0].startsWith("```")) {
+                lines.shift();
+            }
+            if (lines[lines.length - 1] === "```") {
+                lines.pop();
+            }
+            result = lines.join("\n").trim();
+        }
+        
+        return result;
     }
 
     // Initialize Widget Event Listeners
@@ -635,21 +695,67 @@ Guidelines:
                 }
 
                 if (parsed && parsed.action !== "unknown") {
-                    const actionResult = executeAgentAction(parsed);
-                    if (actionResult.success) {
-                        if (parsed.replyHindi) {
-                            replyText = parsed.replyHindi;
+                    if (parsed.action === 'updateApp') {
+                        if (!key) {
+                            replyText = "जय हरी! ऐप अपडेट करने के लिए मुझे जेमिनी एपीआई की (Gemini API Key) की आवश्यकता है, कृपया सेटिंग्स में जाकर इसे दर्ज करें।";
                         } else {
-                            if (parsed.action === 'addClient') {
-                                replyText = `जय हरी! मैंने ${parsed.name} को ${parsed.monthlyPay > 0 ? `${parsed.monthlyPay} रुपये प्रति माह के मासिक भुगतान के साथ` : ''} नए क्लाइंट के रूप में जोड़ दिया है।`;
-                            } else if (parsed.action === 'addExpense') {
-                                replyText = `जय हरी! मैंने ₹${parsed.amount} का ${parsed.category} खर्च ${parsed.clientName ? `${parsed.clientName} के लिए` : ''} दर्ज कर लिया है।`;
-                            } else if (parsed.action === 'addIncome') {
-                                replyText = `जय हरी! मैंने ${parsed.clientName ? `${parsed.clientName} से` : ''} ₹${parsed.amount} की आय दर्ज कर ली है।`;
+                            try {
+                                appendMessage(`Fetching current ${parsed.targetFile}...`, "sindhu");
+                                const fileRes = await fetch(`${parsed.targetFile}?cb=${Date.now()}`);
+                                if (!fileRes.ok) {
+                                    throw new Error(`Failed to fetch local file ${parsed.targetFile}`);
+                                }
+                                const currentCode = await fileRes.text();
+                                
+                                appendMessage(`Generating modifications for ${parsed.targetFile}...`, "sindhu");
+                                const newCode = await generateModifiedCode(parsed.targetFile, currentCode, parsed.instructionForChange, key);
+                                
+                                appendMessage(`Writing modified code to ${parsed.targetFile} locally...`, "sindhu");
+                                const writeRes = await fetch('/api/write-file', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        filename: parsed.targetFile,
+                                        content: newCode
+                                    })
+                                });
+                                
+                                if (!writeRes.ok) {
+                                    const errData = await writeRes.json();
+                                    throw new Error(errData.error || `Failed to write file locally.`);
+                                }
+                                
+                                appendMessage(`Deploying changes to GitHub repository...`, "sindhu");
+                                if (typeof deployAppToGitHub === 'function') {
+                                    await deployAppToGitHub();
+                                    replyText = parsed.replyHindi || `जय हरी! मैंने ${parsed.targetFile} में आपके निर्देश अनुसार बदलाव कर दिए हैं और इसे गिटहब (Git) पर डिप्लॉय कर दिया है।`;
+                                } else {
+                                    replyText = `जय हरी! मैंने ${parsed.targetFile} में बदलाव कर दिए हैं, लेकिन गिटहब डिप्लॉयमेंट फंक्शन नहीं मिला। कृपया इसे मैन्युअल रूप से पुश करें।`;
+                                }
+                            } catch (appErr) {
+                                console.error("App update failed:", appErr);
+                                replyText = `जय हरी! ऐप में अपडेशन करते समय एरर आया: ${appErr.message}`;
                             }
                         }
                     } else {
-                        replyText = "जय हरी! आदेश समझ आया, लेकिन डेटाबेस में दर्ज करने में समस्या हुई।";
+                        const actionResult = executeAgentAction(parsed);
+                        if (actionResult.success) {
+                            if (parsed.replyHindi) {
+                                replyText = parsed.replyHindi;
+                            } else {
+                                if (parsed.action === 'addClient') {
+                                    replyText = `जय हरी! मैंने ${parsed.name} को ${parsed.monthlyPay > 0 ? `${parsed.monthlyPay} रुपये प्रति माह के मासिक भुगतान के साथ` : ''} नए क्लाइंट के रूप में जोड़ दिया है।`;
+                                } else if (parsed.action === 'addExpense') {
+                                    replyText = `जय हरी! मैंने ₹${parsed.amount} का ${parsed.category} खर्च ${parsed.clientName ? `${parsed.clientName} के लिए` : ''} दर्ज कर लिया है।`;
+                                } else if (parsed.action === 'addIncome') {
+                                    replyText = `जय हरी! मैंने ${parsed.clientName ? `${parsed.clientName} से` : ''} ₹${parsed.amount} की आय दर्ज कर ली है।`;
+                                }
+                            }
+                        } else {
+                            replyText = "जय हरी! आदेश समझ आया, लेकिन डेटाबेस में दर्ज करने में समस्या हुई।";
+                        }
                     }
                 } else {
                     replyText = "जय हरी! मुझे आपका आदेश समझ नहीं आया। क्या आप नए क्लाइंट को जोड़ने या खर्चों को दर्ज करने के लिए कह रहे हैं?";
