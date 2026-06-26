@@ -1017,6 +1017,7 @@ h1, h2, h3, h4, h5, h6 {
 .reports-nav-tabs {
     display: flex;
     gap: 4px;
+    flex-wrap: wrap;
 }
 
 .report-tab {
@@ -1856,5 +1857,14 @@ h1, h2, h3, h4, h5, h6 {
     
     body.sindhu-chat-active .main-content {
         margin-right: 380px;
+    }
+
+    /* Force grids to single column when side-by-side is active on medium screens (up to 1250px) to prevent cutoffs */
+    @media (max-width: 1250px) {
+        body.sindhu-chat-active .dashboard-core-grid,
+        body.sindhu-chat-active .charts-grid,
+        body.sindhu-chat-active .report-details-grid {
+            grid-template-columns: 1fr !important;
+        }
     }
 }
