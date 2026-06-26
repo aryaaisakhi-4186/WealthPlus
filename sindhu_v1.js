@@ -385,8 +385,9 @@
         const cats = (typeof state !== 'undefined' && state.categoriesConfig) ? Object.keys(state.categoriesConfig) : ["Food", "Shopping", "Bills", "Transport", "Rent", "Others"];
         const accs = (typeof state !== 'undefined' && state.accounts) ? state.accounts.map(a => `${a.name} (ID: ${a.id}, type: ${a.type})`).join(', ') : "Main Cash (ID: acc_1), HDFC Bank (ID: acc_2)";
         
-        const systemPrompt = `You are Sindhu (सिन्धु), a warm, female AI financial assistant, bookkeeper, and developer helper for the Wealth Plus app.
+        const systemPrompt = `You are Sindhu (सिन्धु), a highly experienced, mature, and extremely polite female financial adviser, bookkeeper, and developer assistant for the Wealth Plus app.
 Your task is to parse the user's voice or text command (which will be in Hindi, English, or Hinglish) and structure it into a database action or an application code modification action.
+Always behave and respond like a highly mannerly, respectful human agent (बहुत सलीके से और आदरपूर्वक बात करना). Use polite pronouns ("आप", "कृपया", "महोदय" / "महोदया") and professional bookkeeper phrasing.
 
 Available Categories: ${cats.join(', ')}
 Available Accounts: ${accs}
@@ -405,7 +406,7 @@ Guidelines:
    Identify the target file and the instruction for change.
    -> action: "updateApp", targetFile: "style.css" or "index.html" or "app.js" or "sindhu_v1.js", instructionForChange: "The user instructions details".
 5. If a field is not found or not specified, leave it null or omit it.
-6. Generate a warm Hindi spoken confirmation (replyHindi). It MUST start with "जय हरी!" (e.g., "जय हरी! मैंने बालकृष्ण प्रेमनारायण को 25000 रुपये के मासिक भुगतान के साथ नए क्लाइंट के रूप में जोड़ दिया है।" or "जय हरी! मैं आपके निर्देशानुसार ऐप के कोड में बदलाव शुरू कर रही हूँ।").
+6. Generate a highly mannerly, respectful, experienced Hindi spoken confirmation (replyHindi). It MUST start with "जय हरी!" (e.g., "जय हरी! आपके निर्देशानुसार, मैंने अत्यंत आदरपूर्वक बालकृष्ण प्रेमनारायण को 25000 रुपये के मासिक भुगतान के साथ नए क्लाइंट के रूप में जोड़ दिया है। कृपया बताएं कि क्या मैं आपकी और सहायता कर सकती हूँ?").
 7. The database inputs (name, description, clientName, category) MUST be in English (Latin script). Only replyHindi must be in Devanagari Hindi.`;
 
         const requestBody = {
@@ -643,7 +644,7 @@ Return the output as raw text (no markdown code blocks, just the file content).`
                 } else {
                     sindhuSessionBuffer = inputText;
                 }
-                const replyText = "जी, मैंने नोट कर लिया है। जब आपका निर्देश पूरा हो जाए, तो 'अपडेट करो' बोलें।";
+                const replyText = "जी हुज़ूर, मैंने आपका निर्देश सलीके से दर्ज कर लिया है। जब आपका संपूर्ण कथन पूरा हो जाए, तो कृपया 'अपडेट करो' बोलकर मुझे पुष्टि प्रदान करें।";
                 appendMessage(replyText, "sindhu");
                 if (voiceReplyCheckbox && voiceReplyCheckbox.checked) {
                     speakSindhuText(replyText);
@@ -746,23 +747,23 @@ Return the output as raw text (no markdown code blocks, just the file content).`
                                 replyText = parsed.replyHindi;
                             } else {
                                 if (parsed.action === 'addClient') {
-                                    replyText = `जय हरी! मैंने ${parsed.name} को ${parsed.monthlyPay > 0 ? `${parsed.monthlyPay} रुपये प्रति माह के मासिक भुगतान के साथ` : ''} नए क्लाइंट के रूप में जोड़ दिया है।`;
+                                    replyText = `जय हरी! आपके निर्देशानुसार, मैंने अत्यंत आदरपूर्वक ${parsed.name} को ${parsed.monthlyPay > 0 ? `${parsed.monthlyPay} रुपये प्रति माह के मासिक भुगतान के साथ` : ''} नए क्लाइंट के रूप में जोड़ दिया है। कृपया बताएं कि क्या मुझे अन्य कोई सहायता प्रदान करनी है?`;
                                 } else if (parsed.action === 'addExpense') {
-                                    replyText = `जय हरी! मैंने ₹${parsed.amount} का ${parsed.category} खर्च ${parsed.clientName ? `${parsed.clientName} के लिए` : ''} दर्ज कर लिया है।`;
+                                    replyText = `जय हरी! मैंने आपके द्वारा बताए गए ₹${parsed.amount} के ${parsed.category} खर्च को ${parsed.clientName ? `${parsed.clientName} के खाते में` : ''} पूर्ण रूप से सहेज लिया है। अन्य किसी प्रविष्टि के लिए कृपया मुझे निर्देश दें।`;
                                 } else if (parsed.action === 'addIncome') {
-                                    replyText = `जय हरी! मैंने ${parsed.clientName ? `${parsed.clientName} से` : ''} ₹${parsed.amount} की आय दर्ज कर ली है।`;
+                                    replyText = `जय हरी! मुझे यह सूचित करते हुए प्रसन्नता हो रही है कि ${parsed.clientName ? `${parsed.clientName} से प्राप्त` : ''} ₹${parsed.amount} की राशि आपके खाते में सफलतापूर्वक जमा कर ली गई है। कृपया अगला कार्य बताएं।`;
                                 }
                             }
                         } else {
-                            replyText = "जय हरी! आदेश समझ आया, लेकिन डेटाबेस में दर्ज करने में समस्या हुई।";
+                            replyText = "जय हरी! आपके निर्देश को मैंने समझ लिया है, लेकिन डेटाबेस में दर्ज करने में कुछ समस्या आ रही है। कृपया पुनः प्रयास करें।";
                         }
                     }
                 } else {
-                    replyText = "जय हरी! मुझे आपका आदेश समझ नहीं आया। क्या आप नए क्लाइंट को जोड़ने या खर्चों को दर्ज करने के लिए कह रहे हैं?";
+                    replyText = "जय हरी! क्षमा करें महोदय, मुझे आपका आदेश समझ नहीं आया। क्या आप कृपया नए क्लाइंट को जोड़ने या खर्चों को दर्ज करने के लिए कह रहे हैं?";
                 }
             } catch (err) {
                 console.error("General parse error:", err);
-                replyText = "जय हरी! क्षमा करें, कुछ तकनीकी समस्या आ गई है। कृपया पुनः प्रयास करें।";
+                replyText = "जय हरी! क्षमा करें महोदय, कुछ तकनीकी समस्या आ गई है। कृपया एक बार फिर प्रयास करने का कष्ट करें।";
             }
 
             appendMessage(replyText, "sindhu");
