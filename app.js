@@ -1572,6 +1572,7 @@ async function deployAppToGitHub() {
     const filesToDeploy = [
         { name: 'index.html', required: true },
         { name: 'app.js', required: true },
+        { name: 'shree_v2.js', required: true },
         { name: 'style.css', required: true },
         { name: 'server.py', required: false },
         { name: 'README.md', required: false }
