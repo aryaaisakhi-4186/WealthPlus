@@ -441,13 +441,11 @@ function saveCustomFieldsDirect(customClientFields, customTxFields, syncToCloud 
 function initLoginSession() {
     const loginOverlay = document.getElementById('login-screen');
     const userBadge = document.getElementById('current-user-badge');
-    const shreeWidget = document.getElementById('shree-chat-widget');
 
     if (state.currentUser) {
         // Logged in
         loginOverlay.classList.add('hidden');
         userBadge.innerText = `${state.currentUser.name} (${state.currentUser.role})`;
-        if (shreeWidget) shreeWidget.style.display = 'block';
         
         // Dynamic Role access checks: Hide Master link for Staff
         const masterLinks = document.querySelectorAll('[data-page="master"]');
@@ -462,7 +460,6 @@ function initLoginSession() {
     } else {
         // Not logged in
         loginOverlay.classList.remove('hidden');
-        if (shreeWidget) shreeWidget.style.display = 'none';
     }
 }
 
@@ -1572,7 +1569,6 @@ async function deployAppToGitHub() {
     const filesToDeploy = [
         { name: 'index.html', required: true },
         { name: 'app.js', required: true },
-        { name: 'shree_v2.js', required: true },
         { name: 'style.css', required: true },
         { name: 'server.py', required: false },
         { name: 'README.md', required: false }
