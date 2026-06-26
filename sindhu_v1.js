@@ -7,6 +7,8 @@
  */
 
 (function () {
+    let sindhuSessionBuffer = "";
+
     // Expose updateSindhuVisibility globally
     window.updateSindhuVisibility = function () {
         const sindhuWidget = document.getElementById('sindhu-chat-widget');
@@ -22,6 +24,8 @@
             if (window.speechSynthesis) {
                 window.speechSynthesis.cancel();
             }
+            // Clear session buffer on hide
+            sindhuSessionBuffer = "";
         }
     };
 
@@ -516,6 +520,8 @@ Guidelines:
             closeBtn.addEventListener("click", () => {
                 chatWindow.classList.remove("active");
                 if (window.speechSynthesis) window.speechSynthesis.cancel();
+                // Clear session buffer on close
+                sindhuSessionBuffer = "";
             });
         }
 
@@ -566,6 +572,42 @@ Guidelines:
             appendMessage(inputText, "user");
             chatInput.value = "";
 
+            const cleanInput = inputText.toLowerCase().trim();
+            const updateTriggers = ["update karo", "update krdo", "update kardo", "update", "अपडेट करो", "अपडेट"];
+            const hasUpdateTrigger = updateTriggers.some(trigger => cleanInput.includes(trigger));
+
+            if (!hasUpdateTrigger) {
+                // Append to session buffer
+                if (sindhuSessionBuffer) {
+                    sindhuSessionBuffer += " " + inputText;
+                } else {
+                    sindhuSessionBuffer = inputText;
+                }
+                const replyText = "जी, मैंने नोट कर लिया है। जब आपका निर्देश पूरा हो जाए, तो 'अपडेट करो' बोलें।";
+                appendMessage(replyText, "sindhu");
+                if (voiceReplyCheckbox && voiceReplyCheckbox.checked) {
+                    speakSindhuText(replyText);
+                }
+                return;
+            }
+
+            // It contains update trigger. Append current input to the buffer.
+            if (sindhuSessionBuffer) {
+                sindhuSessionBuffer += " " + inputText;
+            } else {
+                sindhuSessionBuffer = inputText;
+            }
+
+            // Strip out update triggers from the buffer to send to parser
+            let textToParse = sindhuSessionBuffer;
+            for (let trigger of updateTriggers) {
+                textToParse = textToParse.replace(new RegExp(trigger, "gi"), "");
+            }
+            textToParse = textToParse.trim();
+
+            // Clear buffer immediately for next session
+            sindhuSessionBuffer = "";
+
             const key = geminiKeyInput ? geminiKeyInput.value.trim() : "";
             let parsed = null;
             let replyText = "";
@@ -574,7 +616,7 @@ Guidelines:
                 if (key) {
                     appendMessage("Sindhu is analyzing...", "sindhu");
                     try {
-                        parsed = await callGeminiAI(inputText, key);
+                        parsed = await callGeminiAI(textToParse, key);
                         // remove the placeholder
                         const loadingMsg = messagesDiv.querySelector(".sindhu-msg.msg-sindhu:last-child");
                         if (loadingMsg && loadingMsg.innerText.includes("analyzing")) {
@@ -586,10 +628,10 @@ Guidelines:
                         if (loadingMsg && loadingMsg.innerText.includes("analyzing")) {
                             loadingMsg.remove();
                         }
-                        parsed = parseLocalCommand(inputText);
+                        parsed = parseLocalCommand(textToParse);
                     }
                 } else {
-                    parsed = parseLocalCommand(inputText);
+                    parsed = parseLocalCommand(textToParse);
                 }
 
                 if (parsed && parsed.action !== "unknown") {
