@@ -544,7 +544,7 @@ Return the output as raw text (no markdown code blocks, just the file content).`
     }
 
     // Initialize Widget Event Listeners
-    document.addEventListener("DOMContentLoaded", () => {
+    function initSindhuWidget() {
         const toggleBtn = document.getElementById("sindhu-toggle-btn");
         const closeBtn = document.getElementById("sindhu-btn-close");
         const chatWindow = document.getElementById("sindhu-chat-window");
@@ -838,7 +838,13 @@ Return the output as raw text (no markdown code blocks, just the file content).`
 
         // Initial visibility check when DOM is ready
         updateSindhuVisibility();
-    });
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initSindhuWidget);
+    } else {
+        setTimeout(initSindhuWidget, 0);
+    }
 
     // Make sure voices are loaded
     if (window.speechSynthesis && window.speechSynthesis.onvoiceschanged !== undefined) {
