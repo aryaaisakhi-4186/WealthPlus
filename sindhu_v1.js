@@ -493,16 +493,19 @@ Guidelines:
         window.speechSynthesis.speak(utterance);
     }
 
-    // Advanced: Generate modified code for app files using Gemini API
+    // Advanced: Generate modified code for app files using Gemini API (Search & Replace blocks)
     async function generateModifiedCode(fileName, currentCode, instructions, apiKey) {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
         const prompt = `You are a professional web developer agent.
 Your task is to modify the file "${fileName}" based on the following instructions:
 "${instructions}"
 
-Return the COMPLETE modified code for the file "${fileName}".
-Do NOT truncate, do NOT omit any existing functions, and do NOT use placeholders. Keep all unrelated code exactly as it is.
-Return the output as raw text (no markdown code blocks, just the file content).`;
+Identify the exact contiguous block of code that needs to be replaced in the current file.
+Return a JSON object containing:
+1. "targetContent": The exact contiguous block of code to search for in the current file. It must match exactly (including leading indentation spaces, newlines, and capitalization) and be unique to avoid replacing the wrong block.
+2. "replacementContent": The replacement code for that block.
+
+Format the response strictly as a JSON object, containing nothing else. Do not wrap in markdown code blocks.`;
 
         const requestBody = {
             contents: [
@@ -512,7 +515,18 @@ Return the output as raw text (no markdown code blocks, just the file content).`
                         { text: `Current Code of ${fileName}:\n\n${currentCode}` }
                     ]
                 }
-            ]
+            ],
+            generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: "OBJECT",
+                    properties: {
+                        targetContent: { type: "STRING" },
+                        replacementContent: { type: "STRING" }
+                    },
+                    required: ["targetContent", "replacementContent"]
+                }
+            }
         };
 
         const response = await fetch(url, {
@@ -528,24 +542,31 @@ Return the output as raw text (no markdown code blocks, just the file content).`
         }
 
         const data = await response.json();
-        let result = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!result) {
+        const textResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!textResult) {
             throw new Error("Empty response from Gemini");
         }
-        
-        result = result.trim();
-        if (result.startsWith("```")) {
-            const lines = result.split("\n");
-            if (lines[0].startsWith("```")) {
-                lines.shift();
-            }
-            if (lines[lines.length - 1] === "```") {
-                lines.pop();
-            }
-            result = lines.join("\n").trim();
+
+        const parsedJson = JSON.parse(textResult.trim());
+        if (!parsedJson.targetContent || parsedJson.replacementContent === undefined) {
+            throw new Error("Invalid format returned by Gemini API");
         }
-        
-        return result;
+
+        const target = parsedJson.targetContent;
+        const replacement = parsedJson.replacementContent;
+
+        if (!currentCode.includes(target)) {
+            console.warn("Exact match not found for targetContent. Trying trimmed match...");
+            // Try matching without trailing spaces
+            const trimmedTarget = target.trim();
+            if (trimmedTarget && currentCode.includes(trimmedTarget)) {
+                // Find start and end indices of trimmed target to match exactly
+                return currentCode.replace(trimmedTarget, replacement);
+            }
+            throw new Error("Could not find the target code block in the file for replacement. Please try again with a more specific description.");
+        }
+
+        return currentCode.replace(target, replacement);
     }
 
     // Initialize Widget Event Listeners

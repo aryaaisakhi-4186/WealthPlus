@@ -1116,7 +1116,7 @@ function renderClientsPage() {
                     </div>
                     ${customFieldsHTML}
                 </div>
-                <div class="client-card-footer" style="display: var(--staff-access-display, inline-flex);">
+                <div class="client-card-footer">
                     <button class="btn-icon-only edit-btn" onclick="openEditClient('${client.id}')"><i data-lucide="edit-3"></i></button>
                     <button class="btn-icon-only delete-btn" onclick="deleteClient('${client.id}')"><i data-lucide="trash-2"></i></button>
                 </div>
