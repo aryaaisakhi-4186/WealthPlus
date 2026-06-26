@@ -971,14 +971,86 @@
             </form>
         </div>
     </div>
+    <!-- ==========================================
+         SHREE AI ASSISTANT CHAT WIDGET
+         ========================================== -->
+    <div id="shree-chat-widget" class="shree-widget" style="display: none;">
+        <button id="btn-shree-toggle" class="shree-toggle-btn" title="Ask Shree (AI Assistant)">
+            <i data-lucide="message-square"></i>
+            <span class="pulse-indicator"></span>
+        </button>
+        <div id="shree-chat-window" class="shree-chat-window">
+            <!-- Header -->
+            <div class="shree-header">
+                <div class="shree-header-info">
+                    <div class="shree-avatar">S</div>
+                    <div>
+                        <h4 style="margin:0; font-size:14px; font-weight: 700;">Shree AI</h4>
+                        <span id="shree-status-text" style="font-size:10px; color:rgba(255,255,255,0.75);">AI Assistant &bull; Idle</span>
+                    </div>
+                </div>
+                <div class="shree-header-actions">
+                    <button id="btn-shree-settings-toggle" class="btn-shree-action" title="Gemini API Key Settings">
+                        <i data-lucide="settings"></i>
+                    </button>
+                    <button id="btn-shree-close" class="btn-shree-action" title="Minimize Chat">
+                        <i data-lucide="minimize-2"></i>
+                    </button>
+                </div>
+            </div>
 
+            <!-- Chat View Messages -->
+            <div class="shree-messages" id="shree-messages-container">
+                <div class="shree-msg msg-shree">
+                    <p>नमस्ते! मैं "श्री" हूँ, आपकी AI मुनीम। मैं आपकी आवाज़ सुनकर, टेक्स्ट पढ़कर, या आपके द्वारा पेस्ट किए गए बिल/स्क्रीनशॉट देखकर तुरंत लेजर एंट्री कर सकती हूँ।</p>
+                    <span class="msg-time">सक्रिय (Active)</span>
+                </div>
+            </div>
 
+            <!-- Settings View (Toggled by Gear Icon) -->
+            <div class="shree-settings" id="shree-settings-container">
+                <h5 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary);">Gemini AI API Key (Optional)</h5>
+                <p style="font-size: 11px; color: var(--text-secondary); margin: 0; line-height: 1.4;">
+                    Enter your Gemini API Key to enable general knowledge chat & smart Hinglish conversations with Shree AI.
+                </p>
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
+                    <label for="gemini-api-key" style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">API Key</label>
+                    <input type="password" id="gemini-api-key" placeholder="Paste Gemini Key here..." style="padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 12px;">
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
+                    <button type="button" class="btn btn-outline btn-sm" id="btn-shree-settings-back">Back</button>
+                    <button type="button" class="btn btn-primary btn-sm" id="btn-shree-settings-save">Save Key</button>
+                </div>
+            </div>
+
+            <!-- Preview Container -->
+            <div id="shree-preview-container" style="display:none; padding:8px 12px; background:var(--bg-tertiary); border-top:1px solid var(--border-color); align-items:center; gap:8px; border-bottom: 1px solid var(--border-color);">
+                <!-- Appended dynamically -->
+            </div>
+
+            <!-- Footer controls -->
+            <div class="shree-footer" id="shree-footer-container">
+                <input type="file" id="shree-file-input" style="display:none;" accept="image/*,application/pdf">
+                <button type="button" id="btn-shree-attach" class="btn-mic" title="Attach file or screenshot" style="color:var(--text-secondary);">
+                    <i data-lucide="paperclip"></i>
+                </button>
+                <button id="btn-shree-mic" class="btn-mic" title="Speak to Shree (Hindi)">
+                    <i data-lucide="mic"></i>
+                </button>
+                <input type="text" id="shree-text-input" placeholder="कमांड टाइप करें या स्क्रीनशॉट पेस्ट करें..." autocomplete="off">
+                <button id="btn-shree-send" class="btn-send" title="Send Command">
+                    <i data-lucide="send"></i>
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="app.js?v=3.6.7"></script>
+    <script src="app.js?v=3.6.8"></script>
+    <script src="shree.js?v=3.6.8"></script>
 </body>
 </html>
