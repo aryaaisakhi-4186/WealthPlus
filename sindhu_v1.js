@@ -15,6 +15,11 @@
         if (!sindhuWidget) return;
         if (typeof state !== 'undefined' && state.currentUser && (state.activePage === 'dashboard' || state.activePage === 'clients')) {
             sindhuWidget.style.display = 'block';
+            // Sync the API key input from the global state
+            const geminiKeyInput = document.getElementById("sindhu-gemini-key");
+            if (geminiKeyInput && state.geminiApiKey) {
+                geminiKeyInput.value = state.geminiApiKey;
+            }
         } else {
             sindhuWidget.style.display = 'none';
             const chatWindow = document.getElementById('sindhu-chat-window');
@@ -560,8 +565,8 @@ Return the output as raw text (no markdown code blocks, just the file content).`
         const voiceReplyCheckbox = document.getElementById("sindhu-voice-reply");
 
         // Load saved settings
-        if (localStorage.getItem("sindhu_gemini_key")) {
-            geminiKeyInput.value = localStorage.getItem("sindhu_gemini_key");
+        if (typeof state !== 'undefined' && state.geminiApiKey) {
+            geminiKeyInput.value = state.geminiApiKey;
         }
         if (localStorage.getItem("sindhu_voice_reply") !== null) {
             voiceReplyCheckbox.checked = localStorage.getItem("sindhu_voice_reply") === "true";
@@ -600,7 +605,10 @@ Return the output as raw text (no markdown code blocks, just the file content).`
         }
         if (geminiKeyInput) {
             geminiKeyInput.addEventListener("change", () => {
-                localStorage.setItem("sindhu_gemini_key", geminiKeyInput.value.trim());
+                if (typeof state !== 'undefined') {
+                    state.geminiApiKey = geminiKeyInput.value.trim();
+                    if (typeof saveState === 'function') saveState();
+                }
             });
         }
         if (voiceReplyCheckbox) {
