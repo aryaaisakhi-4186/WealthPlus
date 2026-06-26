@@ -1211,22 +1211,39 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition && micBtn) {
             const recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.interimResults = false;
+            recognition.continuous = true;
+            recognition.interimResults = true;
             recognition.lang = 'hi-IN'; // default to Hindi listening
 
             let isListening = false;
+            let recognitionTimeout = null;
+            let hasProcessedVoice = false;
 
             recognition.onstart = () => {
                 isListening = true;
+                hasProcessedVoice = false;
                 micBtn.classList.add("active");
                 chatInput.placeholder = "Listening... Speak now!";
+                chatInput.value = "";
             };
 
             recognition.onend = () => {
                 isListening = false;
                 micBtn.classList.remove("active");
                 chatInput.placeholder = "Type a command...";
+                if (recognitionTimeout) {
+                    clearTimeout(recognitionTimeout);
+                    recognitionTimeout = null;
+                }
+                
+                // Submit the voice text if not already processed
+                if (!hasProcessedVoice) {
+                    hasProcessedVoice = true;
+                    const text = chatInput.value.trim();
+                    if (text) {
+                        processCommand(text);
+                    }
+                }
             };
 
             recognition.onerror = (e) => {
@@ -1234,14 +1251,26 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
                 isListening = false;
                 micBtn.classList.remove("active");
                 chatInput.placeholder = "Type a command...";
+                if (recognitionTimeout) {
+                    clearTimeout(recognitionTimeout);
+                    recognitionTimeout = null;
+                }
             };
 
             recognition.onresult = (e) => {
-                const resultText = e.results[0][0].transcript;
-                if (resultText) {
-                    chatInput.value = resultText;
-                    processCommand(resultText);
+                let transcript = "";
+                for (let i = 0; i < e.results.length; i++) {
+                    transcript += e.results[i][0].transcript;
                 }
+                chatInput.value = transcript;
+
+                // Auto-submit after 1.8 seconds of silence
+                if (recognitionTimeout) clearTimeout(recognitionTimeout);
+                recognitionTimeout = setTimeout(() => {
+                    if (isListening) {
+                        recognition.stop();
+                    }
+                }, 1800);
             };
 
             micBtn.addEventListener("click", () => {
