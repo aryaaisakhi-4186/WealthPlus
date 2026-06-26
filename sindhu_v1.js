@@ -78,7 +78,8 @@
             "add", "kar", "do", "karo", "please", "shree", "sindhu", "ai", "जोड़ो", "जोड़ो", "करो", "कर", "दो", "नए", "नया", "नाम", "है", "को", "से", "के", "client", "क्लाइंट", "ग्राहक", "कस्टमर", "register",
             "श्री", "shri", "hai", "banao", "बनाओ", "बना", "ka", "का", "naam", "se", "ke",
             "jiski", "jiska", "जिसकी", "जिसका", "monthly", "payment", "मंथली", "पेमेंट", "naya", "naye", "new", "aur", "and", "ऐड", "एड",
-            "मासिक", "भुगतान", "प्रति", "माह"
+            "मासिक", "भुगतान", "प्रति", "माह", "सिंधु", "रुपए", "रुपये", "रुपया", "रिसीव", "जमा", "क्रेडिट", "अपडेट", "एंट्री",
+            "receive", "received", "payment", "cash", "bank", "online", "upi", "via", "rs", "rupees", "rupay"
         ];
         let words = cleaned.split(/\s+/);
         let filtered = words.filter(w => !stopwords.includes(w.toLowerCase()));
@@ -148,138 +149,207 @@
         }
         
         // 2. Expense & Income Check
-        let amountMatch = cleanText.match(/\b\d{2,7}\b/);
-        if (amountMatch) {
-            let amount = parseInt(amountMatch[0], 10);
-            const incomeKws = ["received", "mile", "mila", "aaye", "income", "प्राप्त", "मिले", "मिला", "जमा"];
-            let isIncome = incomeKws.some(x => cleanText.includes(x));
-            
-            if (isIncome) {
-                // Income parsing
-                let clientNameVal = "";
-                let fromMatch = cleanText.match(/(?:from|received\s+from|se|से|द्वारा)\s*([a-z0-9\s\u0900-\u097F]+)/i);
-                if (fromMatch && fromMatch[1]) {
-                    clientNameVal = fromMatch[1];
-                }
-                
-                if (clientNameVal) {
-                    let clientNameClean = clientNameVal.replace(/\b(shree|sindhu|ai|karo|please|add|received|cash|date|kharch|expense|payment|se|kero|krdo|via|bank|online|upi)\b/gi, "");
-                    clientNameClean = cleanClientName(clientNameClean);
-                    clientNameVal = clientNameClean.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-                }
-                
-                let mode = "acc_2"; // default to Bank for income
-                let cashAccount = null;
-                let bankAccount = null;
-                if (typeof state !== 'undefined' && state.accounts) {
-                    cashAccount = state.accounts.find(a => a.type === 'Cash') || state.accounts[0];
-                    bankAccount = state.accounts.find(a => a.type === 'Bank') || state.accounts[1] || state.accounts[0];
-                }
-                
-                if (cleanText.includes("cash") || cleanText.includes("नकद") || cleanText.includes("कैश")) {
-                    mode = cashAccount ? cashAccount.id : "acc_1";
-                } else {
-                    mode = bankAccount ? bankAccount.id : "acc_2";
-                }
-                
-                return {
-                    action: "addIncome",
-                    amount: amount,
-                    mode: mode,
-                    clientName: clientNameVal
-                };
-            } else {
-                // Expense parsing
-                let category = "Others";
-                let dynamicCats = (typeof state !== 'undefined' && state.categoriesConfig) ? Object.keys(state.categoriesConfig) : ["Food", "Shopping", "Bills", "Transport", "Rent", "Others"];
-                
-                const transportSynonyms = ["transport", "travelling", "travel", "taxi", "cab", "auto", "petrol", "diesel", "fuel", "ट्रेवल", "ट्रैवल", "किराया", "यात्रा"];
-                const foodSynonyms = ["food", "restaurant", "lunch", "dinner", "breakfast", "tea", "coffee", "chai", "mithai", "खाना", "चाय", "नाश्ता", "मिठाई"];
-                const billsSynonyms = ["bill", "electricity", "water", "internet", "recharge", "mobile", "wifi", "light", "बिल", "रिचार्ज", "बिजली"];
-                const rentSynonyms = ["rent", "office rent", "room rent", "shop rent", "किराया", "भाड़ा"];
-                const shoppingSynonyms = ["shopping", "clothes", "groceries", "purchase", "खरीदारी", "सामान"];
-                
-                let matchedCat = "";
-                if (transportSynonyms.some(s => cleanText.includes(s)) && dynamicCats.includes("Transport")) {
-                    matchedCat = "Transport";
-                } else if (foodSynonyms.some(s => cleanText.includes(s)) && dynamicCats.includes("Food")) {
-                    matchedCat = "Food";
-                } else if (billsSynonyms.some(s => cleanText.includes(s)) && dynamicCats.includes("Bills")) {
-                    matchedCat = "Bills";
-                } else if (rentSynonyms.some(s => cleanText.includes(s)) && dynamicCats.includes("Rent")) {
-                    matchedCat = "Rent";
-                } else if (shoppingSynonyms.some(s => cleanText.includes(s)) && dynamicCats.includes("Shopping")) {
-                    matchedCat = "Shopping";
-                }
-                
-                if (matchedCat) {
-                    category = matchedCat;
-                } else {
-                    for (let cat of dynamicCats) {
-                        if (cleanText.includes(cat.toLowerCase()) || (cat === "Others" && cleanText.includes("misc"))) {
-                            category = cat;
+        let allNumbers = cleanText.match(/\b\d{2,7}\b/g);
+        if (allNumbers && allNumbers.length > 0) {
+            let amount = null;
+            let accountDigits = null;
+
+            // Step A: Identify currency-associated amount
+            let currencyPattern = /(?:rs\.?\s*|₹\s*)?(\d{2,7})\s*(?:rs|rupees|rupay|रुपए|रुपये|rupe|rupi|₹)/i;
+            let currMatch = cleanText.match(currencyPattern);
+            if (!currMatch) {
+                // Check prefix currency symbol
+                currMatch = cleanText.match(/(?:rs\.?\s*|₹\s*)(\d{2,7})/i);
+            }
+            if (currMatch) {
+                amount = parseInt(currMatch[1], 10);
+            }
+
+            // Step B: Match bank account digits from state_accounts
+            let matchedAcc = null;
+            if (typeof state !== 'undefined' && state.accounts) {
+                for (let acc of state.accounts) {
+                    let accName = acc.name.toLowerCase();
+                    if (cleanText.includes(accName)) {
+                        matchedAcc = acc;
+                        break;
+                    }
+                    
+                    let accDigitsMatch = acc.name.match(/\d{3,}/);
+                    if (accDigitsMatch) {
+                        let digits = accDigitsMatch[0];
+                        if (cleanText.includes(digits)) {
+                            accountDigits = digits;
+                            matchedAcc = acc;
                             break;
                         }
                     }
                 }
-                
-                // Client allocation parsing
-                let clientNameVal = "";
-                let allocMatchAfter = cleanText.match(/(?:allocate\s+fund\s+to|allocate\s+to|allocation\s+to|fund\s+allocate\s+to|को\s+आवंटित|आवंटन)\s*([a-z0-9\s\u0900-\u097F]+)/i);
-                let allocMatchBefore = cleanText.match(/([a-z0-9\s\u0900-\u097F]+?)\s*(?:se\s+fund\s+allocate|se\s+allocate|fund\s+allocate|के\s+फंड|से\s+फंड)/i);
-                
-                if (allocMatchAfter && allocMatchAfter[1]) {
-                    clientNameVal = allocMatchAfter[1];
-                } else if (allocMatchBefore && allocMatchBefore[1]) {
-                    clientNameVal = allocMatchBefore[1];
+            }
+
+            // Step C: Resolve amount if not found by currency pattern
+            if (amount === null) {
+                if (allNumbers.length === 1) {
+                    amount = parseInt(allNumbers[0], 10);
+                } else if (allNumbers.length > 1) {
+                    let remainingNums = allNumbers.filter(n => n !== accountDigits);
+                    if (remainingNums.length > 0) {
+                        amount = parseInt(remainingNums.reduce((max, n) => parseInt(n, 10) > parseInt(max, 10) ? n : max), 10);
+                    } else {
+                        amount = parseInt(allNumbers[0], 10);
+                    }
                 }
-                
-                if (clientNameVal) {
-                    let clientNameClean = clientNameVal.replace(/\b(shree|sindhu|ai|karo|please|add|received|cash|date|kharch|expense|payment|travelling|expenses|se|kero|krdo)\b/gi, "");
-                    clientNameClean = cleanClientName(clientNameClean);
-                    clientNameVal = clientNameClean.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-                }
-                
-                let mode = "acc_1"; // default to Cash for expense
-                let cashAccount = null;
-                let bankAccount = null;
-                if (typeof state !== 'undefined' && state.accounts) {
-                    cashAccount = state.accounts.find(a => a.type === 'Cash') || state.accounts[0];
-                    bankAccount = state.accounts.find(a => a.type === 'Bank') || state.accounts[1] || state.accounts[0];
-                }
-                
-                if (cleanText.includes("cash") || cleanText.includes("नकद") || cleanText.includes("कैश")) {
-                    mode = cashAccount ? cashAccount.id : "acc_1";
-                } else if (cleanText.includes("bank") || cleanText.includes("online") || cleanText.includes("बैंक") || cleanText.includes("ऑनलाइन")) {
-                    mode = bankAccount ? bankAccount.id : "acc_2";
+            }
+
+            if (amount !== null) {
+                const incomeKws = [
+                    "received", "receive", "recieved", "income", "mile", "mila", "aaye", "jama", "credit", "credited",
+                    "रिसीव", "रिसीव्ड", "प्राप्त", "मिले", "मिला", "आए", "आए हैं", "जमा", "जमा करो", "क्रेडिट"
+                ];
+                let isIncome = incomeKws.some(x => cleanText.includes(x));
+
+                if (isIncome) {
+                    // Income parsing
+                    let clientNameVal = "";
+                    
+                    // 1. Space-insensitive existing clients matching
+                    if (typeof state !== 'undefined' && state.clients) {
+                        let cleanInputNoSpaces = cleanText.replace(/\s+/g, "");
+                        for (let client of state.clients) {
+                            let cleanCName = client.name.toLowerCase().replace(/\s+/g, "");
+                            if (cleanInputNoSpaces.includes(cleanCName)) {
+                                clientNameVal = client.name;
+                                break;
+                            }
+                        }
+                    }
+
+                    // 2. Fallback to regex patterns
+                    if (!clientNameVal) {
+                        let fromMatch = cleanText.match(/(?:from|received\s+from)\s+([a-z0-9\s\u0900-\u097F]+)/i);
+                        if (fromMatch && fromMatch[1]) {
+                            clientNameVal = fromMatch[1];
+                        } else {
+                            let seMatch = cleanText.match(/([a-z0-9\s\u0900-\u097F]+?)\s*(?:se|से|dwara|द्वारा)/i);
+                            if (seMatch && seMatch[1]) {
+                                clientNameVal = seMatch[1];
+                            }
+                        }
+                    }
+
+                    if (clientNameVal) {
+                        clientNameVal = cleanClientName(clientNameVal);
+                        clientNameVal = clientNameVal.replace(/\b\d+\b/g, "").trim();
+                        clientNameVal = clientNameVal.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+                    }
+
+                    let mode = matchedAcc ? matchedAcc.id : "acc_2";
+                    if (!matchedAcc && typeof state !== 'undefined' && state.accounts) {
+                        let cashAccount = state.accounts.find(a => a.type === 'Cash') || state.accounts[0];
+                        let bankAccount = state.accounts.find(a => a.type === 'Bank') || state.accounts[1] || state.accounts[0];
+                        if (cleanText.includes("cash") || cleanText.includes("नकद") || cleanText.includes("कैश")) {
+                            mode = cashAccount ? cashAccount.id : "acc_1";
+                        } else {
+                            mode = bankAccount ? bankAccount.id : "acc_2";
+                        }
+                    }
+
+                    return {
+                        action: "addIncome",
+                        amount: amount,
+                        mode: mode,
+                        clientName: clientNameVal
+                    };
                 } else {
-                    mode = cashAccount ? cashAccount.id : "acc_1";
+                    // Expense parsing
+                    let category = "Others";
+                    let dynamicCats = (typeof state !== 'undefined' && state.categoriesConfig) ? Object.keys(state.categoriesConfig) : ["Food", "Shopping", "Bills", "Transport", "Rent", "Others"];
+                    
+                    const transportSynonyms = ["transport", "travelling", "travel", "taxi", "cab", "auto", "petrol", "diesel", "fuel", "ट्रेवल", "ट्रैवल", "किराया", "यात्रा"];
+                    const foodSynonyms = ["food", "restaurant", "lunch", "dinner", "breakfast", "tea", "coffee", "chai", "mithai", "खाना", "चाय", "नाश्ता", "मिठाई"];
+                    const billsSynonyms = ["bill", "electricity", "water", "internet", "recharge", "mobile", "wifi", "light", "बिल", "रिचार्ज", "बिजली"];
+                    const rentSynonyms = ["rent", "office rent", "room rent", "shop rent", "किराया", "भाड़ा"];
+                    const shoppingSynonyms = ["shopping", "clothes", "groceries", "purchase", "खरीदारी", "सामान"];
+                    
+                    let matchedCat = "";
+                    if (transportSynonyms.some(s => cleanText.includes(s)) && dynamicCats.includes("Transport")) {
+                        matchedCat = "Transport";
+                    } else if (foodSynonyms.some(s => cleanText.includes(s)) && dynamicCats.includes("Food")) {
+                        matchedCat = "Food";
+                    } else if (billsSynonyms.some(s => cleanText.includes(s)) && dynamicCats.includes("Bills")) {
+                        matchedCat = "Bills";
+                    } else if (rentSynonyms.some(s => cleanText.includes(s)) && dynamicCats.includes("Rent")) {
+                        matchedCat = "Rent";
+                    } else if (shoppingSynonyms.some(s => cleanText.includes(s)) && dynamicCats.includes("Shopping")) {
+                        matchedCat = "Shopping";
+                    }
+                    
+                    if (matchedCat) {
+                        category = matchedCat;
+                    } else {
+                        for (let cat of dynamicCats) {
+                            if (cleanText.includes(cat.toLowerCase()) || (cat === "Others" && cleanText.includes("misc"))) {
+                                category = cat;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Client allocation parsing
+                    let clientNameVal = "";
+                    let allocMatchAfter = cleanText.match(/(?:allocate\s+fund\s+to|allocate\s+to|allocation\s+to|fund\s+allocate\s+to|को\s+आवंटित|आवंटन)\s*([a-z0-9\s\u0900-\u097F]+)/i);
+                    let allocMatchBefore = cleanText.match(/([a-z0-9\s\u0900-\u097F]+?)\s*(?:se\s+fund\s+allocate|se\s+allocate|fund\s+allocate|के\s+फंड|से\s+फंड)/i);
+                    
+                    if (allocMatchAfter && allocMatchAfter[1]) {
+                        clientNameVal = allocMatchAfter[1];
+                    } else if (allocMatchBefore && allocMatchBefore[1]) {
+                        clientNameVal = allocMatchBefore[1];
+                    }
+                    
+                    if (clientNameVal) {
+                        clientNameVal = cleanClientName(clientNameVal);
+                        clientNameVal = clientNameVal.replace(/\b\d+\b/g, "").trim();
+                        clientNameVal = clientNameVal.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+                    }
+                    
+                    let mode = matchedAcc ? matchedAcc.id : "acc_1";
+                    if (!matchedAcc && typeof state !== 'undefined' && state.accounts) {
+                        let cashAccount = state.accounts.find(a => a.type === 'Cash') || state.accounts[0];
+                        let bankAccount = state.accounts.find(a => a.type === 'Bank') || state.accounts[1] || state.accounts[0];
+                        if (cleanText.includes("cash") || cleanText.includes("नकद") || cleanText.includes("कैश")) {
+                            mode = cashAccount ? cashAccount.id : "acc_1";
+                        } else if (cleanText.includes("bank") || cleanText.includes("online") || cleanText.includes("बैंक") || cleanText.includes("ऑनलाइन")) {
+                            mode = bankAccount ? bankAccount.id : "acc_2";
+                        } else {
+                            mode = cashAccount ? cashAccount.id : "acc_1";
+                        }
+                    }
+
+                    let desc = text;
+                    const kws = ["shree", "sindhu", "ai", "karo", "karein", "add", "kar do", "me", "par", "under", "date", "kharch", "expense", "exp", "rupees", "rs", "rupay", "hua", "hai", "allocate", "fund", "to", "paid", "from", "se", "cash", "bank"];
+                    for (let kw of kws) {
+                        desc = desc.replace(new RegExp("\\b" + kw + "\\b", "gi"), "");
+                    }
+                    if (clientNameVal) {
+                        desc = desc.replace(new RegExp(clientNameVal, "gi"), "");
+                    }
+                    desc = desc.replace(new RegExp(amount.toString(), "g"), "");
+                    desc = desc.replace(new RegExp(category, "gi"), "");
+                    desc = desc.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
+                    desc = desc.replace(/\s+/g, " ").trim();
+                    if (!desc) {
+                        desc = "Expense Entry";
+                    }
+
+                    return {
+                        action: "addExpense",
+                        description: desc,
+                        category: category,
+                        amount: amount,
+                        mode: mode,
+                        clientName: clientNameVal
+                    };
                 }
-                
-                let desc = text;
-                const kws = ["shree", "sindhu", "ai", "karo", "karein", "add", "kar do", "me", "par", "under", "date", "kharch", "expense", "exp", "rupees", "rs", "rupay", "hua", "hai", "allocate", "fund", "to", "paid", "from", "se", "cash", "bank"];
-                for (let kw of kws) {
-                    desc = desc.replace(new RegExp("\\b" + kw + "\\b", "gi"), "");
-                }
-                if (clientNameVal) {
-                    desc = desc.replace(new RegExp(clientNameVal, "gi"), "");
-                }
-                desc = desc.replace(new RegExp(amount.toString(), "g"), "");
-                desc = desc.replace(new RegExp(category, "gi"), "");
-                desc = desc.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
-                desc = desc.replace(/\s+/g, " ").trim();
-                if (!desc) {
-                    desc = "Expense Entry";
-                }
-                
-                return {
-                    action: "addExpense",
-                    description: desc,
-                    category: category,
-                    amount: amount,
-                    mode: mode,
-                    clientName: clientNameVal
-                };
             }
         }
         
