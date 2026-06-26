@@ -87,6 +87,113 @@
         return name.replace(/\s+/g, " ").trim();
     }
 
+    // Helper: Parse date from text (DD-MM-YYYY, DD/MM/YYYY, or DD Month YYYY)
+    function parseDateFromText(text) {
+        let cleanText = text.toLowerCase().trim();
+        
+        // 1. Numeric format (DD-MM-YYYY or DD/MM/YYYY)
+        let dMatch = cleanText.match(/\b(\d{1,2})[-\/. ](\d{1,2})[-\/. ](\d{4})\b/);
+        if (dMatch) {
+            let day = String(dMatch[1]).padStart(2, '0');
+            let month = String(dMatch[2]).padStart(2, '0');
+            let year = dMatch[3];
+            return `${year}-${month}-${day}`;
+        }
+        
+        // 2. Month name format (e.g. 27-jun-2026 or 27 june 2026)
+        const months = {
+            jan: '01', january: '01',
+            feb: '02', february: '02',
+            mar: '03', march: '03',
+            apr: '04', april: '04',
+            may: '05',
+            jun: '06', june: '06',
+            jul: '07', july: '07',
+            aug: '08', august: '08',
+            sep: '09', september: '09',
+            oct: '10', october: '10',
+            nov: '11', november: '11',
+            dec: '12', december: '12'
+        };
+        
+        let mMatch = cleanText.match(/\b(\d{1,2})[-\s.\/](jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[-\s.\/](\d{4})\b/i);
+        if (mMatch) {
+            let day = String(mMatch[1]).padStart(2, '0');
+            let monthName = mMatch[2].substring(0, 3);
+            let month = months[monthName] || '01';
+            let year = mMatch[3];
+            return `${year}-${month}-${day}`;
+        }
+        
+        return null;
+    }
+
+    // Helper: Resolve account name from user representation
+    function resolveAccountName(modeStr, userTextInput = "") {
+        if (typeof state === 'undefined' || !state.accounts || state.accounts.length === 0) {
+            return null;
+        }
+        
+        let targetStr = (modeStr || "").toLowerCase().trim();
+        let fullText = (userTextInput || "").toLowerCase().trim();
+        
+        // 1. Try matching targetStr with account.id
+        let acc = state.accounts.find(a => a.id.toLowerCase() === targetStr);
+        if (acc) return acc.name;
+        
+        // 2. Try matching targetStr with account.name (case insensitive)
+        acc = state.accounts.find(a => a.name.toLowerCase() === targetStr);
+        if (acc) return acc.name;
+        
+        // 3. Try matching normalized targetStr (remove spaces, hyphens, underscores)
+        let normTarget = targetStr.replace(/[\s\-_]/g, '');
+        if (normTarget) {
+            acc = state.accounts.find(a => a.name.toLowerCase().replace(/[\s\-_]/g, '') === normTarget);
+            if (acc) return acc.name;
+        }
+
+        // 4. Try matching using digits (e.g. "308" or "boi-308")
+        let digitsMatch = targetStr.match(/\d{3,}/) || fullText.match(/\d{3,}/);
+        if (digitsMatch) {
+            let digits = digitsMatch[0];
+            acc = state.accounts.find(a => {
+                let accDigits = a.name.match(/\d{3,}/);
+                return accDigits && accDigits[0] === digits;
+            });
+            if (acc) return acc.name;
+        }
+
+        // 5. Try matching targetStr against account name parts
+        if (targetStr.length > 2) {
+            acc = state.accounts.find(a => {
+                let normName = a.name.toLowerCase().replace(/[\s\-_]/g, '');
+                return normName.includes(normTarget) || normTarget.includes(normName);
+            });
+            if (acc) return acc.name;
+        }
+
+        // 6. Try matching parts of account names in user text
+        for (let a of state.accounts) {
+            let accWords = a.name.toLowerCase().split(/[\s\-_]/).filter(w => w.length >= 3);
+            for (let word of accWords) {
+                if (fullText.includes(word)) {
+                    return a.name;
+                }
+            }
+        }
+
+        // 7. Check keywords in fullText for cash vs bank fallback
+        if (fullText.includes("cash") || fullText.includes("नकद") || fullText.includes("कैश")) {
+            let cashAcc = state.accounts.find(a => a.type === 'Cash') || state.accounts[0];
+            if (cashAcc) return cashAcc.name;
+        } else if (fullText.includes("bank") || fullText.includes("online") || fullText.includes("upi") || fullText.includes("बैंक") || fullText.includes("ऑनलाइन")) {
+            let bankAcc = state.accounts.find(a => a.type === 'Bank') || state.accounts.find(a => a.type !== 'Cash') || state.accounts[0];
+            if (bankAcc) return bankAcc.name;
+        }
+
+        return null;
+    }
+
     // Local Regex Command Parser
     window.parseLocalCommand = function (text) {
         let cleanText = text.toLowerCase().trim();
@@ -185,6 +292,20 @@
                         }
                     }
                 }
+                
+                // Smart word-based matching if not matched yet
+                if (!matchedAcc) {
+                    for (let acc of state.accounts) {
+                        let accWords = acc.name.toLowerCase().split(/[\s\-_]/).filter(w => w.length >= 3);
+                        for (let word of accWords) {
+                            if (cleanText.includes(word)) {
+                                matchedAcc = acc;
+                                break;
+                            }
+                        }
+                        if (matchedAcc) break;
+                    }
+                }
             }
 
             // Step C: Resolve amount if not found by currency pattern
@@ -208,6 +329,9 @@
                 ];
                 let isIncome = incomeKws.some(x => cleanText.includes(x));
 
+                // Step D: Parse date
+                let parsedDate = parseDateFromText(cleanText);
+
                 if (isIncome) {
                     // Income parsing
                     let clientNameVal = "";
@@ -222,9 +346,30 @@
                                 break;
                             }
                         }
+
+                        // 2. Fuzzy client name match with typo tolerance
+                        if (!clientNameVal) {
+                            for (let client of state.clients) {
+                                let clientWords = client.name.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+                                for (let word of clientWords) {
+                                    let typoVersions = [
+                                        word,
+                                        word.replace('shna', 'shan'),
+                                        word.replace('shan', 'shna'),
+                                        word.replace('narayan', 'naryan'),
+                                        word.replace('premnarayan', 'premnaryan')
+                                    ];
+                                    if (typoVersions.some(tv => cleanText.includes(tv))) {
+                                        clientNameVal = client.name;
+                                        break;
+                                    }
+                                }
+                                if (clientNameVal) break;
+                            }
+                        }
                     }
 
-                    // 2. Fallback to regex patterns
+                    // 3. Fallback to regex patterns
                     if (!clientNameVal) {
                         let fromMatch = cleanText.match(/(?:from|received\s+from)\s+([a-z0-9\s\u0900-\u097F]+)/i);
                         if (fromMatch && fromMatch[1]) {
@@ -254,12 +399,14 @@
                         }
                     }
 
-                    return {
+                    let res = {
                         action: "addIncome",
                         amount: amount,
                         mode: mode,
                         clientName: clientNameVal
                     };
+                    if (parsedDate) res.date = parsedDate;
+                    return res;
                 } else {
                     // Expense parsing
                     let category = "Others";
@@ -341,7 +488,7 @@
                         desc = "Expense Entry";
                     }
 
-                    return {
+                    let res = {
                         action: "addExpense",
                         description: desc,
                         category: category,
@@ -349,6 +496,8 @@
                         mode: mode,
                         clientName: clientNameVal
                     };
+                    if (parsedDate) res.date = parsedDate;
+                    return res;
                 }
             }
         }
@@ -576,11 +725,24 @@
                 clientId = client.id;
             }
             
-            const localDate = new Date();
-            const year = localDate.getFullYear();
-            const month = String(localDate.getMonth() + 1).padStart(2, '0');
-            const day = String(localDate.getDate()).padStart(2, '0');
-            const dateStr = `${year}-${month}-${day}`;
+            let dateStr = parsed.date;
+            if (!dateStr) {
+                const localDate = new Date();
+                const year = localDate.getFullYear();
+                const month = String(localDate.getMonth() + 1).padStart(2, '0');
+                const day = String(localDate.getDate()).padStart(2, '0');
+                dateStr = `${year}-${month}-${day}`;
+            }
+
+            let modeName = '';
+            if (typeof state !== 'undefined' && state.accounts) {
+                modeName = resolveAccountName(parsed.mode, parsed.originalText || parsed.description || '');
+            }
+            if (!modeName && typeof state !== 'undefined' && state.accounts) {
+                let cashAccount = state.accounts.find(a => a.type === 'Cash') || state.accounts[0];
+                modeName = cashAccount ? cashAccount.name : 'Main Cash';
+            }
+            if (!modeName) modeName = 'Main Cash';
             
             const txObj = {
                 id: 't_' + Date.now(),
@@ -588,7 +750,7 @@
                 category: parsed.category || 'Others',
                 amount: parsed.amount,
                 date: dateStr,
-                mode: parsed.mode || 'acc_1',
+                mode: modeName,
                 clientId: clientId
             };
             
@@ -639,18 +801,31 @@
                 clientId = client.id;
             }
             
-            const localDate = new Date();
-            const year = localDate.getFullYear();
-            const month = String(localDate.getMonth() + 1).padStart(2, '0');
-            const day = String(localDate.getDate()).padStart(2, '0');
-            const dateStr = `${year}-${month}-${day}`;
+            let dateStr = parsed.date;
+            if (!dateStr) {
+                const localDate = new Date();
+                const year = localDate.getFullYear();
+                const month = String(localDate.getMonth() + 1).padStart(2, '0');
+                const day = String(localDate.getDate()).padStart(2, '0');
+                dateStr = `${year}-${month}-${day}`;
+            }
+
+            let modeName = '';
+            if (typeof state !== 'undefined' && state.accounts) {
+                modeName = resolveAccountName(parsed.mode, parsed.originalText || '');
+            }
+            if (!modeName && typeof state !== 'undefined' && state.accounts) {
+                let bankAccount = state.accounts.find(a => a.type === 'Bank') || state.accounts[1] || state.accounts[0];
+                modeName = bankAccount ? bankAccount.name : 'HDFC Bank';
+            }
+            if (!modeName) modeName = 'HDFC Bank';
             
             const logObj = {
                 id: 'i_' + Date.now(),
                 clientId: clientId,
                 amount: parsed.amount,
                 date: dateStr,
-                mode: parsed.mode || 'acc_2'
+                mode: modeName
             };
             
             if (typeof state !== 'undefined' && state.customClientFields) {
@@ -1008,6 +1183,7 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
             // 1. Let's first parse locally for navigation to keep it fast and 100% reliable offline
             let localNav = parseNavigationCommand(cleanInput);
             if (localNav) {
+                localNav.originalText = inputText;
                 const actionResult = executeAgentAction(localNav);
                 if (actionResult.success) {
                     let pageName = localNav.target;
@@ -1086,6 +1262,9 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
             if (!parsed) {
                 parsed = { action: "chat", replyHindi: "जय हरी! मुझे आपकी बात समझ नहीं आई। क्या आप कोई एंट्री करना चाहते हैं या नेविगेट करना चाहते हैं?" };
             }
+            if (parsed) {
+                parsed.originalText = inputText;
+            }
 
             const mutations = ["addClient", "addExpense", "addIncome", "updateApp"];
             const isMutation = mutations.includes(parsed.action);
@@ -1136,6 +1315,7 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
                     }
 
                     if (finalParsed && finalParsed.action !== "unknown") {
+                        finalParsed.originalText = textToParse;
                         await executeMutationAction(finalParsed, key);
                     } else {
                         const replyText = "जय हरी! मुझे एंट्री का ब्योरा समझ नहीं आया। प्लीज एक बार फिर ट्राई करें।";
@@ -1149,6 +1329,7 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
                 // Non-mutation action (navigate, chat, unknown)
                 // Execute immediately!
                 if (parsed.action === 'navigate') {
+                    parsed.originalText = inputText;
                     const actionResult = executeAgentAction(parsed);
                     let replyText = parsed.replyHindi || `जय हरी! मैंने ${parsed.target} स्क्रीन खोल दी है।`;
                     if (parsed.target === 'ledger-account' && typeof state !== 'undefined') {
@@ -1242,6 +1423,9 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
             } else {
                 const actionResult = executeAgentAction(parsed);
                 if (actionResult.success) {
+                    if (typeof renderPage === 'function' && typeof state !== 'undefined' && state.activePage) {
+                        renderPage(state.activePage);
+                    }
                     if (parsed.replyHindi) {
                         replyText = parsed.replyHindi;
                     } else {
