@@ -290,13 +290,79 @@
     function parseNavigationCommand(text) {
         let cleanText = text.toLowerCase().trim();
         
+        // Define strong/specific page keywords
+        const strongClientsKws = ["client directory", "clients & income", "clients and income", "clients page", "clients tab", "client page", "client list", "क्लाइंट डायरेक्टरी", "क्लाइंट्स डायरेक्टरी", "क्लाइंट्स एंड इनकम", "क्लाइंट पेज", "क्लाइंट टैब", "डायरेक्टरी"];
+        const strongEntriesKws = ["entries page", "transactions page", "expenses tab", "expense entry screen", "एंट्री स्क्रीन", "एंट्री पेज", "ट्रांजैक्शन स्क्रीन", "ट्रांजैक्शन पेज", "खर्चे स्क्रीन"];
+        const strongReportsKws = ["reports page", "reports tab", "bookkeeping report", "रिपोर्ट स्क्रीन", "बहीखाता स्क्रीन", "मंथली रिपोर्ट", "मंथली समरी", "क्लाइंट रिपोर्ट", "अकाउंट्स लेजर"];
+        const strongMasterKws = ["master settings", "settings page", "मास्टर सेटिंग्स", "सेटिंग्स पेज", "खाता सेटिंग", "खाता सेटअप", "कैटेगरी सेटिंग्स", "स्टाफ डायरेक्टरी"];
+
+        // List of all strong keywords to remove before checking for tx/update keywords
+        const allStrongKws = [...strongClientsKws, ...strongEntriesKws, ...strongReportsKws, ...strongMasterKws, "client report", "क्लाइंट रिपोर्ट", "detail report", "विवरण"];
+
+        // Temporarily remove strong keywords to check if remaining text contains tx/update cues
+        let textForChecking = cleanText;
+        for (let kw of allStrongKws) {
+            textForChecking = textForChecking.replace(new RegExp(kw, 'g'), "");
+        }
+
+        // 1. Check for transaction/mutation indicators in the remaining text
+        const hasAmount = /\b\d{3,}\b/.test(textForChecking) || 
+                          textForChecking.includes("thousand") || textForChecking.includes("हजार") || 
+                          textForChecking.includes("lakh") || textForChecking.includes("लाख") ||
+                          textForChecking.includes("rs") || textForChecking.includes("rupees") || textForChecking.includes("rupay") || textForChecking.includes("रुपए") || textForChecking.includes("रुपये");
+        
+        const txKeywords = [
+            "receive", "received", "payment", "pay", "paid", "expense", "income", 
+            "kharch", "kharcha", "diye", "liye", "mila", "mile", "dene", "lene", "jama", "nikale",
+            "रिसीव", "पेमेंट", "पे", "खर्च", "खर्चा", "दिए", "लिए", "मिला", "मिले", "जमा", "निकाले",
+            "add client", "client add", "new client", "नया क्लाइंट", "add kar", "add kardo", "add krdo", 
+            "जोड़ो", "जोड़ो", "जोड़", "जोड़"
+        ];
+        const hasTxKeyword = txKeywords.some(kw => textForChecking.includes(kw));
+
+        // 2. Check for code modification / app update indicators in the remaining text
+        const updateKeywords = [
+            "edit", "delete", "button", "visible", "css", "js", "html", "code", "file", "ui", 
+            "styling", "layout", "style", "script", "font", "color", "background", "margin", "padding",
+            "बटन", "दिखा", "दिखाई", "बदलो", "बदलें", "चेंज", "change", "modify", "update", "अपडेट"
+        ];
+        const hasUpdateKeyword = updateKeywords.some(kw => textForChecking.includes(kw));
+
+        if (hasAmount || hasTxKeyword || hasUpdateKeyword) {
+            return null;
+        }
+
+        // 3. Check navigation verbs and context words
+        const navVerbs = [
+            "open", "go to", "go", "show", "view", "check", "navigate", "display", "switch",
+            "kholo", "jao", "dikhao", "check karo", "khool", "chala", "open kar", "kholna",
+            "खोलना", "खोल", "खोलो", "खोलें", "जाना", "जाओ", "जा", "दिखाना", "दिखाओ", "दिखा", 
+            "देखना", "देखो", "चेक", "चल", "चलो"
+        ];
+        const navContexts = [
+            "tab", "page", "screen", "directory", "list", "section", "view",
+            "टैब", "पेज", "स्क्रीन", "डायरेक्टरी", "लिस्ट", "सेक्शन", "विवरण"
+        ];
+
+        const hasNavVerb = navVerbs.some(v => cleanText.includes(v));
+        const hasNavContext = navContexts.some(c => cleanText.includes(c));
+        const hasNavIntent = hasNavVerb || hasNavContext;
+
+        const dashboardKws = ["dashboard", "home", "main screen", "डैशबोर्ड", "होम", "मुख्य"];
+        const clientsKws = ["client", "income", "क्लाइंट", "इनकम"];
+        const entriesKws = ["entries", "transactions", "expenses", "expense entry", "एंट्री", "ट्रांजैक्शन", "खर्चे"];
+        const reportsKws = ["reports", "report", "bookkeeping", "रिपोर्ट", "बहीखाता", "bahikhata", "bahi khata"];
+        const masterKws = ["settings", "master", "मास्टर", "सेटिंग्स"];
+
         // 1. Specific ledger accounts or client reports
         if (cleanText.includes("ledger") || cleanText.includes("लेजर") || cleanText.includes("खाता")) {
             if (typeof state !== 'undefined' && state.accounts) {
                 for (let acc of state.accounts) {
                     let accName = acc.name.toLowerCase();
                     if (cleanText.includes(accName)) {
-                        return { action: "navigate", target: "ledger-account", value: acc.id };
+                        if (hasNavIntent || cleanText.includes("ledger") || cleanText.includes("लेजर")) {
+                            return { action: "navigate", target: "ledger-account", value: acc.id };
+                        }
                     }
                 }
             }
@@ -339,17 +405,11 @@
         }
 
         // 4. Main Pages
-        const dashboardKws = ["dashboard", "home", "main screen", "डैशबोर्ड", "होम", "मुख्य"];
-        const clientsKws = ["client directory", "clients & income", "clients page", "clients tab", "client page", "client list", "क्लाइंट", "इनकम", "directry"];
-        const entriesKws = ["entries", "transactions", "expenses", "expense entry", "एंट्री", "ट्रांजैक्शन", "खर्चे"];
-        const reportsKws = ["reports", "report", "bookkeeping", "रिपोर्ट", "बहीखाता"];
-        const masterKws = ["settings", "master", "मास्टर", "सेटिंग्स"];
-
         if (dashboardKws.some(k => cleanText.includes(k))) return { action: "navigate", target: "dashboard" };
-        if (clientsKws.some(k => cleanText.includes(k))) return { action: "navigate", target: "clients" };
-        if (entriesKws.some(k => cleanText.includes(k))) return { action: "navigate", target: "expenses" };
-        if (reportsKws.some(k => cleanText.includes(k))) return { action: "navigate", target: "reports" };
-        if (masterKws.some(k => cleanText.includes(k))) return { action: "navigate", target: "master" };
+        if (strongClientsKws.some(k => cleanText.includes(k)) || (hasNavIntent && clientsKws.some(k => cleanText.includes(k)))) return { action: "navigate", target: "clients" };
+        if (strongEntriesKws.some(k => cleanText.includes(k)) || (hasNavIntent && entriesKws.some(k => cleanText.includes(k)))) return { action: "navigate", target: "expenses" };
+        if (strongReportsKws.some(k => cleanText.includes(k)) || (hasNavIntent && reportsKws.some(k => cleanText.includes(k)))) return { action: "navigate", target: "reports" };
+        if (strongMasterKws.some(k => cleanText.includes(k)) || (hasNavIntent && masterKws.some(k => cleanText.includes(k)))) return { action: "navigate", target: "master" };
 
         return null;
     }
