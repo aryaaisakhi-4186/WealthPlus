@@ -384,9 +384,71 @@
         return { success: false, error: "unknown action" };
     }
 
+    // Helper: Fetch Gemini API with Retry and Model Fallback
+    async function fetchGeminiWithRetry(requestBody, apiKey, maxRetries = 3, initialDelay = 1000) {
+        const models = ["gemini-2.5-flash", "gemini-1.5-flash"];
+        let lastError = null;
+
+        for (let model of models) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            let retries = 0;
+            
+            while (true) {
+                try {
+                    const response = await fetch(url, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(requestBody)
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const textResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (!textResult) {
+                            throw new Error("Empty response from Gemini API");
+                        }
+                        return textResult;
+                    }
+
+                    // Retry on transient errors: 429, 503, 504
+                    if (response.status === 429 || response.status === 503 || response.status === 504) {
+                        if (retries < maxRetries) {
+                            retries++;
+                            const delay = initialDelay * Math.pow(2, retries - 1);
+                            console.warn(`Gemini API call failed with status ${response.status} using model ${model}. Retrying in ${delay}ms (retry ${retries}/${maxRetries})...`);
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            continue;
+                        }
+                    }
+
+                    // If model is not supported (404/400), try fallback model
+                    if (response.status === 404 || response.status === 400) {
+                        console.warn(`Model ${model} might not be supported (status ${response.status}). Trying fallback...`);
+                        lastError = new Error(`Gemini API Error: Status ${response.status}`);
+                        break;
+                    }
+
+                    throw new Error(`Gemini API Error: Status ${response.status}`);
+                } catch (err) {
+                    if (retries < maxRetries && (err.message.includes('Failed to fetch') || err.name === 'TypeError')) {
+                        retries++;
+                        const delay = initialDelay * Math.pow(2, retries - 1);
+                        console.warn(`Gemini network error: ${err.message}. Retrying in ${delay}ms (retry ${retries}/${maxRetries})...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                    lastError = err;
+                    break;
+                }
+            }
+        }
+        throw lastError || new Error("Failed to communicate with Gemini API");
+    }
+
     // Call Gemini API
     async function callGeminiAI(inputText, apiKey) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
         const cats = (typeof state !== 'undefined' && state.categoriesConfig) ? Object.keys(state.categoriesConfig) : ["Food", "Shopping", "Bills", "Transport", "Rent", "Others"];
         const accs = (typeof state !== 'undefined' && state.accounts) ? state.accounts.map(a => `${a.name} (ID: ${a.id}, type: ${a.type})`).join(', ') : "Main Cash (ID: acc_1), HDFC Bank (ID: acc_2)";
         
@@ -448,24 +510,7 @@ Guidelines:
             }
         };
 
-        const response = await fetch(url, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-            throw new Error(`Gemini API Error: Status ${response.status}`);
-        }
-
-        const data = await response.json();
-        const textResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!textResult) {
-            throw new Error("Empty response from Gemini API");
-        }
-
+        const textResult = await fetchGeminiWithRetry(requestBody, apiKey);
         return JSON.parse(textResult);
     }
 
@@ -495,7 +540,6 @@ Guidelines:
 
     // Advanced: Generate modified code for app files using Gemini API (Search & Replace blocks)
     async function generateModifiedCode(fileName, currentCode, instructions, apiKey) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
         const prompt = `You are a professional web developer agent.
 Your task is to modify the file "${fileName}" based on the following instructions:
 "${instructions}"
@@ -529,24 +573,7 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
             }
         };
 
-        const response = await fetch(url, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-            throw new Error(`Gemini API Error: Status ${response.status}`);
-        }
-
-        const data = await response.json();
-        const textResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!textResult) {
-            throw new Error("Empty response from Gemini");
-        }
-
+        const textResult = await fetchGeminiWithRetry(requestBody, apiKey);
         const parsedJson = JSON.parse(textResult.trim());
         if (!parsedJson.targetContent || parsedJson.replacementContent === undefined) {
             throw new Error("Invalid format returned by Gemini API");
