@@ -13,7 +13,7 @@
     window.updateSindhuVisibility = function () {
         const sindhuWidget = document.getElementById('sindhu-chat-widget');
         if (!sindhuWidget) return;
-        if (typeof state !== 'undefined' && state.currentUser && (state.activePage === 'dashboard' || state.activePage === 'clients')) {
+        if (typeof state !== 'undefined' && state.currentUser) {
             sindhuWidget.style.display = 'block';
             // Sync the API key input from the global state
             const geminiKeyInput = document.getElementById("sindhu-gemini-key");
@@ -31,6 +31,42 @@
             }
             // Clear session buffer on hide
             sindhuSessionBuffer = "";
+        }
+    };
+
+    // Global navigation helpers for specific sub-details
+    window.navigateToLedgerAccount = function(accountNameOrId) {
+        if (typeof state === 'undefined' || !state.accounts) return;
+        let acc = state.accounts.find(a => a.id === accountNameOrId || a.name.toLowerCase().includes(accountNameOrId.toLowerCase()));
+        if (!acc) return;
+        
+        state.selectedLedgerAccountId = acc.id;
+        if (typeof navigateToPage === 'function') navigateToPage('reports');
+        if (typeof setReportType === 'function') setReportType('ledger');
+        
+        const selectEl = document.getElementById('ledger-account-select');
+        if (selectEl) {
+            selectEl.value = acc.id;
+        }
+        if (typeof renderAccountLedgerDetails === 'function') {
+            renderAccountLedgerDetails();
+        }
+    };
+
+    window.navigateToClientReport = function(clientNameOrId) {
+        if (typeof state === 'undefined' || !state.clients) return;
+        let client = state.clients.find(c => c.id === clientNameOrId || c.name.toLowerCase().includes(clientNameOrId.toLowerCase()));
+        if (!client) return;
+        
+        if (typeof navigateToPage === 'function') navigateToPage('reports');
+        if (typeof setReportType === 'function') setReportType('client');
+        
+        const selectEl = document.getElementById('report-client-select');
+        if (selectEl) {
+            selectEl.value = client.id;
+        }
+        if (typeof renderClientReportDetails === 'function') {
+            renderClientReportDetails(client.id);
         }
     };
 
@@ -249,10 +285,127 @@
         return null;
     };
 
-    // Execute Database Action
+    // Local Navigation Parser
+    function parseNavigationCommand(text) {
+        let cleanText = text.toLowerCase().trim();
+        
+        // 1. Specific ledger accounts or client reports
+        if (cleanText.includes("ledger") || cleanText.includes("लेजर") || cleanText.includes("खाता")) {
+            if (typeof state !== 'undefined' && state.accounts) {
+                for (let acc of state.accounts) {
+                    let accName = acc.name.toLowerCase();
+                    if (cleanText.includes(accName)) {
+                        return { action: "navigate", target: "ledger-account", value: acc.id };
+                    }
+                }
+            }
+        }
+        
+        if (cleanText.includes("client report") || cleanText.includes("क्लाइंट रिपोर्ट") || cleanText.includes("detail report") || cleanText.includes("विवरण")) {
+            if (typeof state !== 'undefined' && state.clients) {
+                for (let client of state.clients) {
+                    let clientName = client.name.toLowerCase();
+                    if (cleanText.includes(clientName)) {
+                        return { action: "navigate", target: "client-report", value: client.id };
+                    }
+                }
+            }
+        }
+
+        // 2. Reports sub-screens
+        if (cleanText.includes("client report") || cleanText.includes("क्लाइंट रिपोर्ट") || cleanText.includes("क्लाइंट समरी")) {
+            return { action: "navigate", target: "reports-client" };
+        }
+        if (cleanText.includes("monthly") || cleanText.includes("मंथली समरी") || cleanText.includes("मंथली रिपोर्ट") || cleanText.includes("मासिक")) {
+            return { action: "navigate", target: "reports-monthly" };
+        }
+        if (cleanText.includes("ledger") || cleanText.includes("लेजर")) {
+            return { action: "navigate", target: "reports-ledger" };
+        }
+
+        // 3. Master / Settings sub-panels
+        if (cleanText.includes("member") || cleanText.includes("स्टाफ") || cleanText.includes("मेंबर्स") || cleanText.includes("user")) {
+            return { action: "navigate", target: "master-members" };
+        }
+        if (cleanText.includes("category") || cleanText.includes("कैटेगरी") || cleanText.includes("head") || cleanText.includes("हेड")) {
+            return { action: "navigate", target: "master-categories" };
+        }
+        if (cleanText.includes("client config") || cleanText.includes("client setting") || cleanText.includes("क्लाइंट सेटिंग") || cleanText.includes("क्लाइंट कॉन्फ़िगरेशन")) {
+            return { action: "navigate", target: "master-clients-config" };
+        }
+        if (cleanText.includes("account setup") || cleanText.includes("account setting") || cleanText.includes("खाता सेटिंग") || cleanText.includes("खाता सेटअप")) {
+            return { action: "navigate", target: "master-accounts" };
+        }
+
+        // 4. Main Pages
+        const dashboardKws = ["dashboard", "home", "main screen", "डैशबोर्ड", "होम", "मुख्य"];
+        const clientsKws = ["client directory", "clients & income", "clients page", "clients tab", "client page", "client list", "क्लाइंट", "इनकम", "directry"];
+        const entriesKws = ["entries", "transactions", "expenses", "expense entry", "एंट्री", "ट्रांजैक्शन", "खर्चे"];
+        const reportsKws = ["reports", "report", "bookkeeping", "रिपोर्ट", "बहीखाता"];
+        const masterKws = ["settings", "master", "मास्टर", "सेटिंग्स"];
+
+        if (dashboardKws.some(k => cleanText.includes(k))) return { action: "navigate", target: "dashboard" };
+        if (clientsKws.some(k => cleanText.includes(k))) return { action: "navigate", target: "clients" };
+        if (entriesKws.some(k => cleanText.includes(k))) return { action: "navigate", target: "expenses" };
+        if (reportsKws.some(k => cleanText.includes(k))) return { action: "navigate", target: "reports" };
+        if (masterKws.some(k => cleanText.includes(k))) return { action: "navigate", target: "master" };
+
+        return null;
+    }
+
+    // Execute Database & App Action
     function executeAgentAction(parsed) {
         if (!parsed) return { success: false, error: "could not parse" };
         
+        if (parsed.action === 'navigate') {
+            try {
+                if (parsed.target === 'dashboard') {
+                    if (typeof navigateToPage === 'function') navigateToPage('dashboard');
+                } else if (parsed.target === 'clients') {
+                    if (typeof navigateToPage === 'function') navigateToPage('clients');
+                } else if (parsed.target === 'expenses') {
+                    if (typeof navigateToPage === 'function') navigateToPage('expenses');
+                } else if (parsed.target === 'reports') {
+                    if (typeof navigateToPage === 'function') navigateToPage('reports');
+                } else if (parsed.target === 'master') {
+                    if (typeof navigateToPage === 'function') navigateToPage('master');
+                } else if (parsed.target === 'reports-client') {
+                    if (typeof navigateToPage === 'function') navigateToPage('reports');
+                    if (typeof setReportType === 'function') setReportType('client');
+                } else if (parsed.target === 'reports-monthly') {
+                    if (typeof navigateToPage === 'function') navigateToPage('reports');
+                    if (typeof setReportType === 'function') setReportType('monthly');
+                } else if (parsed.target === 'reports-ledger') {
+                    if (typeof navigateToPage === 'function') navigateToPage('reports');
+                    if (typeof setReportType === 'function') setReportType('ledger');
+                } else if (parsed.target === 'master-accounts') {
+                    if (typeof navigateToPage === 'function') navigateToPage('master');
+                    if (typeof setMasterTab === 'function') setMasterTab('accounts');
+                } else if (parsed.target === 'master-clients-config') {
+                    if (typeof navigateToPage === 'function') navigateToPage('master');
+                    if (typeof setMasterTab === 'function') setMasterTab('clients-config');
+                } else if (parsed.target === 'master-categories') {
+                    if (typeof navigateToPage === 'function') navigateToPage('master');
+                    if (typeof setMasterTab === 'function') setMasterTab('categories');
+                } else if (parsed.target === 'master-members') {
+                    if (typeof navigateToPage === 'function') navigateToPage('master');
+                    if (typeof setMasterTab === 'function') setMasterTab('members');
+                } else if (parsed.target === 'ledger-account' && parsed.value) {
+                    if (typeof window.navigateToLedgerAccount === 'function') {
+                        window.navigateToLedgerAccount(parsed.value);
+                    }
+                } else if (parsed.target === 'client-report' && parsed.value) {
+                    if (typeof window.navigateToClientReport === 'function') {
+                        window.navigateToClientReport(parsed.value);
+                    }
+                }
+                return { success: true, message: `Navigated to ${parsed.target}` };
+            } catch (navErr) {
+                console.error("Navigation action failed:", navErr);
+                return { success: false, error: navErr.message };
+            }
+        }
+
         if (parsed.action === 'addClient') {
             const clientObj = {
                 id: 'c_' + Date.now(),
@@ -453,7 +606,7 @@
         const accs = (typeof state !== 'undefined' && state.accounts) ? state.accounts.map(a => `${a.name} (ID: ${a.id}, type: ${a.type})`).join(', ') : "Main Cash (ID: acc_1), HDFC Bank (ID: acc_2)";
         
         const systemPrompt = `You are Sindhu (सिन्धु), a highly experienced and professional female assistant, bookkeeper, and developer agent for the Wealth Plus app.
-Your task is to parse the user's voice or text command (which will be in Hindi, English, or Hinglish) and structure it into a database action or an application code modification action.
+Your task is to parse the user's voice or text command (which will be in Hindi, English, or Hinglish) and structure it into a database action, an application code modification action, a navigation action, or a general conversational response.
 Always behave and respond like a real human lady (friendly, polite, but completely conversational). Use modern conversational Hinglish (Hindi mixed with common English terms like 'monthly payment', 'new client', 'expense', 'save', 'add', 'receive', 'problem', 'please').
 CRITICAL: Do NOT use overly formal, robotic, or dramatic words like "कृपया", "महोदय", "महोदया", "हुज़ूर", "प्रसन्नता", "अत्यंत आदरपूर्वक", "सहेज लिया है". Keep it natural and modern.
 
@@ -473,9 +626,15 @@ Guidelines:
 4. For Application code updates/modifications (e.g., "change UI styling to purple", "change dashboard title in index.html", "modify app.js to add custom logging"):
    Identify the target file and the instruction for change.
    -> action: "updateApp", targetFile: "style.css" or "index.html" or "app.js" or "sindhu_v1.js", instructionForChange: "The user instructions details".
-5. If a field is not found or not specified, leave it null or omit it.
-6. Generate a warm, natural lady-like Hindi/Hinglish spoken confirmation (replyHindi). It MUST start with "जय हरी!" (e.g., "जय हरी! मैंने बालकृष्ण प्रेमनारायण को 25000 रुपये मंथली पेमेंट के साथ न्यू क्लाइंट ऐड कर दिया है। कुछ और हेल्प चाहिए?" or "जय हरी! मैंने कोड में चेंजेस शुरू कर दिए हैं।").
-7. The database inputs (name, description, clientName, category) MUST be in English (Latin script). Only replyHindi must be in Devanagari Hindi (written in conversational Hinglish words).`;
+5. For Application Screen Navigation (e.g., "dashboard open karo", "go to clients page", "clients & income tab open karo", "monthly reports analysis screen pe jao", "hdfc bank ledger account detail open karo"):
+   Identify the target navigation screen.
+   -> action: "navigate", target: "dashboard" or "clients" or "expenses" or "reports" or "master" or "reports-client" or "reports-monthly" or "reports-ledger" or "master-accounts" or "master-clients-config" or "master-categories" or "master-members" or "ledger-account" or "client-report".
+   - If user asks for a specific ledger account (e.g. "hdfc bank ledger check karo"): set target = "ledger-account" and value = "acc_2" (or the account's name or ID).
+   - If user asks for client reports of a specific client (e.g. "Acme Corporation client report open karo"): set target = "client-report" and value = "Acme Corporation" (or client name/ID).
+6. For General Conversation/Chat (e.g., "hello sindhu", "kaise ho?", "what can you do?"):
+   -> action: "chat", replyHindi: "जय हरी! मैं अच्छी हूँ, बताइए आज बहीखाते में क्या एंट्री करनी है?"
+7. Generate a warm, natural lady-like Hindi/Hinglish spoken confirmation (replyHindi). It MUST start with "जय हरी!" (e.g., "जय हरी! मैंने बालकृष्ण प्रेमनारायण को 25000 रुपये मंथली पेमेंट के साथ न्यू क्लाइंट ऐड कर दिया है। कुछ और हेल्प चाहिए?" or "जय हरी! मैंने कोड में चेंजेस शुरू कर दिए हैं।").
+8. The database inputs (name, description, clientName, category) MUST be in English (Latin script). Only replyHindi must be in Devanagari Hindi (written in conversational Hinglish words).`;
 
         const requestBody = {
             contents: [
@@ -492,7 +651,7 @@ Guidelines:
                     properties: {
                         action: {
                             type: "STRING",
-                            enum: ["addClient", "addExpense", "addIncome", "updateApp", "unknown"]
+                            enum: ["addClient", "addExpense", "addIncome", "updateApp", "navigate", "chat", "unknown"]
                         },
                         name: { type: "STRING" },
                         monthlyPay: { type: "INTEGER" },
@@ -503,6 +662,8 @@ Guidelines:
                         clientName: { type: "STRING" },
                         targetFile: { type: "STRING" },
                         instructionForChange: { type: "STRING" },
+                        target: { type: "STRING" },
+                        value: { type: "STRING" },
                         replyHindi: { type: "STRING" }
                     },
                     required: ["action", "replyHindi"]
@@ -694,135 +855,267 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
             const updateTriggers = ["update karo", "update krdo", "update kardo", "update", "अपडेट करो", "अपडेट"];
             const hasUpdateTrigger = updateTriggers.some(trigger => cleanInput.includes(trigger));
 
-            if (!hasUpdateTrigger) {
-                // Append to session buffer
-                if (sindhuSessionBuffer) {
-                    sindhuSessionBuffer += " " + inputText;
-                } else {
-                    sindhuSessionBuffer = inputText;
+            // Helper to clean update triggers out of a string
+            function cleanTriggers(str) {
+                let s = str;
+                for (let trigger of updateTriggers) {
+                    s = s.replace(new RegExp(trigger, "gi"), "");
                 }
-                const replyText = "जय हरी! हाँ जी, मैंने नोट कर लिया है। जब आपका काम पूरा हो जाए, तो प्लीज 'अपडेट करो' बोल देना।";
-                appendMessage(replyText, "sindhu");
-                if (voiceReplyCheckbox && voiceReplyCheckbox.checked) {
-                    speakSindhuText(replyText);
+                return s.replace(/\s+/g, " ").trim();
+            }
+
+            // 1. Let's first parse locally for navigation to keep it fast and 100% reliable offline
+            let localNav = parseNavigationCommand(cleanInput);
+            if (localNav) {
+                const actionResult = executeAgentAction(localNav);
+                if (actionResult.success) {
+                    let pageName = localNav.target;
+                    let replyText = `जय हरी! मैंने ${pageName} स्क्रीन ओपन कर दी है।`;
+                    if (localNav.target === 'ledger-account' && typeof state !== 'undefined') {
+                        let acc = state.accounts.find(a => a.id === localNav.value);
+                        replyText = `जय हरी! मैंने ${acc ? acc.name : ''} का लेज़र खाता खोल दिया है।`;
+                    } else if (localNav.target === 'client-report' && typeof state !== 'undefined') {
+                        let client = state.clients.find(c => c.id === localNav.value);
+                        replyText = `जय हरी! मैंने ${client ? client.name : ''} की डिटेल रिपोर्ट खोल दी है।`;
+                    } else {
+                        // Human friendly tab names mapping
+                        const tabNames = {
+                            'dashboard': 'डैशबोर्ड (Dashboard)',
+                            'clients': 'क्लाइंट्स डायरेक्टरी (Clients & Income)',
+                            'expenses': 'ट्रांजैक्शन एंट्रीज़ (Wealth Plus Entries)',
+                            'reports': 'रिपोर्ट्स (Reports & Bookkeeping)',
+                            'master': 'मास्टर सेटिंग्स (Master Settings)',
+                            'reports-client': 'क्लाइंट रिपोर्ट्स (Client Reports)',
+                            'reports-monthly': 'मंथली समरी (Monthly Summaries)',
+                            'reports-ledger': 'अकाउंट्स लेजर (Accounts Ledger)',
+                            'master-accounts': 'अकाउंट्स सेटअप (Accounts Setup)',
+                            'master-clients-config': 'क्लाइंट्स सेटिंग्स (Clients Configuration)',
+                            'master-categories': 'ट्रांजैक्शन हेड्स (Categories)',
+                            'master-members': 'स्टाफ डायरेक्टरी (Members)'
+                        };
+                        if (tabNames[localNav.target]) {
+                            replyText = `जय हरी! मैंने ${tabNames[localNav.target]} ओपन कर दिया है।`;
+                        }
+                    }
+                    appendMessage(replyText, "sindhu");
+                    if (voiceReplyCheckbox && voiceReplyCheckbox.checked) {
+                        speakSindhuText(replyText);
+                    }
+                } else {
+                    let replyText = "जय हरी! मैं नेविगेट करने की कोशिश कर रही हूँ, पर कुछ एरर आ रहा है।";
+                    appendMessage(replyText, "sindhu");
+                    if (voiceReplyCheckbox && voiceReplyCheckbox.checked) {
+                        speakSindhuText(replyText);
+                    }
                 }
                 return;
             }
 
-            // It contains update trigger. Append current input to the buffer.
-            if (sindhuSessionBuffer) {
-                sindhuSessionBuffer += " " + inputText;
-            } else {
-                sindhuSessionBuffer = inputText;
-            }
-
-            // Strip out update triggers from the buffer to send to parser
-            let textToParse = sindhuSessionBuffer;
-            for (let trigger of updateTriggers) {
-                textToParse = textToParse.replace(new RegExp(trigger, "gi"), "");
-            }
-            textToParse = textToParse.trim();
-
-            // Clear buffer immediately for next session
-            sindhuSessionBuffer = "";
-
+            // 2. If not local navigation, call Gemini or local regex to parse input
             const key = geminiKeyInput ? geminiKeyInput.value.trim() : "";
             let parsed = null;
-            let replyText = "";
 
             try {
                 if (key) {
                     appendMessage("Sindhu is analyzing...", "sindhu");
                     try {
-                        parsed = await callGeminiAI(textToParse, key);
+                        let cleanInputForAnalysis = cleanTriggers(inputText);
+                        parsed = await callGeminiAI(cleanInputForAnalysis, key);
                         // remove the placeholder
                         const loadingMsg = messagesDiv.querySelector(".sindhu-msg.msg-sindhu:last-child");
                         if (loadingMsg && loadingMsg.innerText.includes("analyzing")) {
                             loadingMsg.remove();
                         }
                     } catch (err) {
-                        console.warn("Gemini execution failed, falling back to regex parser:", err);
+                        console.warn("Gemini parsing failed, using local parser:", err);
                         const loadingMsg = messagesDiv.querySelector(".sindhu-msg.msg-sindhu:last-child");
                         if (loadingMsg && loadingMsg.innerText.includes("analyzing")) {
                             loadingMsg.remove();
                         }
-                        parsed = parseLocalCommand(textToParse);
+                        parsed = parseLocalCommand(cleanTriggers(inputText));
                     }
                 } else {
-                    parsed = parseLocalCommand(textToParse);
-                }
-
-                if (parsed && parsed.action !== "unknown") {
-                    if (parsed.action === 'updateApp') {
-                        if (!key) {
-                            replyText = "जय हरी! ऐप अपडेट करने के लिए मुझे जेमिनी एपीआई की (Gemini API Key) की आवश्यकता है, कृपया सेटिंग्स में जाकर इसे दर्ज करें।";
-                        } else {
-                            try {
-                                appendMessage(`Fetching current ${parsed.targetFile}...`, "sindhu");
-                                const fileRes = await fetch(`${parsed.targetFile}?cb=${Date.now()}`);
-                                if (!fileRes.ok) {
-                                    throw new Error(`Failed to fetch local file ${parsed.targetFile}`);
-                                }
-                                const currentCode = await fileRes.text();
-                                
-                                appendMessage(`Generating modifications for ${parsed.targetFile}...`, "sindhu");
-                                const newCode = await generateModifiedCode(parsed.targetFile, currentCode, parsed.instructionForChange, key);
-                                
-                                appendMessage(`Writing modified code to ${parsed.targetFile} locally...`, "sindhu");
-                                const writeRes = await fetch('/api/write-file', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json'
-                                    },
-                                    body: JSON.stringify({
-                                        filename: parsed.targetFile,
-                                        content: newCode
-                                    })
-                                });
-                                
-                                if (!writeRes.ok) {
-                                    const errData = await writeRes.json();
-                                    throw new Error(errData.error || `Failed to write file locally.`);
-                                }
-                                
-                                appendMessage(`Deploying changes to GitHub repository...`, "sindhu");
-                                if (typeof deployAppToGitHub === 'function') {
-                                    await deployAppToGitHub();
-                                    replyText = parsed.replyHindi || `जय हरी! मैंने ${parsed.targetFile} में आपके निर्देश अनुसार बदलाव कर दिए हैं और इसे गिटहब (Git) पर डिप्लॉय कर दिया है।`;
-                                } else {
-                                    replyText = `जय हरी! मैंने ${parsed.targetFile} में बदलाव कर दिए हैं, लेकिन गिटहब डिप्लॉयमेंट फंक्शन नहीं मिला। कृपया इसे मैन्युअल रूप से पुश करें।`;
-                                }
-                            } catch (appErr) {
-                                console.error("App update failed:", appErr);
-                                replyText = `जय हरी! ऐप में अपडेशन करते समय एरर आया: ${appErr.message}`;
-                            }
-                        }
-                    } else {
-                        const actionResult = executeAgentAction(parsed);
-                        if (actionResult.success) {
-                            if (parsed.replyHindi) {
-                                replyText = parsed.replyHindi;
-                            } else {
-                                if (parsed.action === 'addClient') {
-                                    replyText = `जय हरी! मैंने ${parsed.name} को ${parsed.monthlyPay > 0 ? `${parsed.monthlyPay} रुपये मंथली पेमेंट के साथ` : ''} न्यू क्लाइंट ऐड कर दिया है। कुछ और हेल्प चाहिए?`;
-                                } else if (parsed.action === 'addExpense') {
-                                    replyText = `जय हरी! मैंने ₹${parsed.amount} का ${parsed.category} एक्सपेंस ${parsed.clientName ? `${parsed.clientName} के लिए` : ''} सेव कर लिया है। कोई और एंट्री करनी है?`;
-                                } else if (parsed.action === 'addIncome') {
-                                    replyText = `जय हरी! ${parsed.clientName ? `${parsed.clientName} से` : ''} ₹${parsed.amount} रिसीव हो गए हैं और एंट्री सेव कर ली है। अगला काम बताएं?`;
-                                }
-                            }
-                        } else {
-                            replyText = "जय हरी! बात तो समझ आ गई है, पर डेटाबेस में सेव करने में कोई प्रॉब्लम आ रही है। प्लीज एक बार फिर ट्राई कीजिए।";
-                        }
-                    }
-                } else {
-                    replyText = "जय हरी! मुझे आपकी बात समझ नहीं आई। क्या आप न्यू क्लाइंट ऐड करना चाहते हैं या कोई एक्सपेंस सेव करना चाहते हैं?";
+                    parsed = parseLocalCommand(cleanTriggers(inputText));
                 }
             } catch (err) {
                 console.error("General parse error:", err);
-                replyText = "जय हरी! कुछ टेक्निकल प्रॉब्लम आ गई है। प्लीज एक बार फिर ट्राई कीजिए।";
             }
 
+            // If still not parsed, treat as unknown/chat
+            if (!parsed) {
+                parsed = { action: "chat", replyHindi: "जय हरी! मुझे आपकी बात समझ नहीं आई। क्या आप कोई एंट्री करना चाहते हैं या नेविगेट करना चाहते हैं?" };
+            }
+
+            const mutations = ["addClient", "addExpense", "addIncome", "updateApp"];
+            const isMutation = mutations.includes(parsed.action);
+
+            if (isMutation) {
+                if (!hasUpdateTrigger) {
+                    // Buffer it
+                    if (sindhuSessionBuffer) {
+                        sindhuSessionBuffer += " " + inputText;
+                    } else {
+                        sindhuSessionBuffer = inputText;
+                    }
+                    const replyText = "जय हरी! हाँ जी, मैंने नोट कर लिया है। जब आपका काम पूरा हो जाए, तो प्लीज 'अपडेट करो' बोल देना।";
+                    appendMessage(replyText, "sindhu");
+                    if (voiceReplyCheckbox && voiceReplyCheckbox.checked) {
+                        speakSindhuText(replyText);
+                    }
+                    return;
+                } else {
+                    // It is a mutation and has update trigger.
+                    // Process buffer + current input
+                    let fullTextToProcess = sindhuSessionBuffer ? (sindhuSessionBuffer + " " + inputText) : inputText;
+                    let textToParse = cleanTriggers(fullTextToProcess);
+
+                    // Clear buffer immediately for next session
+                    sindhuSessionBuffer = "";
+
+                    // Re-parse the full combined text
+                    let finalParsed = null;
+                    if (key) {
+                        try {
+                            appendMessage("Processing transaction...", "sindhu");
+                            finalParsed = await callGeminiAI(textToParse, key);
+                            // remove placeholder
+                            const loadingMsg = messagesDiv.querySelector(".sindhu-msg.msg-sindhu:last-child");
+                            if (loadingMsg && loadingMsg.innerText.includes("Processing")) {
+                                loadingMsg.remove();
+                            }
+                        } catch (err) {
+                            finalParsed = parseLocalCommand(textToParse);
+                        }
+                    } else {
+                        finalParsed = parseLocalCommand(textToParse);
+                    }
+
+                    if (!finalParsed || finalParsed.action === "unknown") {
+                        finalParsed = parseLocalCommand(textToParse);
+                    }
+
+                    if (finalParsed && finalParsed.action !== "unknown") {
+                        await executeMutationAction(finalParsed, key);
+                    } else {
+                        const replyText = "जय हरी! मुझे एंट्री का ब्योरा समझ नहीं आया। प्लीज एक बार फिर ट्राई करें।";
+                        appendMessage(replyText, "sindhu");
+                        if (voiceReplyCheckbox && voiceReplyCheckbox.checked) {
+                            speakSindhuText(replyText);
+                        }
+                    }
+                }
+            } else {
+                // Non-mutation action (navigate, chat, unknown)
+                // Execute immediately!
+                if (parsed.action === 'navigate') {
+                    const actionResult = executeAgentAction(parsed);
+                    let replyText = parsed.replyHindi || `जय हरी! मैंने ${parsed.target} स्क्रीन खोल दी है।`;
+                    if (parsed.target === 'ledger-account' && typeof state !== 'undefined') {
+                        let acc = state.accounts.find(a => a.id === parsed.value || a.name.toLowerCase().includes(String(parsed.value).toLowerCase()));
+                        replyText = `जय हरी! मैंने ${acc ? acc.name : ''} का लेज़र खाता खोल दिया है।`;
+                    } else if (parsed.target === 'client-report' && typeof state !== 'undefined') {
+                        let client = state.clients.find(c => c.id === parsed.value || c.name.toLowerCase().includes(String(parsed.value).toLowerCase()));
+                        replyText = `जय हरी! मैंने ${client ? client.name : ''} की डिटेल रिपोर्ट खोल दी है।`;
+                    } else {
+                        // Human friendly tab names mapping
+                        const tabNames = {
+                            'dashboard': 'डैशबोर्ड (Dashboard)',
+                            'clients': 'क्लाइंट्स डायरेक्टरी (Clients & Income)',
+                            'expenses': 'ट्रांजैक्शन एंट्रीज़ (Wealth Plus Entries)',
+                            'reports': 'रिपोर्ट्स (Reports & Bookkeeping)',
+                            'master': 'मास्टर सेटिंग्स (Master Settings)',
+                            'reports-client': 'क्लाइंट रिपोर्ट्स (Client Reports)',
+                            'reports-monthly': 'मंथली समरी (Monthly Summaries)',
+                            'reports-ledger': 'अकाउंट्स लेजर (Accounts Ledger)',
+                            'master-accounts': 'अकाउंट्स सेटअप (Accounts Setup)',
+                            'master-clients-config': 'क्लाइंट्स सेटिंग्स (Clients Configuration)',
+                            'master-categories': 'ट्रांजैक्शन हेड्स (Categories)',
+                            'master-members': 'स्टाफ डायरेक्टरी (Members)'
+                        };
+                        if (tabNames[parsed.target]) {
+                            replyText = `जय हरी! मैंने ${tabNames[parsed.target]} ओपन कर दिया है।`;
+                        }
+                    }
+                    appendMessage(replyText, "sindhu");
+                    if (voiceReplyCheckbox && voiceReplyCheckbox.checked) {
+                        speakSindhuText(replyText);
+                    }
+                } else {
+                    // General Chat / Question
+                    let replyText = parsed.replyHindi || "जय हरी! बताइए मैं आपकी क्या सेवा कर सकती हूँ?";
+                    appendMessage(replyText, "sindhu");
+                    if (voiceReplyCheckbox && voiceReplyCheckbox.checked) {
+                        speakSindhuText(replyText);
+                    }
+                }
+            }
+        }
+
+        // Execute Mutation Action
+        async function executeMutationAction(parsed, key) {
+            let replyText = "";
+            if (parsed.action === 'updateApp') {
+                if (!key) {
+                    replyText = "जय हरी! ऐप अपडेट करने के लिए मुझे जेमिनी एपीआई की (Gemini API Key) की आवश्यकता है, कृपया सेटिंग्स में जाकर इसे दर्ज करें।";
+                } else {
+                    try {
+                        appendMessage(`Fetching current ${parsed.targetFile}...`, "sindhu");
+                        const fileRes = await fetch(`${parsed.targetFile}?cb=${Date.now()}`);
+                        if (!fileRes.ok) {
+                            throw new Error(`Failed to fetch local file ${parsed.targetFile}`);
+                        }
+                        const currentCode = await fileRes.text();
+                        
+                        appendMessage(`Generating modifications for ${parsed.targetFile}...`, "sindhu");
+                        const newCode = await generateModifiedCode(parsed.targetFile, currentCode, parsed.instructionForChange, key);
+                        
+                        appendMessage(`Writing modified code to ${parsed.targetFile} locally...`, "sindhu");
+                        const writeRes = await fetch('/api/write-file', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                filename: parsed.targetFile,
+                                content: newCode
+                            })
+                        });
+                        
+                        if (!writeRes.ok) {
+                            const errData = await writeRes.json();
+                            throw new Error(errData.error || `Failed to write file locally.`);
+                        }
+                        
+                        appendMessage(`Deploying changes to GitHub repository...`, "sindhu");
+                        if (typeof deployAppToGitHub === 'function') {
+                            await deployAppToGitHub();
+                            replyText = parsed.replyHindi || `जय हरी! मैंने ${parsed.targetFile} में आपके निर्देश अनुसार बदलाव कर दिए हैं और इसे गिटहब (Git) पर डिप्लॉय कर दिया है।`;
+                        } else {
+                            replyText = `जय हरी! मैंने ${parsed.targetFile} में बदलाव कर दिए हैं, लेकिन गिटहब डिप्लॉयमेंट फंक्शन नहीं मिला। कृपया इसे मैन्युअल रूप से पुश करें।`;
+                        }
+                    } catch (appErr) {
+                        console.error("App update failed:", appErr);
+                        replyText = `जय हरी! ऐप में अपडेशन करते समय एरर आया: ${appErr.message}`;
+                    }
+                }
+            } else {
+                const actionResult = executeAgentAction(parsed);
+                if (actionResult.success) {
+                    if (parsed.replyHindi) {
+                        replyText = parsed.replyHindi;
+                    } else {
+                        if (parsed.action === 'addClient') {
+                            replyText = `जय हरी! मैंने ${parsed.name} को ${parsed.monthlyPay > 0 ? `${parsed.monthlyPay} रुपये मंथली पेमेंट के साथ` : ''} न्यू क्लाइंट ऐड कर दिया है। कुछ और हेल्प चाहिए?`;
+                        } else if (parsed.action === 'addExpense') {
+                            replyText = `जय हरी! मैंने ₹${parsed.amount} का ${parsed.category} एक्सपेंस ${parsed.clientName ? `${parsed.clientName} के लिए` : ''} सेव कर लिया है। कोई और एंट्री करनी है?`;
+                        } else if (parsed.action === 'addIncome') {
+                            replyText = `जय हरी! ${parsed.clientName ? `${parsed.clientName} से` : ''} ₹${parsed.amount} रिसीव हो गए हैं और एंट्री सेव कर ली है। अगला काम बताएं?`;
+                        }
+                    }
+                } else {
+                    replyText = "जय हरी! बात तो समझ आ गई है, पर डेटाबेस में सेव करने में कोई प्रॉब्लम आ रही है। प्लीज एक बार फिर ट्राई कीजिए।";
+                }
+            }
             appendMessage(replyText, "sindhu");
             if (voiceReplyCheckbox && voiceReplyCheckbox.checked) {
                 speakSindhuText(replyText);
