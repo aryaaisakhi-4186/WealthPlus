@@ -1998,3 +1998,48 @@ h1, h2, h3, h4, h5, h6 {
     width: 14px;
     height: 14px;
 }
+
+.form-group-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.github-deploy-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+    margin-top: 15px;
+}
+
+/* Mobile responsive fixes */
+@media (max-width: 576px) {
+    .sindhu-widget {
+        right: 12px !important;
+        bottom: 12px !important;
+        left: 12px !important;
+        width: auto !important;
+    }
+    
+    .sindhu-chat-window {
+        position: fixed !important;
+        top: 12px !important;
+        right: 12px !important;
+        bottom: 80px !important;
+        left: 12px !important;
+        width: auto !important;
+        height: auto !important;
+        border-radius: var(--radius-lg) !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    .form-group-row {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .github-deploy-container {
+        grid-template-columns: 1fr !important;
+    }
+}

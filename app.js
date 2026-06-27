@@ -248,33 +248,36 @@ function initFirebaseSyncListeners() {
 
     // 1. Clients
     firebaseDb.collection('clients').onSnapshot(snapshot => {
-        if (snapshot.empty) return;
         let items = [];
-        snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+        if (!snapshot.empty) {
+            snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+        }
         if (!isSame(state.clients, items)) {
             state.clients = items;
             saveStateLocalOnly();
-            if (state.activePage === 'clients' || state.activePage === 'master') renderPage(state.activePage);
+            renderPage(state.activePage);
         }
     }, err => console.error("Clients sync error:", err));
 
     // 2. Income Logs
     firebaseDb.collection('incomeLogs').onSnapshot(snapshot => {
-        if (snapshot.empty) return;
         let items = [];
-        snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+        if (!snapshot.empty) {
+            snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+        }
         if (!isSame(state.incomeLogs, items)) {
             state.incomeLogs = items;
             saveStateLocalOnly();
-            if (state.activePage === 'clients') renderPage('clients');
+            renderPage(state.activePage);
         }
     }, err => console.error("Income logs sync error:", err));
 
     // 3. Transactions
     firebaseDb.collection('transactions').onSnapshot(snapshot => {
-        if (snapshot.empty) return;
         let items = [];
-        snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+        if (!snapshot.empty) {
+            snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+        }
         if (!isSame(state.transactions, items)) {
             state.transactions = items;
             saveStateLocalOnly();
@@ -284,21 +287,23 @@ function initFirebaseSyncListeners() {
 
     // 4. Accounts
     firebaseDb.collection('accounts').onSnapshot(snapshot => {
-        if (snapshot.empty) return;
         let items = [];
-        snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+        if (!snapshot.empty) {
+            snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+        }
         if (!isSame(state.accounts, items)) {
             state.accounts = items;
             saveStateLocalOnly();
-            if (state.activePage === 'dashboard' || state.activePage === 'master' || state.activePage === 'reports') renderPage(state.activePage);
+            renderPage(state.activePage);
         }
     }, err => console.error("Accounts sync error:", err));
 
     // 5. Members
     firebaseDb.collection('members').onSnapshot(snapshot => {
-        if (snapshot.empty) return;
         let items = [];
-        snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+        if (!snapshot.empty) {
+            snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+        }
         if (!isSame(state.members, items)) {
             state.members = items;
             saveStateLocalOnly();
@@ -306,8 +311,8 @@ function initFirebaseSyncListeners() {
                 state.currentUser = null;
                 saveStateLocalOnly();
                 initLoginSession();
-            } else if (state.activePage === 'master') {
-                renderPage('master');
+            } else {
+                renderPage(state.activePage);
             }
         }
     }, err => console.error("Members sync error:", err));
