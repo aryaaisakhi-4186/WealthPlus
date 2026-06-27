@@ -14,6 +14,12 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- SheetJS CDN for Excel Export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- PWA Manifest & Mobile Web App support -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://img.icons8.com/fluency/192/000000/accounting.png">
     <link rel="stylesheet" href="style.css?v=3.6.2">
 </head>
 <body class="light-theme">
@@ -580,6 +586,15 @@
                                     </button>
                                     <button class="btn btn-danger" id="btn-cloud-disable" type="button">
                                         <i data-lucide="cloud-off"></i> Disable Cloud Sync
+                                    </button>
+                                </div>
+
+                                <!-- PWA Install Card -->
+                                <div class="card" id="pwa-install-card" style="display: none; padding: 20px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+                                    <h5 style="margin-top: 0; margin-bottom: 10px;">Install Bookkeeping Application</h5>
+                                    <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 15px;">You can install Wealth Plus directly on your device's home screen as a native application for offline access.</p>
+                                    <button type="button" class="btn btn-primary" id="btn-pwa-install" style="display: inline-flex; align-items: center; gap: 8px;">
+                                        <i data-lucide="download"></i> Install App
                                     </button>
                                 </div>
 

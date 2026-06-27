@@ -1591,6 +1591,8 @@ async function deployAppToGitHub() {
         { name: 'style.css', required: true },
         { name: 'sindhu_v1.js', required: true },
         { name: 'firebase-config.js', required: false },
+        { name: 'manifest.json', required: false },
+        { name: 'sw.js', required: false },
         { name: 'server.py', required: false },
         { name: 'README.md', required: false }
     ];
@@ -2853,7 +2855,49 @@ document.addEventListener('DOMContentLoaded', () => {
         renderPage(state.activePage);
     }
     
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('Service Worker registered:', reg.scope))
+                .catch(err => console.error('Service Worker registration failed:', err));
+        });
+    }
+
+    // PWA Install Button handler
+    const installBtn = document.getElementById('btn-pwa-install');
+    if (installBtn) {
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`User response to install: ${outcome}`);
+            deferredPrompt = null;
+            const installCard = document.getElementById('pwa-install-card');
+            if (installCard) installCard.style.display = 'none';
+        });
+    }
+
     lucide.createIcons();
+});
+
+// PWA beforeinstallprompt handler
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const installCard = document.getElementById('pwa-install-card');
+    if (installCard) {
+        installCard.style.display = 'block';
+    }
+});
+
+window.addEventListener('appinstalled', (evt) => {
+    console.log('App installed successfully!');
+    const installCard = document.getElementById('pwa-install-card');
+    if (installCard) {
+        installCard.style.display = 'none';
+    }
 });
 
 

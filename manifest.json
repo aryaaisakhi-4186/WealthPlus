@@ -1,0 +1,22 @@
+{
+  "name": "Wealth Plus",
+  "short_name": "WealthPlus",
+  "description": "Secure Real-Time Cloud Bookkeeping & Ledger Application",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/fluency/192/000000/accounting.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://img.icons8.com/fluency/512/000000/accounting.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}
