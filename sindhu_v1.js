@@ -502,6 +502,42 @@
             }
         }
         
+        // 3. Offline Chat / Greeting / Compliment fallbacks
+        const greetings = ["hello", "hi", "hey", "namaste", "हेलो", "हाय", "नमस्ते", "राम राम", "जय हरी"];
+        const howAreYou = ["kaise ho", "kaisi ho", "how are you", "कैसी हो", "कैसा हो", "कैसे हो", "ठीक हो"];
+        const praise = ["sahi", "badhiya", "dhanyawad", "thank", "shukriya", "shabaash", "kaam kar", "kam kar", "kam kr", "कम कर", "काम कर", "sahi se", "shandar", "उत्कृष्ट", "धन्यवाद", "शुक्रिया", "बढ़िया"];
+        const helpKws = ["help", "madad", "मदद", "क्या कर", "kya kar", "kya kr"];
+
+        let normalizedText = cleanText.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
+
+        if (greetings.some(g => normalizedText.includes(g))) {
+            return {
+                action: "chat",
+                replyHindi: "जय हरी! नमस्ते जी। बताइए आज बहीखाते में क्या एंट्री करनी है या कौन सी रिपोर्ट देखनी है?"
+            };
+        }
+
+        if (howAreYou.some(h => normalizedText.includes(h))) {
+            return {
+                action: "chat",
+                replyHindi: "जय हरी! मैं बिल्कुल ठीक हूँ। आप बताइए, आपके क्या हाल हैं और आज बहीखाते में क्या करना है?"
+            };
+        }
+
+        if (praise.some(p => normalizedText.includes(p))) {
+            return {
+                action: "chat",
+                replyHindi: "जय हरी! बहुत-बहुत धन्यवाद आपका। मैं आपके बहीखाते को एकदम सही और अपडेट रखने के लिए हमेशा तैयार हूँ!"
+            };
+        }
+
+        if (helpKws.some(k => normalizedText.includes(k))) {
+            return {
+                action: "chat",
+                replyHindi: "जय हरी! मैं आपके लिए क्लाइंट ऐड कर सकती हूँ (जैसे: 'naya client add karo'), इनकम-एक्सपेंस की एंट्री कर सकती हूँ, और किसी भी रिपोर्ट या लेज़र अकाउंट पर जा सकती हूँ।"
+            };
+        }
+        
         return null;
     };
 
