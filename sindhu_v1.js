@@ -955,7 +955,7 @@
     }
 
     // Call Gemini API
-    async function callGeminiAI(inputText, apiKey) {
+    async function callGeminiAI(inputText, apiKey, attachment = null) {
         const cats = (typeof state !== 'undefined' && state.categoriesConfig) ? Object.keys(state.categoriesConfig) : ["Food", "Shopping", "Bills", "Transport", "Rent", "Others"];
         const accs = (typeof state !== 'undefined' && state.accounts) ? state.accounts.map(a => `${a.name} (ID: ${a.id}, type: ${a.type})`).join(', ') : "Main Cash (ID: acc_1), HDFC Bank (ID: acc_2)";
         
@@ -990,12 +990,28 @@ Guidelines:
 7. Generate a warm, natural lady-like Hindi/Hinglish spoken confirmation (replyHindi). It MUST start with "जय हरी!" (e.g., "जय हरी! मैंने बालकृष्ण प्रेमनारायण को 25000 रुपये मंथली पेमेंट के साथ न्यू क्लाइंट ऐड कर दिया है। कुछ और हेल्प चाहिए?" or "जय हरी! मैंने कोड में चेंजेस शुरू कर दिए हैं।").
 8. The database inputs (name, description, clientName, category) MUST be in English (Latin script). Only replyHindi must be in Devanagari Hindi (written in conversational Hinglish words).`;
 
+        const parts = [
+            { text: `${systemPrompt}\n\nUser Input: "${inputText}"` }
+        ];
+        if (attachment) {
+            if (attachment.mimeType && attachment.mimeType.startsWith("image/") && attachment.base64) {
+                parts.push({
+                    inlineData: {
+                        mimeType: attachment.mimeType,
+                        data: attachment.base64
+                    }
+                });
+            } else {
+                parts.push({
+                    text: `[System Notice: The user has attached a document file named "${attachment.name}" (Type: ${attachment.type}, Size: ${(attachment.size/1024).toFixed(1)} KB) to this message. You cannot directly read the content of this document, so please let the user know you see the attachment and ask them to explain or paste the text content from it if they want you to make an entry, or offer to guide them.]`
+                });
+            }
+        }
+
         const requestBody = {
             contents: [
                 {
-                    parts: [
-                        { text: `${systemPrompt}\n\nUser Input: "${inputText}"` }
-                    ]
+                    parts: parts
                 }
             ],
             generationConfig: {
@@ -1127,6 +1143,87 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
         const geminiKeyInput = document.getElementById("sindhu-gemini-key");
         const voiceReplyCheckbox = document.getElementById("sindhu-voice-reply");
 
+        let currentAttachedFile = null;
+        const attachBtn = document.getElementById("sindhu-attach-btn");
+        const fileInput = document.getElementById("sindhu-file-input");
+        const attachmentBar = document.getElementById("sindhu-attachment-bar");
+
+        if (attachBtn && fileInput) {
+            attachBtn.addEventListener("click", () => {
+                fileInput.click();
+            });
+            
+            fileInput.addEventListener("change", (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    let base64 = "";
+                    if (file.type.startsWith("image/")) {
+                        base64 = evt.target.result.split(",")[1];
+                    }
+                    
+                    currentAttachedFile = {
+                        name: file.name,
+                        size: file.size,
+                        type: file.type,
+                        base64: base64,
+                        dataUrl: evt.target.result
+                    };
+                    
+                    renderAttachmentPreview();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function renderAttachmentPreview() {
+            if (!attachmentBar || !currentAttachedFile) return;
+            
+            let iconHtml = '<i data-lucide="file-text"></i>';
+            if (currentAttachedFile.type.startsWith("image/")) {
+                iconHtml = `<img src="${currentAttachedFile.dataUrl}" class="sindhu-preview-thumb">`;
+            } else if (currentAttachedFile.type.includes("pdf")) {
+                iconHtml = `<div class="sindhu-preview-thumb" style="color: #e11d48;"><i data-lucide="file-text"></i></div>`;
+            } else if (currentAttachedFile.type.includes("sheet") || currentAttachedFile.type.includes("excel")) {
+                iconHtml = `<div class="sindhu-preview-thumb" style="color: #10b981;"><i data-lucide="file-spreadsheet"></i></div>`;
+            } else if (currentAttachedFile.type.includes("word") || currentAttachedFile.type.includes("msword")) {
+                iconHtml = `<div class="sindhu-preview-thumb" style="color: #2563eb;"><i data-lucide="file-check"></i></div>`;
+            }
+            
+            const sizeStr = (currentAttachedFile.size / 1024).toFixed(1) + " KB";
+            
+            attachmentBar.innerHTML = `
+                ${iconHtml}
+                <div class="sindhu-preview-info">
+                    <div class="sindhu-preview-name">${currentAttachedFile.name}</div>
+                    <div class="sindhu-preview-size">${sizeStr}</div>
+                </div>
+                <button type="button" class="btn-remove-attachment" id="sindhu-btn-remove-attachment">
+                    <i data-lucide="x"></i>
+                </button>
+            `;
+            
+            attachmentBar.classList.add("active");
+            
+            const removeBtn = document.getElementById("sindhu-btn-remove-attachment");
+            if (removeBtn) {
+                removeBtn.addEventListener("click", resetAttachment);
+            }
+            
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        function resetAttachment() {
+            currentAttachedFile = null;
+            if (fileInput) fileInput.value = "";
+            if (attachmentBar) {
+                attachmentBar.classList.remove("active");
+                attachmentBar.innerHTML = "";
+            }
+        }
+
         // Load saved settings
         if (typeof state !== 'undefined' && state.geminiApiKey) {
             geminiKeyInput.value = state.geminiApiKey;
@@ -1191,13 +1288,28 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
         }
 
         // Append message UI helper
-        function appendMessage(text, sender) {
+        function appendMessage(text, sender, file = null) {
             if (!messagesDiv) return;
             const msg = document.createElement("div");
             msg.className = `sindhu-msg msg-${sender}`;
             const p = document.createElement("p");
             p.innerText = text;
             msg.appendChild(p);
+            
+            // Render file attachment if present
+            if (file) {
+                const attachDiv = document.createElement("div");
+                attachDiv.className = "sindhu-bubble-attachment";
+                
+                let iconName = "file-text";
+                if (file.type.startsWith("image/")) iconName = "image";
+                else if (file.type.includes("pdf")) iconName = "file-text";
+                else if (file.type.includes("sheet") || file.type.includes("excel")) iconName = "file-spreadsheet";
+                else if (file.type.includes("word") || file.type.includes("msword")) iconName = "file-check";
+                
+                attachDiv.innerHTML = `<i data-lucide="${iconName}"></i> <span>${file.name}</span>`;
+                msg.appendChild(attachDiv);
+            }
             
             const timeSpan = document.createElement("span");
             timeSpan.className = "msg-time";
@@ -1207,12 +1319,17 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
             
             messagesDiv.appendChild(msg);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
         // Process Assistant Response
         async function processCommand(inputText) {
             if (!inputText.trim()) return;
-            appendMessage(inputText, "user");
+            const fileToProcess = currentAttachedFile;
+            resetAttachment();
+            
+            appendMessage(inputText, "user", fileToProcess);
             chatInput.value = "";
 
             const cleanInput = inputText.toLowerCase().trim();
@@ -1285,7 +1402,7 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
                     appendMessage("Sindhu is analyzing...", "sindhu");
                     try {
                         let cleanInputForAnalysis = cleanTriggers(inputText);
-                        parsed = await callGeminiAI(cleanInputForAnalysis, key);
+                        parsed = await callGeminiAI(cleanInputForAnalysis, key, fileToProcess);
                         // remove the placeholder
                         const loadingMsg = messagesDiv.querySelector(".sindhu-msg.msg-sindhu:last-child");
                         if (loadingMsg && loadingMsg.innerText.includes("analyzing")) {
@@ -1308,7 +1425,14 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
 
             // If still not parsed, treat as unknown/chat
             if (!parsed) {
-                parsed = { action: "chat", replyHindi: "जय हरी! मुझे आपकी बात समझ नहीं आई। क्या आप कोई एंट्री करना चाहते हैं या नेविगेट करना चाहते हैं?" };
+                if (fileToProcess) {
+                    parsed = { 
+                        action: "chat", 
+                        replyHindi: `जय हरी! मैंने आपका डॉक्यूमेंट '${fileToProcess.name}' देख लिया है। कृपया बोलकर या लिखकर बताएं कि इस फ़ाइल से बहीखाते में क्या एंट्री करनी है?` 
+                    };
+                } else {
+                    parsed = { action: "chat", replyHindi: "जय हरी! मुझे आपकी बात समझ नहीं आई। क्या आप कोई एंट्री करना चाहते हैं या नेविगेट करना चाहते हैं?" };
+                }
             }
             if (parsed) {
                 parsed.originalText = inputText;
@@ -1345,7 +1469,7 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
                     if (key) {
                         try {
                             appendMessage("Processing transaction...", "sindhu");
-                            finalParsed = await callGeminiAI(textToParse, key);
+                            finalParsed = await callGeminiAI(textToParse, key, fileToProcess);
                             // remove placeholder
                             const loadingMsg = messagesDiv.querySelector(".sindhu-msg.msg-sindhu:last-child");
                             if (loadingMsg && loadingMsg.innerText.includes("Processing")) {

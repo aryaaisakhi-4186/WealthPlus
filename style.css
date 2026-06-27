@@ -1868,3 +1868,133 @@ h1, h2, h3, h4, h5, h6 {
         }
     }
 }
+
+.btn-attach-sindhu {
+    background: var(--bg-tertiary);
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+}
+
+.btn-attach-sindhu:hover {
+    background: var(--bg-hover);
+    color: #4f46e5;
+}
+
+.btn-attach-sindhu i {
+    width: 16px;
+    height: 16px;
+}
+
+/* Sindhu attachment preview bar style */
+.sindhu-attachment-preview {
+    padding: 8px 16px;
+    background: var(--bg-tertiary);
+    border-top: 1px solid var(--border-color);
+    display: none; /* hidden until file selected */
+    align-items: center;
+    gap: 10px;
+    animation: popIn 0.2s ease-out;
+}
+
+.sindhu-attachment-preview.active {
+    display: flex;
+}
+
+.sindhu-preview-thumb {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    object-fit: cover;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+}
+
+.sindhu-preview-thumb i {
+    width: 16px;
+    height: 16px;
+}
+
+.sindhu-preview-info {
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.sindhu-preview-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    text-align: left;
+}
+
+.sindhu-preview-size {
+    font-size: 9px;
+    color: var(--text-secondary);
+    text-align: left;
+}
+
+.btn-remove-attachment {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: var(--transition);
+}
+
+.btn-remove-attachment:hover {
+    background: rgba(225, 29, 72, 0.1);
+    color: var(--danger);
+}
+
+.btn-remove-attachment i {
+    width: 14px;
+    height: 14px;
+}
+
+/* Chat bubble attachment styling */
+.sindhu-bubble-attachment {
+    margin-top: 6px;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    max-width: 100%;
+}
+
+.msg-user .sindhu-bubble-attachment {
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+}
+
+.msg-sindhu .sindhu-bubble-attachment {
+    background: rgba(79, 70, 229, 0.08);
+    border: 1px solid rgba(79, 70, 229, 0.15);
+    color: var(--text-primary);
+}
+
+.sindhu-bubble-attachment i {
+    width: 14px;
+    height: 14px;
+}
