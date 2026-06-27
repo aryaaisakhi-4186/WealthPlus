@@ -1125,6 +1125,7 @@ function renderClientsPage() {
         });
     }
 
+    lucide.createIcons();
     renderIncomeLogsTable();
 }
 
@@ -1147,6 +1148,7 @@ function renderIncomeLogsTable() {
 
     if (sorted.length === 0) {
         tbody.innerHTML = `<tr><td colspan="${5 + state.customClientFields.length}" style="text-align:center; color:var(--text-muted); padding:24px;">No income logged.</td></tr>`;
+        lucide.createIcons();
         return;
     }
 
@@ -1201,6 +1203,7 @@ function renderExpensesPage() {
 
     if (sorted.length === 0) {
         tbody.innerHTML = `<tr><td colspan="${7 + state.customTxFields.length}" style="text-align:center; color:var(--text-muted); padding:32px;">No expense entries logged.</td></tr>`;
+        lucide.createIcons();
         return;
     }
 
