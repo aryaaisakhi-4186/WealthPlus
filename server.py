@@ -31,7 +31,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 
                 # Check for secure filename (restrict to repository root files only)
                 clean_filename = os.path.basename(filename)
-                allowed_files = ['index.html', 'app.js', 'style.css', 'sindhu_v1.js', 'server.py', 'README.md']
+                allowed_files = ['index.html', 'app.js', 'style.css', 'sindhu_v1.js', 'server.py', 'README.md', 'firebase-config.js']
                 
                 if clean_filename not in allowed_files:
                     self.send_response(400)

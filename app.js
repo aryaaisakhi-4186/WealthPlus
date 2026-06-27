@@ -112,6 +112,10 @@ function loadState() {
     } else {
         seedState();
     }
+    if (window.firebaseConfig && window.firebaseConfig.projectId) {
+        state.firebaseConfig = window.firebaseConfig;
+        state.cloudSyncEnabled = true;
+    }
     populateCategoryDropdowns();
 }
 
@@ -1581,6 +1585,7 @@ async function deployAppToGitHub() {
         { name: 'app.js', required: true },
         { name: 'style.css', required: true },
         { name: 'sindhu_v1.js', required: true },
+        { name: 'firebase-config.js', required: false },
         { name: 'server.py', required: false },
         { name: 'README.md', required: false }
     ];
@@ -2865,6 +2870,27 @@ function handleCloudConfigSubmit(e) {
         state.cloudSyncEnabled = true;
         saveStateLocalOnly();
 
+        // Save locally to firebase-config.js via local server API if running on localhost
+        if (location.protocol !== 'file:') {
+            const configJsContent = `window.firebaseConfig = ${JSON.stringify(config, null, 4)};`;
+            fetch('/api/write-file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filename: 'firebase-config.js',
+                    content: configJsContent
+                })
+            }).then(res => {
+                if (res.ok) {
+                    console.log("firebase-config.js saved locally successfully.");
+                } else {
+                    console.error("Failed to save firebase-config.js locally.");
+                }
+            }).catch(err => {
+                console.error("Error writing firebase-config.js locally:", err);
+            });
+        }
+
         alert("Cloud Sync settings saved! Initializing connection...");
         
         // Re-initialize Firebase Sync
@@ -2883,6 +2909,18 @@ function handleCloudDisableClick() {
         state.cloudSyncEnabled = false;
         saveStateLocalOnly();
         
+        // Clear firebase-config.js locally
+        if (location.protocol !== 'file:') {
+            fetch('/api/write-file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filename: 'firebase-config.js',
+                    content: 'window.firebaseConfig = {};'
+                })
+            }).catch(err => console.error("Error clearing firebase-config.js:", err));
+        }
+
         alert("Cloud Sync disabled. Returning to Local Mode.");
         window.location.reload();
     }
