@@ -853,14 +853,19 @@
             let retries = 0;
             
             while (true) {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+                
                 try {
                     const response = await fetch(url, {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json"
                         },
-                        body: JSON.stringify(requestBody)
+                        body: JSON.stringify(requestBody),
+                        signal: controller.signal
                     });
+                    clearTimeout(timeoutId);
 
                     if (response.ok) {
                         const data = await response.json();
@@ -891,6 +896,13 @@
 
                     throw new Error(`Gemini API Error: Status ${response.status}`);
                 } catch (err) {
+                    clearTimeout(timeoutId);
+                    
+                    if (err.name === 'AbortError') {
+                        console.warn(`Gemini API call timed out after 8 seconds.`);
+                        throw new Error("Gemini API call timed out");
+                    }
+
                     if (retries < maxRetries && (err.message.includes('Failed to fetch') || err.name === 'TypeError')) {
                         retries++;
                         const delay = initialDelay * Math.pow(2, retries - 1);
