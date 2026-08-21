@@ -502,14 +502,65 @@
             }
         }
         
-        // 3. Offline Chat / Greeting / Compliment fallbacks
+        // 3. Offline Chat / FAQ / Action fallbacks
         const greetings = ["hello", "hi", "hey", "namaste", "हेलो", "हाय", "नमस्ते", "राम राम", "जय हरी"];
         const howAreYou = ["kaise ho", "kaisi ho", "how are you", "कैसी हो", "कैसा हो", "कैसे हो", "ठीक हो"];
-        const praise = ["sahi", "badhiya", "dhanyawad", "thank", "shukriya", "shabaash", "kaam kar", "kam kar", "kam kr", "कम कर", "काम कर", "sahi se", "shandar", "उत्कृष्ट", "धन्यवाद", "शुक्रिया", "बढ़िया"];
-        const helpKws = ["help", "madad", "मदद", "क्या कर", "kya kar", "kya kr"];
+        const praise = ["sahi", "badhiya", "dhanyawad", "thank", "shukriya", "shabaash", "kaam kar", "kam kar", "kam kr", "कम कर", "काम कर", "sahi se", "shandar", "उत्कृष्ट", "धन्यवाद", "शुक्रिया", "बढ़िया", "great", "nice"];
+        const resetKws = ["reset", "रिसेट", "फुली रिसेट", "फुल्ली रिसेट", "ऐप रिसेट", "डाटा रिसेट", "डेटा रिसेट", "सब डिलीट", "clear data", "wipe data", "reset app", "full reset"];
+        const installKws = ["install", "इंस्टॉल", "डाउनलोड", "mobile app", "phone me", "होम स्क्रीन", "home screen", "apk", "pwa", "डाउनलोड ऐप"];
+        const loginPinKws = ["pin", "पिन", "पासवर्ड", "password", "login kaise", "लॉगिन कैसे", "login", "लॉगिन", "लॉग इन"];
+        const cloudSyncKws = ["cloud sync", "क्लाउड सिंक", "firebase", "फायरबेस", "backup", "सिंक", "sync", "बैकअप"];
+        const excelKws = ["excel", "एक्सेल", "export", "एक्सपोर्ट", "sheet", "शीट", "download excel", "एक्सेल डाउनलोड"];
+        const helpKws = ["help", "madad", "मदद", "क्या कर", "kya kar", "kya kr", "kya kar sakti ho", "features", "क्या कर सकती हो"];
 
         let normalizedText = cleanText.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
 
+        // A. App Reset Query
+        if (resetKws.some(k => normalizedText.includes(k))) {
+            return {
+                action: "navigate",
+                target: "master-reset-app",
+                replyHindi: "जय हरी! मैंने आपके लिए 'Reset App' स्क्रीन खोल दी है। आप मास्टर सेटिंग्स में दिए गए लाल बटन 'Reset Entire App Database' पर क्लिक करके ऐप का सारा डेटा साफ़/रिसेट कर सकते हैं।"
+            };
+        }
+
+        // B. Install / Mobile App Query
+        if (installKws.some(k => normalizedText.includes(k))) {
+            return {
+                action: "navigate",
+                target: "master-cloud-sync",
+                replyHindi: "जय हरी! ऐप को मोबाइल में इंस्टॉल करने के लिए Chrome ब्राउज़र में ऊपर 3 डॉट्स (⋮) पर टैप करके 'Install app' या 'Add to Home screen' चुनें, या मास्टर सेटिंग्स ➔ क्लाउड सिंक में दिए गए 'Install App' बटन पर क्लिक करें।"
+            };
+        }
+
+        // C. Login / PIN Query
+        if (loginPinKws.some(k => normalizedText.includes(k))) {
+            return {
+                action: "navigate",
+                target: "master-members",
+                replyHindi: "जय हरी! लॉगिन करने के लिए अपना रजिस्टर्ड मोबाइल नंबर और 4-अंकों का पिन डालें। डिफ़ॉल्ट एडमिन पिन '1234' और स्टाफ पिन '5678' है। नया पिन सेट करने के लिए मैंने आपके लिए 'Member Directory' खोल दी है।"
+            };
+        }
+
+        // D. Cloud Sync / Firebase Query
+        if (cloudSyncKws.some(k => normalizedText.includes(k))) {
+            return {
+                action: "navigate",
+                target: "master-cloud-sync",
+                replyHindi: "जय हरी! मैंने आपके लिए 'Cloud Sync' स्क्रीन खोल दी है। यहाँ आप अपनी फ़ायरबेस सेटिंग्स सेव करके रियल-टाइम मल्टी-डिवाइस सिंक चालू कर सकते हैं।"
+            };
+        }
+
+        // E. Excel Download Query
+        if (excelKws.some(k => normalizedText.includes(k))) {
+            return {
+                action: "navigate",
+                target: "reports",
+                replyHindi: "जय हरी! मैंने आपके लिए 'Reports' स्क्रीन खोल दी है। ऊपर दिए गए हरे रंग के 'Export to Excel' बटन पर क्लिक करके आप पूरी एक्सेल स्प्रेडशीट डाउनलोड कर सकते हैं।"
+            };
+        }
+
+        // F. Greetings & Casual Chat
         if (greetings.some(g => normalizedText.includes(g))) {
             return {
                 action: "chat",
@@ -534,7 +585,7 @@
         if (helpKws.some(k => normalizedText.includes(k))) {
             return {
                 action: "chat",
-                replyHindi: "जय हरी! मैं आपके लिए क्लाइंट ऐड कर सकती हूँ (जैसे: 'naya client add karo'), इनकम-एक्सपेंस की एंट्री कर सकती हूँ, और किसी भी रिपोर्ट या लेज़र अकाउंट पर जा सकती हूँ।"
+                replyHindi: "जय हरी! मैं सिन्धु हूँ, आपकी AI मुनीम। मैं आपके लिए नए क्लाइंट जोड़ सकती हूँ (उदा. 'naya client balkrishna add karo'), खर्चे व इनकम की एंट्री कर सकती हूँ, लेज़र और रिपोर्ट्स खोल सकती हूँ, और ऐप का डेटा मैनेज कर सकती हूँ।"
             };
         }
         
@@ -646,6 +697,21 @@
         }
 
         // 3. Master / Settings sub-panels
+        if (cleanText.includes("reset") || cleanText.includes("रिसेट") || cleanText.includes("wipe") || cleanText.includes("क्लियर")) {
+            return { action: "navigate", target: "master-reset-app", replyHindi: "जय हरी! मैंने आपके लिए 'Reset App' स्क्रीन खोल दी है। आप मास्टर सेटिंग्स में दिए गए लाल बटन 'Reset Entire App Database' पर क्लिक करके ऐप डेटा रिसेट कर सकते हैं।" };
+        }
+        if (cleanText.includes("cloud") || cleanText.includes("firebase") || cleanText.includes("क्लाउड") || cleanText.includes("फायरबेस") || cleanText.includes("सिंक") || cleanText.includes("sync")) {
+            return { action: "navigate", target: "master-cloud-sync" };
+        }
+        if (cleanText.includes("github") || cleanText.includes("deploy") || cleanText.includes("गिटहब") || cleanText.includes("डिप्लॉय") || cleanText.includes("पब्लिश") || cleanText.includes("publish")) {
+            return { action: "navigate", target: "master-ai-developer" };
+        }
+        if (cleanText.includes("column") || cleanText.includes("कॉलम") || cleanText.includes("field") || cleanText.includes("फील्ड")) {
+            return { action: "navigate", target: "master-columns" };
+        }
+        if (cleanText.includes("budget") || cleanText.includes("बजट")) {
+            return { action: "navigate", target: "master-budgets" };
+        }
         if (cleanText.includes("member") || cleanText.includes("स्टाफ") || cleanText.includes("मेंबर्स") || cleanText.includes("user")) {
             return { action: "navigate", target: "master-members" };
         }
@@ -706,6 +772,21 @@
                 } else if (parsed.target === 'master-members') {
                     if (typeof navigateToPage === 'function') navigateToPage('master');
                     if (typeof setMasterTab === 'function') setMasterTab('members');
+                } else if (parsed.target === 'master-cloud-sync') {
+                    if (typeof navigateToPage === 'function') navigateToPage('master');
+                    if (typeof setMasterTab === 'function') setMasterTab('cloud-sync');
+                } else if (parsed.target === 'master-ai-developer') {
+                    if (typeof navigateToPage === 'function') navigateToPage('master');
+                    if (typeof setMasterTab === 'function') setMasterTab('ai-developer');
+                } else if (parsed.target === 'master-columns') {
+                    if (typeof navigateToPage === 'function') navigateToPage('master');
+                    if (typeof setMasterTab === 'function') setMasterTab('columns');
+                } else if (parsed.target === 'master-budgets') {
+                    if (typeof navigateToPage === 'function') navigateToPage('master');
+                    if (typeof setMasterTab === 'function') setMasterTab('budgets');
+                } else if (parsed.target === 'master-reset-app') {
+                    if (typeof navigateToPage === 'function') navigateToPage('master');
+                    if (typeof setMasterTab === 'function') setMasterTab('reset-app');
                 } else if (parsed.target === 'ledger-account' && parsed.value) {
                     if (typeof window.navigateToLedgerAccount === 'function') {
                         window.navigateToLedgerAccount(parsed.value);
@@ -982,7 +1063,8 @@ Guidelines:
    -> action: "updateApp", targetFile: "style.css" or "index.html" or "app.js" or "sindhu_v1.js", instructionForChange: "The user instructions details".
 5. For Application Screen Navigation (e.g., "dashboard open karo", "go to clients page", "clients & income tab open karo", "monthly reports analysis screen pe jao", "hdfc bank ledger account detail open karo"):
    Identify the target navigation screen.
-   -> action: "navigate", target: "dashboard" or "clients" or "expenses" or "reports" or "master" or "reports-client" or "reports-monthly" or "reports-ledger" or "master-accounts" or "master-clients-config" or "master-categories" or "master-members" or "ledger-account" or "client-report".
+   -> action: "navigate", target: "dashboard" or "clients" or "expenses" or "reports" or "master" or "reports-client" or "reports-monthly" or "reports-ledger" or "master-accounts" or "master-clients-config" or "master-categories" or "master-members" or "master-cloud-sync" or "master-ai-developer" or "master-columns" or "master-budgets" or "master-reset-app" or "ledger-account" or "client-report".
+   - If user asks to reset the app or delete all data: set target = "master-reset-app" and reply with instructions.
    - If user asks for a specific ledger account (e.g. "hdfc bank ledger check karo"): set target = "ledger-account" and value = "acc_2" (or the account's name or ID).
    - If user asks for client reports of a specific client (e.g. "Acme Corporation client report open karo"): set target = "client-report" and value = "Acme Corporation" (or client name/ID).
 6. For General Conversation/Chat (e.g., "hello sindhu", "kaise ho?", "what can you do?"):
@@ -1373,7 +1455,12 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
                             'master-accounts': 'अकाउंट्स सेटअप (Accounts Setup)',
                             'master-clients-config': 'क्लाइंट्स सेटिंग्स (Clients Configuration)',
                             'master-categories': 'ट्रांजैक्शन हेड्स (Categories)',
-                            'master-members': 'स्टाफ डायरेक्टरी (Members)'
+                            'master-members': 'स्टाफ डायरेक्टरी (Members)',
+                            'master-cloud-sync': 'क्लाउड सिंक (Cloud Sync)',
+                            'master-ai-developer': 'AI डेवलपर व GitHub डिप्लॉय (AI & Deploy)',
+                            'master-columns': 'कस्टम कॉलम्स (Custom Columns)',
+                            'master-budgets': 'कैटेगरी बजट (Category Budgets)',
+                            'master-reset-app': 'ऐप रिसेट (Reset App)'
                         };
                         if (tabNames[localNav.target]) {
                             replyText = `जय हरी! मैंने ${tabNames[localNav.target]} ओपन कर दिया है।`;
@@ -1524,7 +1611,12 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
                             'master-accounts': 'अकाउंट्स सेटअप (Accounts Setup)',
                             'master-clients-config': 'क्लाइंट्स सेटिंग्स (Clients Configuration)',
                             'master-categories': 'ट्रांजैक्शन हेड्स (Categories)',
-                            'master-members': 'स्टाफ डायरेक्टरी (Members)'
+                            'master-members': 'स्टाफ डायरेक्टरी (Members)',
+                            'master-cloud-sync': 'क्लाउड सिंक (Cloud Sync)',
+                            'master-ai-developer': 'AI डेवलपर व GitHub डिप्लॉय (AI & Deploy)',
+                            'master-columns': 'कस्टम कॉलम्स (Custom Columns)',
+                            'master-budgets': 'कैटेगरी बजट (Category Budgets)',
+                            'master-reset-app': 'ऐप रिसेट (Reset App)'
                         };
                         if (tabNames[parsed.target]) {
                             replyText = `जय हरी! मैंने ${tabNames[parsed.target]} ओपन कर दिया है।`;
