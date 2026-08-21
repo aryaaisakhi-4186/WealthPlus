@@ -2986,7 +2986,11 @@ async function handleCloudUploadClick() {
             alert("Local ledger data successfully uploaded to Firebase Cloud!");
         } catch (e) {
             console.error(e);
-            alert("Error uploading data: " + e.message);
+            if (e.message && e.message.toLowerCase().includes("permission")) {
+                alert("Firebase Firestore Permission Error: Your Firebase Firestore database rules are currently blocking write access.\n\nPlease go to Firebase Console (console.firebase.google.com) > Firestore Database > Rules tab, set 'allow read, write: if true;' and click Publish.");
+            } else {
+                alert("Error uploading data: " + e.message);
+            }
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<i data-lucide="upload-cloud"></i> Push Local Data to Cloud';
