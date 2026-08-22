@@ -611,7 +611,7 @@ function getAccountLedger(accountId) {
     if (openingBal !== 0) {
         ledger.push({
             date: 'Opening Balance',
-            particulars: 'Opening Balance (प्रारंभिक शेष)',
+            particulars: 'Opening Balance',
             category: 'Opening Balance',
             debit: openingBal > 0 ? openingBal : 0,
             credit: openingBal < 0 ? Math.abs(openingBal) : 0,
@@ -1183,7 +1183,7 @@ function renderClientsPage() {
                     <h4>${client.name}</h4>
                     <span class="party-group-badge ${isCreditor ? 'creditor' : 'debtor'}">
                         <i data-lucide="${isCreditor ? 'arrow-up-right' : 'arrow-down-left'}" style="width:12px; height:12px;"></i>
-                        ${isCreditor ? 'Creditor (लेनदार)' : 'Debtor (देनदार)'}
+                        ${isCreditor ? 'Creditor (Supplier)' : 'Debtor (Client)'}
                     </span>
                 </div>
                 <div class="client-stats">
@@ -1843,7 +1843,7 @@ function renderMasterClients() {
             <td style="font-weight:600;">${client.name}</td>
             <td>
                 <span class="party-group-badge ${isCreditor ? 'creditor' : 'debtor'}">
-                    ${isCreditor ? 'Creditor (लेनदार)' : 'Debtor (देनदार)'}
+                    ${isCreditor ? 'Creditor (Supplier)' : 'Debtor (Client)'}
                 </span>
             </td>
             <td>${fC(client.monthlyPay || 0)}</td>
