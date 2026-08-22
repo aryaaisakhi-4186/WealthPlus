@@ -38,8 +38,8 @@ let state = {
 
 // Seed Data
 const defaultClients = [
-    { id: "c1", name: "Acme Corporation", monthlyPay: 35000 },
-    { id: "c2", name: "StarLabs Ltd", monthlyPay: 20000 }
+    { id: "c1", name: "Acme Corporation", monthlyPay: 35000, yearlyPay: 420000, openingBalance: 0 },
+    { id: "c2", name: "StarLabs Ltd", monthlyPay: 20000, yearlyPay: 240000, openingBalance: 0 }
 ];
 
 const defaultAccounts = [
@@ -673,9 +673,11 @@ function getGlobalStats() {
 
 function getClientReportStats(clientId) {
     const client = state.clients.find(c => c.id === clientId);
-    if (!client) return { totalReceived: 0, totalSpent: 0, balance: 0, yearlyContract: 0, balanceReceivable: 0 };
+    if (!client) return { totalReceived: 0, totalSpent: 0, balance: 0, yearlyContract: 0, balanceReceivable: 0, openingBalance: 0 };
 
-    const yearlyContract = Number(client.monthlyPay) * 12;
+    const monthlyPay = Number(client.monthlyPay) || 0;
+    const yearlyContract = Number(client.yearlyPay) || (monthlyPay * 12);
+    const openingBalance = Number(client.openingBalance) || 0;
 
     const totalReceived = state.incomeLogs
         .filter(log => log.clientId === clientId)
@@ -685,10 +687,10 @@ function getClientReportStats(clientId) {
         .filter(tx => tx.clientId === clientId)
         .reduce((sum, tx) => sum + Number(tx.amount), 0);
 
-    const balance = totalReceived - totalSpent;
+    const balance = (openingBalance + totalReceived) - totalSpent;
     const balanceReceivable = yearlyContract - totalReceived;
 
-    return { yearlyContract, totalReceived, totalSpent, balance, balanceReceivable };
+    return { yearlyContract, openingBalance, totalReceived, totalSpent, balance, balanceReceivable };
 }
 
 // --- 5. NAVIGATION CONTROLLER ---
@@ -1133,11 +1135,15 @@ function renderClientsPage() {
                 <div class="client-stats">
                     <div class="c-stat-row">
                         <span class="c-stat-label">Monthly Retainer:</span>
-                        <span class="c-stat-val">${fC(client.monthlyPay)}</span>
+                        <span class="c-stat-val">${fC(client.monthlyPay || 0)}</span>
                     </div>
                     <div class="c-stat-row">
                         <span class="c-stat-label">Yearly Contract:</span>
                         <span class="c-stat-val">${fC(stats.yearlyContract)}</span>
+                    </div>
+                    <div class="c-stat-row">
+                        <span class="c-stat-label">Opening Balance:</span>
+                        <span class="c-stat-val" style="color:var(--text-secondary); font-weight:600;">${fC(client.openingBalance || 0)}</span>
                     </div>
                     <div class="c-stat-row">
                         <span class="c-stat-label">Received Amount:</span>
@@ -1761,12 +1767,13 @@ function renderMasterClients() {
     const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
 
     state.clients.forEach(client => {
-        const yearly = client.monthlyPay * 12;
+        const yearly = client.yearlyPay || (client.monthlyPay * 12);
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="font-weight:600;">${client.name}</td>
-            <td>${fC(client.monthlyPay)}</td>
+            <td>${fC(client.monthlyPay || 0)}</td>
             <td style="font-weight:500;">${fC(yearly)}</td>
+            <td style="color:var(--text-secondary); font-weight:500;">${fC(client.openingBalance || 0)}</td>
             <td class="actions-col">
                 <div class="actions-wrapper">
                     <button class="btn-icon-only edit-btn" onclick="openEditClient('${client.id}')"><i data-lucide="edit-3"></i></button>
@@ -2191,11 +2198,19 @@ function initEventHandlers() {
     document.getElementById('btn-close-member-modal').addEventListener('click', () => closeMemberModal());
     document.getElementById('btn-cancel-member').addEventListener('click', () => closeMemberModal());
 
-    // Client retainer preview
-    document.getElementById('client-monthly-pay').addEventListener('input', function() {
-        const v = Number(this.value) || 0;
-        document.getElementById('yearly-calculation-preview').innerText = `Yearly Total: ₹${(v * 12).toLocaleString('en-IN')}`;
-    });
+    // Client retainer two-way live calculation
+    const clientMonthly = document.getElementById('client-monthly-pay');
+    const clientYearly = document.getElementById('client-yearly-pay');
+    if (clientMonthly && clientYearly) {
+        clientMonthly.addEventListener('input', function() {
+            const m = Number(this.value) || 0;
+            clientYearly.value = m > 0 ? (m * 12) : '';
+        });
+        clientYearly.addEventListener('input', function() {
+            const y = Number(this.value) || 0;
+            clientMonthly.value = y > 0 ? Math.round(y / 12) : '';
+        });
+    }
 
     // Form Submissions
     document.getElementById('form-client').addEventListener('submit', handleClientSubmit);
@@ -2315,8 +2330,11 @@ function openClientModal(editId = '') {
             title.innerText = 'Edit Client Details';
             document.getElementById('edit-client-id').value = client.id;
             document.getElementById('client-name').value = client.name;
-            document.getElementById('client-monthly-pay').value = client.monthlyPay;
-            document.getElementById('yearly-calculation-preview').innerText = `Yearly Total: ₹${(Number(client.monthlyPay) * 12).toLocaleString('en-IN')}`;
+            const m = Number(client.monthlyPay) || 0;
+            const y = Number(client.yearlyPay) || (m * 12);
+            document.getElementById('client-monthly-pay').value = m || '';
+            document.getElementById('client-yearly-pay').value = y || '';
+            document.getElementById('client-opening-balance').value = client.openingBalance !== undefined ? client.openingBalance : 0;
             
             state.customClientFields.forEach(f => {
                 const val = client[f.name] || '';
@@ -2331,7 +2349,9 @@ function openClientModal(editId = '') {
     } else {
         title.innerText = 'Add New Client';
         document.getElementById('edit-client-id').value = '';
-        document.getElementById('yearly-calculation-preview').innerText = `Yearly Total: ₹0.00`;
+        document.getElementById('client-monthly-pay').value = '';
+        document.getElementById('client-yearly-pay').value = '';
+        document.getElementById('client-opening-balance').value = '0';
         
         state.customClientFields.forEach(f => {
             customContainer.innerHTML += `
@@ -2353,9 +2373,11 @@ function handleClientSubmit(e) {
     e.preventDefault();
     const id = document.getElementById('edit-client-id').value;
     const name = document.getElementById('client-name').value.trim();
-    const monthlyPay = Number(document.getElementById('client-monthly-pay').value);
+    const monthlyPay = Number(document.getElementById('client-monthly-pay').value) || 0;
+    const yearlyPay = Number(document.getElementById('client-yearly-pay').value) || (monthlyPay * 12);
+    const openingBalance = Number(document.getElementById('client-opening-balance').value) || 0;
 
-    let clientObj = { name, monthlyPay };
+    let clientObj = { name, monthlyPay, yearlyPay, openingBalance };
 
     state.customClientFields.forEach(f => {
         const val = document.getElementById(`custom-field-${f.name}`).value;

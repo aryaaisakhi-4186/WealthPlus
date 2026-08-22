@@ -807,10 +807,14 @@
         }
 
         if (parsed.action === 'addClient') {
+            const m = Number(parsed.monthlyPay) || 0;
+            const y = Number(parsed.yearlyPay) || (m * 12);
             const clientObj = {
                 id: 'c_' + Date.now(),
                 name: parsed.name,
-                monthlyPay: parsed.monthlyPay || 0
+                monthlyPay: m,
+                yearlyPay: y,
+                openingBalance: Number(parsed.openingBalance) || 0
             };
             if (typeof state !== 'undefined' && state.customClientFields) {
                 state.customClientFields.forEach(f => {

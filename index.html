@@ -547,6 +547,7 @@
                                             <th>Client Name</th>
                                             <th>Monthly Retainer</th>
                                             <th>Yearly Retainer</th>
+                                            <th>Opening Balance</th>
                                             <th class="actions-col">Actions</th>
                                         </tr>
                                     </thead>
@@ -907,13 +908,23 @@
             <form id="form-client" class="modal-form">
                 <input type="hidden" id="edit-client-id">
                 <div class="form-group">
-                    <label for="client-name">Client Name *</label>
+                    <label for="client-name">Client Full Name *</label>
                     <input type="text" id="client-name" required placeholder="e.g. Acme Corporation">
                 </div>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="client-monthly-pay">Monthly Retainer (₹ / Mo) *</label>
+                        <input type="number" id="client-monthly-pay" required min="0" placeholder="e.g. 25000" inputmode="numeric">
+                    </div>
+                    <div class="form-group">
+                        <label for="client-yearly-pay">Yearly Retainer (₹ / Yr) *</label>
+                        <input type="number" id="client-yearly-pay" required min="0" placeholder="e.g. 300000" inputmode="numeric">
+                    </div>
+                </div>
                 <div class="form-group">
-                    <label for="client-monthly-pay">Monthly Receivable (INR) *</label>
-                    <input type="number" id="client-monthly-pay" required min="0" placeholder="e.g. 25000">
-                    <span class="field-helper-text" id="yearly-calculation-preview">Yearly Total: ₹0.00</span>
+                    <label for="client-opening-balance">Opening Balance (₹) (Initial Due / Advance)</label>
+                    <input type="number" id="client-opening-balance" placeholder="0 (e.g. 5000 or -2000)" step="any" inputmode="numeric" value="0">
+                    <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Enter pending balance (positive) or advance payment (negative).</span>
                 </div>
                 <!-- Dynamic client custom fields container -->
                 <div id="client-modal-custom-fields-container"></div>
