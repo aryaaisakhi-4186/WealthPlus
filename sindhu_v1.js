@@ -831,8 +831,10 @@
             let clientId = '';
             if (parsed.clientName && typeof state !== 'undefined') {
                 const cLow = parsed.clientName.toLowerCase();
-                if (cLow.includes('opening balance') || cLow.includes('bank opening') || cLow === 'opening') {
-                    clientId = 'opening_balance';
+                if (cLow.includes('cash opening') || cLow.includes('cash opening balance')) {
+                    clientId = 'opening_cash';
+                } else if (cLow.includes('opening balance') || cLow.includes('bank opening') || cLow === 'opening') {
+                    clientId = 'opening_bank';
                 } else {
                     let client = state.clients.find(c => c.name.toLowerCase() === parsed.clientName.toLowerCase());
                     if (!client) {

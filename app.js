@@ -600,6 +600,42 @@ function formatDbDate(dateStr) {
 
 // --- 4. CORE LEDGER ENGINE CALCULATIONS ---
 
+function resolveFundSourceText(clientId) {
+    if (!clientId) return 'General';
+    if (clientId === 'opening_cash') return 'Cash Opening Balance';
+    if (clientId === 'opening_bank' || clientId === 'opening_balance') return 'Bank Opening Balance';
+    if (typeof clientId === 'string' && clientId.startsWith('opening_acc_')) {
+        const accId = clientId.replace('opening_acc_', '');
+        const acc = state.accounts.find(a => a.id === accId);
+        return acc ? `${acc.name} Opening Balance` : 'Opening Balance';
+    }
+    const client = state.clients.find(c => c.id === clientId);
+    return client ? client.name : 'General';
+}
+
+function resolveFundSourceLabel(clientId) {
+    if (!clientId) return '<span style="color:var(--text-muted); font-style:italic;">General</span>';
+    if (clientId === 'opening_cash') {
+        return '<span style="color:var(--success); font-weight:600;"><i data-lucide="coins" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:2px;"></i> Cash Opening Balance</span>';
+    }
+    if (clientId === 'opening_bank' || clientId === 'opening_balance') {
+        return '<span style="color:var(--primary); font-weight:600;"><i data-lucide="landmark" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:2px;"></i> Bank Opening Balance</span>';
+    }
+    if (typeof clientId === 'string' && clientId.startsWith('opening_acc_')) {
+        const accId = clientId.replace('opening_acc_', '');
+        const acc = state.accounts.find(a => a.id === accId);
+        if (acc) {
+            const icon = acc.type === 'Cash' ? 'coins' : 'landmark';
+            const color = acc.type === 'Cash' ? 'var(--success)' : 'var(--primary)';
+            return `<span style="color:${color}; font-weight:600;"><i data-lucide="${icon}" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:2px;"></i> ${acc.name} Opening</span>`;
+        }
+        return '<span style="color:var(--primary); font-weight:600;"><i data-lucide="landmark" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:2px;"></i> Opening Balance</span>';
+    }
+    const client = state.clients.find(c => c.id === clientId);
+    if (client) return client.name;
+    return '<span style="color:var(--text-muted); font-style:italic;">General</span>';
+}
+
 function getAccountLedger(accountId) {
     const account = state.accounts.find(a => a.id === accountId);
     if (!account) return [];
@@ -638,7 +674,12 @@ function getAccountLedger(accountId) {
     state.transactions.forEach(tx => {
         if (tx.mode === account.name) {
             const client = state.clients.find(c => c.id === tx.clientId);
-            const fundSuffix = client ? ` [Party: ${client.name}]` : (tx.clientId === 'opening_balance' || (typeof tx.clientId === 'string' && tx.clientId.startsWith('opening_')) ? ` [Fund: Bank Opening Balance]` : '');
+            let fundSuffix = '';
+            if (client) {
+                fundSuffix = ` [Party: ${client.name}]`;
+            } else if (tx.clientId) {
+                fundSuffix = ` [Fund: ${resolveFundSourceText(tx.clientId)}]`;
+            }
             ledger.push({
                 date: tx.date,
                 particulars: `${tx.description}${fundSuffix}`,
@@ -921,8 +962,7 @@ function renderDashboard() {
         recentContainer.innerHTML = `<div class="empty-state" style="padding: 24px; text-align: center; color: var(--text-muted);">No expenses logged in this period.</div>`;
     } else {
         latestTx.forEach(tx => {
-            const client = state.clients.find(c => c.id === tx.clientId);
-            const clientLabel = client ? client.name : (tx.clientId === 'opening_balance' || (typeof tx.clientId === 'string' && tx.clientId.startsWith('opening_')) ? 'Bank Opening Balance' : 'General');
+            const clientLabel = resolveFundSourceText(tx.clientId);
             const firstCat = Object.keys(state.categoriesConfig)[0] || 'Others';
             const catMeta = state.categoriesConfig[tx.category] || state.categoriesConfig[firstCat] || { color: '#64748b', icon: 'tag' };
             
@@ -1323,11 +1363,7 @@ function renderExpensesPage() {
     }
 
     sorted.forEach(tx => {
-        const client = state.clients.find(c => c.id === tx.clientId);
-        let clientLabel = client ? client.name : '<span style="color:var(--text-muted); font-style:italic;">General</span>';
-        if (tx.clientId === 'opening_balance' || (typeof tx.clientId === 'string' && tx.clientId.startsWith('opening_'))) {
-            clientLabel = '<span style="color:var(--primary); font-weight:600;"><i data-lucide="landmark" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:2px;"></i> Bank Opening Balance</span>';
-        }
+        const clientLabel = resolveFundSourceLabel(tx.clientId);
         
         let customCells = '';
         state.customTxFields.forEach(f => {
@@ -2769,10 +2805,23 @@ function openExpenseModal(editId = '') {
     const accSelect = document.getElementById('expense-account-select');
     form.reset();
 
+    const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
+    let capitalOptions = `
+        <option value="opening_bank">🏦 Bank Opening Balance</option>
+        <option value="opening_cash">💵 Cash Opening Balance</option>
+    `;
+    if (state.accounts && state.accounts.length > 0) {
+        state.accounts.forEach(a => {
+            const icon = a.type === 'Cash' ? '💵' : '🏦';
+            const balStr = a.openingBalance ? ` (${fC(a.openingBalance)})` : '';
+            capitalOptions += `<option value="opening_acc_${a.id}">${icon} ${a.name} Opening${balStr}</option>`;
+        });
+    }
+
     clientSelect.innerHTML = `
         <option value="">None / General Expense</option>
         <optgroup label="Capital / Opening Funds">
-            <option value="opening_balance">🏦 Bank / Cash Opening Balance</option>
+            ${capitalOptions}
         </optgroup>
         <optgroup label="Party / Client Funds">
             ${state.clients.map(c => `<option value="${c.id}">👤 ${c.name} (${c.group || 'Client'})</option>`).join('')}
