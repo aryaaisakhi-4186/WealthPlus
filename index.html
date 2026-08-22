@@ -23,7 +23,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=5.4.0">
+    <link rel="stylesheet" href="style.css?v=5.5.0">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -577,7 +577,8 @@
                                     <thead>
                                         <tr>
                                             <th>Party Name</th>
-                                            <th>Group</th>
+                                            <th>Category</th>
+                                            <th>Credit / Loan (₹)</th>
                                             <th>Monthly Retainer</th>
                                             <th>Yearly Retainer</th>
                                             <th>Opening Balance</th>
@@ -953,14 +954,19 @@
                     </select>
                     <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Clients pay you for services; Vendors are suppliers/contractors you pay.</span>
                 </div>
+                <div class="form-group">
+                    <label for="client-credit-amount">Credit Amount / Loan Given (₹) (One-Time Credit / Udhar)</label>
+                    <input type="number" id="client-credit-amount" min="0" placeholder="0 (e.g. 50000)" step="any" inputmode="numeric" value="0">
+                    <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Enter one-time loan / credit / udhar given to this party (if not a monthly retainer client).</span>
+                </div>
                 <div class="form-group-row">
                     <div class="form-group">
-                        <label for="client-monthly-pay">Monthly Retainer (₹ / Mo) *</label>
-                        <input type="number" id="client-monthly-pay" required min="0" placeholder="e.g. 25000" inputmode="numeric">
+                        <label for="client-monthly-pay">Monthly Retainer (₹ / Mo) (Optional)</label>
+                        <input type="number" id="client-monthly-pay" min="0" placeholder="0 (e.g. 25000)" inputmode="numeric">
                     </div>
                     <div class="form-group">
-                        <label for="client-yearly-pay">Yearly Retainer (₹ / Yr) *</label>
-                        <input type="number" id="client-yearly-pay" required min="0" placeholder="e.g. 300000" inputmode="numeric">
+                        <label for="client-yearly-pay">Yearly Retainer (₹ / Yr) (Optional)</label>
+                        <input type="number" id="client-yearly-pay" min="0" placeholder="0 (e.g. 300000)" inputmode="numeric">
                     </div>
                 </div>
                 <div class="form-group">
@@ -1203,9 +1209,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=5.4.0"></script>
-    <script src="app.js?v=5.4.0"></script>
-    <script src="sindhu_v1.js?v=5.4.0"></script>
+    <script src="firebase-config.js?v=5.5.0"></script>
+    <script src="app.js?v=5.5.0"></script>
+    <script src="sindhu_v1.js?v=5.5.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

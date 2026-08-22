@@ -736,12 +736,13 @@ function getGlobalStats() {
 
 function getClientReportStats(clientId) {
     const client = state.clients.find(c => c.id === clientId);
-    if (!client) return { totalReceived: 0, totalSpent: 0, balance: 0, yearlyContract: 0, balanceReceivable: 0, openingBalance: 0, totalReceivable: 0 };
+    if (!client) return { totalReceived: 0, totalSpent: 0, balance: 0, yearlyContract: 0, balanceReceivable: 0, openingBalance: 0, totalReceivable: 0, creditAmount: 0 };
 
+    const creditAmount = Number(client.creditAmount) || 0;
     const monthlyPay = Number(client.monthlyPay) || 0;
     const yearlyContract = Number(client.yearlyPay) || (monthlyPay * 12);
     const openingBalance = Number(client.openingBalance) || 0;
-    const totalReceivable = yearlyContract + openingBalance;
+    const totalReceivable = creditAmount + yearlyContract + openingBalance;
 
     const totalReceived = state.incomeLogs
         .filter(log => log.clientId === clientId)
@@ -754,7 +755,7 @@ function getClientReportStats(clientId) {
     const balance = (openingBalance + totalReceived) - totalSpent;
     const balanceReceivable = totalReceivable - totalReceived;
 
-    return { yearlyContract, openingBalance, totalReceivable, totalReceived, totalSpent, balance, balanceReceivable };
+    return { creditAmount, yearlyContract, openingBalance, totalReceivable, totalReceived, totalSpent, balance, balanceReceivable };
 }
 
 // --- 5. NAVIGATION CONTROLLER ---
@@ -1234,6 +1235,28 @@ function renderClientsPage() {
                 `;
             });
 
+            let contractInfoHTML = '';
+            if (stats.creditAmount > 0) {
+                contractInfoHTML += `
+                    <div class="c-stat-row" style="background: rgba(13, 148, 136, 0.08); padding: 4px 8px; border-radius: 4px; margin: 3px 0; border: 1px solid rgba(13, 148, 136, 0.2);">
+                        <span class="c-stat-label" style="font-weight: 700; color: var(--primary);">Credit / Loan Given:</span>
+                        <span class="c-stat-val" style="font-weight: 700; color: var(--primary);">${fC(stats.creditAmount)}</span>
+                    </div>
+                `;
+            }
+            if (Number(client.monthlyPay) > 0 || stats.yearlyContract > 0) {
+                contractInfoHTML += `
+                    <div class="c-stat-row">
+                        <span class="c-stat-label">Monthly Retainer:</span>
+                        <span class="c-stat-val">${fC(client.monthlyPay || 0)}</span>
+                    </div>
+                    <div class="c-stat-row">
+                        <span class="c-stat-label">Yearly Retainer:</span>
+                        <span class="c-stat-val">${fC(stats.yearlyContract)}</span>
+                    </div>
+                `;
+            }
+
             const card = document.createElement('div');
             card.className = 'client-card';
             card.innerHTML = `
@@ -1245,14 +1268,7 @@ function renderClientsPage() {
                     </span>
                 </div>
                 <div class="client-stats">
-                    <div class="c-stat-row">
-                        <span class="c-stat-label">Monthly Retainer:</span>
-                        <span class="c-stat-val">${fC(client.monthlyPay || 0)}</span>
-                    </div>
-                    <div class="c-stat-row">
-                        <span class="c-stat-label">Yearly Retainer:</span>
-                        <span class="c-stat-val">${fC(stats.yearlyContract)}</span>
-                    </div>
+                    ${contractInfoHTML}
                     <div class="c-stat-row">
                         <span class="c-stat-label">Opening Balance:</span>
                         <span class="c-stat-val" style="color:var(--text-secondary); font-weight:600;">${fC(stats.openingBalance)}</span>
@@ -1448,7 +1464,18 @@ function renderClientReportDetails(clientId) {
     const stats = getClientReportStats(clientId);
     const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
 
+    let creditCardHTML = '';
+    if (stats.creditAmount > 0) {
+        creditCardHTML = `
+            <div class="report-stat-card val-primary" style="border-left: 4px solid var(--primary);">
+                <h5>Credit / Loan Given</h5>
+                <span class="val" style="color:var(--primary); font-weight:700;">${fC(stats.creditAmount)}</span>
+            </div>
+        `;
+    }
+
     statsContainer.innerHTML = `
+        ${creditCardHTML}
         <div class="report-stat-card val-primary">
             <h5>Yearly Retainer</h5>
             <span class="val">${fC(stats.yearlyContract)}</span>
@@ -1935,6 +1962,7 @@ function renderMasterClients() {
     state.clients.forEach(client => {
         const stats = getClientReportStats(client.id);
         const isVendor = isVendorParty(client);
+        const creditAmt = Number(client.creditAmount) || 0;
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="font-weight:600;">${client.name}</td>
@@ -1943,6 +1971,7 @@ function renderMasterClients() {
                     ${isVendor ? 'Vendor' : 'Client'}
                 </span>
             </td>
+            <td style="font-weight:600; color: ${creditAmt > 0 ? 'var(--primary)' : 'var(--text-muted)'};">${fC(creditAmt)}</td>
             <td>${fC(client.monthlyPay || 0)}</td>
             <td style="font-weight:500;">${fC(stats.yearlyContract)}</td>
             <td style="color:var(--text-secondary); font-weight:500;">${fC(stats.openingBalance)}</td>
@@ -2522,6 +2551,7 @@ function openClientModal(editId = '') {
             document.getElementById('edit-client-id').value = client.id;
             document.getElementById('client-name').value = client.name;
             document.getElementById('client-group').value = isVendorParty(client) ? 'Vendor' : 'Client';
+            document.getElementById('client-credit-amount').value = client.creditAmount !== undefined ? client.creditAmount : 0;
             const m = Number(client.monthlyPay) || 0;
             const y = Number(client.yearlyPay) || (m * 12);
             document.getElementById('client-monthly-pay').value = m || '';
@@ -2542,6 +2572,7 @@ function openClientModal(editId = '') {
         title.innerText = 'Add New Party';
         document.getElementById('edit-client-id').value = '';
         document.getElementById('client-group').value = (state.partyFilter === 'vendor' || state.partyFilter === 'creditor') ? 'Vendor' : 'Client';
+        document.getElementById('client-credit-amount').value = '0';
         document.getElementById('client-monthly-pay').value = '';
         document.getElementById('client-yearly-pay').value = '';
         document.getElementById('client-opening-balance').value = '0';
@@ -2567,11 +2598,12 @@ function handleClientSubmit(e) {
     const id = document.getElementById('edit-client-id').value;
     const name = document.getElementById('client-name').value.trim();
     const group = document.getElementById('client-group').value || 'Client';
+    const creditAmount = Number(document.getElementById('client-credit-amount').value) || 0;
     const monthlyPay = Number(document.getElementById('client-monthly-pay').value) || 0;
     const yearlyPay = Number(document.getElementById('client-yearly-pay').value) || (monthlyPay * 12);
     const openingBalance = Number(document.getElementById('client-opening-balance').value) || 0;
 
-    let clientObj = { name, group, monthlyPay, yearlyPay, openingBalance };
+    let clientObj = { name, group, creditAmount, monthlyPay, yearlyPay, openingBalance };
 
     state.customClientFields.forEach(f => {
         const val = document.getElementById(`custom-field-${f.name}`).value;
@@ -3089,9 +3121,13 @@ function exportToExcel() {
     const clientsData = state.clients.map(client => {
         const stats = getClientReportStats(client.id);
         let rowObj = {
-            "Client Name": client.name,
-            "Monthly Retainer (INR)": client.monthlyPay,
+            "Party Name": client.name,
+            "Party Group": isVendorParty(client) ? 'Vendor' : 'Client',
+            "Credit / Loan Amount (INR)": client.creditAmount || 0,
+            "Monthly Retainer (INR)": client.monthlyPay || 0,
             "Yearly Retainer (INR)": stats.yearlyContract,
+            "Opening Balance (INR)": stats.openingBalance,
+            "Total Receivable (INR)": stats.totalReceivable,
             "Total Received (INR)": stats.totalReceived,
             "Balance Receivable (INR)": stats.balanceReceivable,
             "Spent Allocated (INR)": stats.totalSpent,
