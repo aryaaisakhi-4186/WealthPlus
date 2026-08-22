@@ -23,7 +23,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=5.1.0">
+    <link rel="stylesheet" href="style.css?v=5.2.0">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -388,8 +388,12 @@
                                 <select id="ledger-account-select" class="select-filter select-wide">
                                     <!-- Populated dynamically with accounts -->
                                 </select>
-                                <div class="ledger-summary-badge" style="margin-left: auto;">
-                                    Closing Balance: <strong id="selected-ledger-closing-balance">₹0.00</strong>
+                                <div class="ledger-summary-badge" style="margin-left: auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                                    <span>Opening: <strong id="selected-ledger-opening-balance" style="color: var(--primary);">₹0</strong></span>
+                                    <span>Closing: <strong id="selected-ledger-closing-balance">₹0</strong></span>
+                                    <button type="button" class="btn btn-outline btn-sm" id="btn-edit-ledger-opening" onclick="quickEditCurrentLedgerOpening()" style="padding: 4px 8px; font-size: 11px; height: auto;" title="Edit Account Opening Balance">
+                                        <i data-lucide="edit-2" style="width: 12px; height: 12px;"></i> Edit
+                                    </button>
                                 </div>
                             </div>
                             <div class="table-container">
@@ -551,7 +555,7 @@
                                         <tr>
                                             <th>Account Name</th>
                                             <th>Account Type</th>
-                                            <th>Opening Balance</th>
+                                            <th style="min-width: 170px;">Opening Balance (₹)</th>
                                             <th>Current Balance</th>
                                             <th class="actions-col">Actions</th>
                                         </tr>
@@ -1192,9 +1196,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=5.1.0"></script>
-    <script src="app.js?v=5.1.0"></script>
-    <script src="sindhu_v1.js?v=5.1.0"></script>
+    <script src="firebase-config.js?v=5.2.0"></script>
+    <script src="app.js?v=5.2.0"></script>
+    <script src="sindhu_v1.js?v=5.2.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

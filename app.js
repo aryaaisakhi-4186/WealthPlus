@@ -866,12 +866,16 @@ function renderDashboard() {
     
     state.accounts.forEach(acc => {
         const ledger = getAccountLedger(acc.id);
-        const closingBal = ledger.length > 0 ? ledger[ledger.length - 1].balance : 0;
+        const closingBal = ledger.length > 0 ? ledger[ledger.length - 1].balance : (Number(acc.openingBalance) || 0);
+        const openingBal = Number(acc.openingBalance) || 0;
         
         const card = document.createElement('div');
         card.className = 'dash-acc-bal-card';
         card.innerHTML = `
-            <span class="acc-name">${acc.name} (${acc.type})</span>
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+                <span class="acc-name">${acc.name} (${acc.type})</span>
+                <span style="font-size: 11px; color: var(--text-muted);">Opening: ${fC(openingBal)}</span>
+            </div>
             <span class="acc-bal ${closingBal < 0 ? 'neg-bal' : 'pos-bal'}">${fC(closingBal)}</span>
         `;
         card.addEventListener('click', () => {
@@ -1484,14 +1488,19 @@ function renderAccountLedgerDetails() {
         return;
     }
 
+    const acc = state.accounts.find(a => a.id === accId);
     const ledger = getAccountLedger(accId);
     const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
-    const closingBal = ledger.length > 0 ? ledger[ledger.length - 1].balance : 0;
+    const closingBal = ledger.length > 0 ? ledger[ledger.length - 1].balance : (acc ? Number(acc.openingBalance) || 0 : 0);
+    const openingBal = acc ? (Number(acc.openingBalance) || 0) : 0;
     
-    document.getElementById('selected-ledger-closing-balance').innerText = fC(closingBal);
+    const elOpening = document.getElementById('selected-ledger-opening-balance');
+    const elClosing = document.getElementById('selected-ledger-closing-balance');
+    if (elOpening) elOpening.innerText = fC(openingBal);
+    if (elClosing) elClosing.innerText = fC(closingBal);
 
     if (ledger.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px;">No transactions logged in this account book.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px;">No transactions logged in this account book. Initial Opening Balance: ${fC(openingBal)}</td></tr>`;
         return;
     }
 
@@ -1814,6 +1823,23 @@ async function deployAppToGitHub() {
     }
 }
 
+window.saveInlineAccountOpening = function(accId, val) {
+    const acc = state.accounts.find(a => a.id === accId);
+    if (!acc) return;
+    acc.openingBalance = Number(val) || 0;
+    addAccountDirect(acc);
+    renderMasterAccounts();
+    renderGlobalStats();
+    if (state.activePage === 'dashboard') renderDashboardPage();
+    if (state.activePage === 'reports') renderAccountLedgerDetails();
+};
+
+window.quickEditCurrentLedgerOpening = function() {
+    const accId = state.selectedLedgerAccountId;
+    if (!accId) return;
+    openAccountModal(accId);
+};
+
 function renderMasterAccounts() {
     const tbody = document.getElementById('master-accounts-tbody');
     tbody.innerHTML = '';
@@ -1828,11 +1854,30 @@ function renderMasterAccounts() {
         tr.innerHTML = `
             <td style="font-weight:600;">${acc.name}</td>
             <td><span class="badge-acctype">${acc.type} Book</span></td>
-            <td style="color:var(--text-secondary); font-weight:500;">${fC(openingBal)}</td>
+            <td style="min-width: 170px;">
+                <div style="display: inline-flex; align-items: center; gap: 6px;">
+                    <span style="font-weight: 600; color: var(--text-muted); font-size: 13px;">₹</span>
+                    <input type="number" 
+                           id="acc-inline-opening-${acc.id}" 
+                           value="${openingBal}" 
+                           step="any"
+                           placeholder="0"
+                           style="width: 95px; padding: 6px 8px; font-size: 13px; font-weight: 700; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);"
+                           onchange="saveInlineAccountOpening('${acc.id}', this.value)"
+                    >
+                    <button type="button" 
+                            class="btn btn-primary btn-sm" 
+                            onclick="saveInlineAccountOpening('${acc.id}', document.getElementById('acc-inline-opening-${acc.id}').value)"
+                            title="Save Opening Balance"
+                            style="padding: 5px 8px; font-size: 11px; height: auto;">
+                        Save
+                    </button>
+                </div>
+            </td>
             <td style="font-weight:700; color: ${closingBal < 0 ? 'var(--danger)' : 'var(--text-primary)'};">${fC(closingBal)}</td>
             <td class="actions-col">
                 <div class="actions-wrapper">
-                    <button class="btn-icon-only edit-btn" onclick="openEditAccount('${acc.id}')" title="Edit Account"><i data-lucide="edit-3"></i></button>
+                    <button class="btn-icon-only edit-btn" onclick="openEditAccount('${acc.id}')" title="Edit Account Details"><i data-lucide="edit-3"></i></button>
                     <button class="btn-icon-only delete-btn" onclick="deleteAccount('${acc.id}')" title="Delete Account"><i data-lucide="trash-2"></i></button>
                 </div>
             </td>
