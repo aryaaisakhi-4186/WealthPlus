@@ -528,8 +528,8 @@
         if (installKws.some(k => normalizedText.includes(k))) {
             return {
                 action: "navigate",
-                target: "master-cloud-sync",
-                replyHindi: "जय हरी! ऐप को मोबाइल में इंस्टॉल करने के लिए Chrome ब्राउज़र में ऊपर 3 डॉट्स (⋮) पर टैप करके 'Install app' या 'Add to Home screen' चुनें, या मास्टर सेटिंग्स ➔ क्लाउड सिंक में दिए गए 'Install App' बटन पर क्लिक करें।"
+                target: "master-install-app",
+                replyHindi: "जय हरी! मैंने आपके लिए 'Install App' स्क्रीन खोल दी है। आप यहाँ 'Install App Now' बटन पर क्लिक करके या ब्राउज़र में ऊपर 3 डॉट्स (⋮) पर टैप करके ऐप इंस्टॉल कर सकते हैं।"
             };
         }
 
@@ -787,6 +787,9 @@
                 } else if (parsed.target === 'master-reset-app') {
                     if (typeof navigateToPage === 'function') navigateToPage('master');
                     if (typeof setMasterTab === 'function') setMasterTab('reset-app');
+                } else if (parsed.target === 'master-install-app') {
+                    if (typeof navigateToPage === 'function') navigateToPage('master');
+                    if (typeof setMasterTab === 'function') setMasterTab('install-app');
                 } else if (parsed.target === 'ledger-account' && parsed.value) {
                     if (typeof window.navigateToLedgerAccount === 'function') {
                         window.navigateToLedgerAccount(parsed.value);
@@ -1475,6 +1478,7 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
                             'master-ai-developer': 'AI डेवलपर व GitHub डिप्लॉय (AI & Deploy)',
                             'master-columns': 'कस्टम कॉलम्स (Custom Columns)',
                             'master-budgets': 'कैटेगरी बजट (Category Budgets)',
+                            'master-install-app': 'ऐप इंस्टॉल (Install Mobile App)',
                             'master-reset-app': 'ऐप रिसेट (Reset App)'
                         };
                         if (tabNames[localNav.target]) {
@@ -1631,6 +1635,7 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
                             'master-ai-developer': 'AI डेवलपर व GitHub डिप्लॉय (AI & Deploy)',
                             'master-columns': 'कस्टम कॉलम्स (Custom Columns)',
                             'master-budgets': 'कैटेगरी बजट (Category Budgets)',
+                            'master-install-app': 'ऐप इंस्टॉल (Install Mobile App)',
                             'master-reset-app': 'ऐप रिसेट (Reset App)'
                         };
                         if (tabNames[parsed.target]) {

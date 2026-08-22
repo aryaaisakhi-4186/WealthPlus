@@ -22,7 +22,7 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="https://img.icons8.com/fluency/192/000000/accounting.png">
-    <link rel="stylesheet" href="style.css?v=4.3.0">
+    <link rel="stylesheet" href="style.css?v=4.4.0">
 </head>
 <body class="light-theme">
 
@@ -490,6 +490,14 @@
                                 </div>
                                 <i data-lucide="check" class="check-icon"></i>
                             </div>
+                            <div class="master-dropdown-item" data-master-sub="install-app" data-icon="download" data-title="Install Mobile App" id="tab-master-install-app">
+                                <div class="item-icon-box"><i data-lucide="download"></i></div>
+                                <div class="item-text-box">
+                                    <strong>Install Mobile App (PWA)</strong>
+                                    <span>Install Wealth Plus on phone Home Screen</span>
+                                </div>
+                                <i data-lucide="check" class="check-icon"></i>
+                            </div>
                             <div class="master-dropdown-item item-danger" data-master-sub="reset-app" data-icon="trash-2" data-title="Reset App" id="tab-master-reset-app">
                                 <div class="item-icon-box"><i data-lucide="trash-2"></i></div>
                                 <div class="item-text-box">
@@ -668,12 +676,16 @@
                                 </div>
 
                                 <!-- PWA Install Card -->
-                                <div class="card" id="pwa-install-card" style="display: none; padding: 20px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px;">
-                                    <h5 style="margin-top: 0; margin-bottom: 10px;">Install Bookkeeping Application</h5>
-                                    <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 15px;">You can install Wealth Plus directly on your device's home screen as a native application for offline access.</p>
-                                    <button type="button" class="btn btn-primary" id="btn-pwa-install" style="display: inline-flex; align-items: center; gap: 8px;">
-                                        <i data-lucide="download"></i> Install App
-                                    </button>
+                                <div class="card" id="pwa-install-card" style="padding: 20px; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 20px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;">
+                                        <div>
+                                            <h5 style="margin-top: 0; margin-bottom: 6px; font-size: 14px; font-weight: 700;">Install Bookkeeping Application</h5>
+                                            <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">Install Wealth Plus directly on your device's home screen as a native application for fast offline access.</p>
+                                        </div>
+                                        <button type="button" class="btn btn-primary btn-pwa-install-trigger" id="btn-pwa-install" style="display: inline-flex; align-items: center; gap: 8px;">
+                                            <i data-lucide="download"></i> Install App
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <!-- Config Form -->
@@ -801,6 +813,53 @@
                                 <button type="button" class="btn btn-danger" id="btn-reset-app-now" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: 600;">
                                     <i data-lucide="trash-2"></i> Reset Application Now
                                 </button>
+                            </div>
+                        </div>
+
+                        <!-- Panel H: Install Mobile App (PWA) -->
+                        <div id="master-panel-install-app" class="master-sub-panel">
+                            <div class="panel-action-header">
+                                <h4>Install Mobile / Desktop App</h4>
+                            </div>
+
+                            <div class="card" style="padding: 28px 20px; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); margin-bottom: 20px; text-align: center;">
+                                <div style="width: 64px; height: 64px; border-radius: 50%; background: var(--primary-glow); color: var(--primary); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                                    <i data-lucide="smartphone" style="width: 32px; height: 32px;"></i>
+                                </div>
+                                <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px; color: var(--text-primary);">Install Wealth Plus on this Device</h3>
+                                <p style="font-size: 13px; color: var(--text-secondary); max-width: 480px; margin: 0 auto 20px auto; line-height: 1.5;">
+                                    Install Wealth Plus on your phone or desktop home screen to use it full-screen without the browser URL bar, with fast offline loading and instant login.
+                                </p>
+                                <button type="button" class="btn btn-primary btn-pwa-install-trigger" style="padding: 12px 28px; font-size: 15px; font-weight: 700; display: inline-flex; align-items: center; gap: 10px; border-radius: var(--radius-md); box-shadow: 0 4px 14px rgba(13, 148, 136, 0.3);">
+                                    <i data-lucide="download"></i> Install App Now
+                                </button>
+                            </div>
+
+                            <!-- Manual Installation Step-by-Step Guide -->
+                            <div class="card" style="padding: 20px; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                                <h5 style="margin: 0 0 14px 0; font-size: 14px; font-weight: 700; color: var(--text-primary);"><i data-lucide="help-circle" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> How to Install Manually from Browser:</h5>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;" class="github-deploy-container">
+                                    <div style="background: var(--bg-primary); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                                        <div style="font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--text-primary);">
+                                            <i data-lucide="chrome" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 4px; color: #4285F4;"></i> Android (Chrome / Brave / Edge)
+                                        </div>
+                                        <ol style="font-size: 12px; color: var(--text-secondary); padding-left: 18px; line-height: 1.6; margin: 0;">
+                                            <li>Tap the <strong>3 vertical dots menu (⋮)</strong> at the top-right corner of Chrome.</li>
+                                            <li>Tap <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong>.</li>
+                                            <li>Tap <strong>"Install"</strong> to confirm. Wealth Plus will appear on your phone home screen!</li>
+                                        </ol>
+                                    </div>
+                                    <div style="background: var(--bg-primary); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                                        <div style="font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--text-primary);">
+                                            <i data-lucide="apple" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 4px; color: #555555;"></i> iPhone / iPad (Safari)
+                                        </div>
+                                        <ol style="font-size: 12px; color: var(--text-secondary); padding-left: 18px; line-height: 1.6; margin: 0;">
+                                            <li>Tap the <strong>Share icon (<i data-lucide="share" style="width:12px; height:12px; display:inline-block; vertical-align:middle;"></i>)</strong> at the bottom of Safari.</li>
+                                            <li>Scroll down and tap <strong>"Add to Home Screen"</strong> (<i data-lucide="plus-square" style="width:12px; height:12px; display:inline-block; vertical-align:middle;"></i>).</li>
+                                            <li>Tap <strong>"Add"</strong> at top-right. Wealth Plus icon will be added!</li>
+                                        </ol>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1069,9 +1128,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=4.3.0"></script>
-    <script src="app.js?v=4.3.0"></script>
-    <script src="sindhu_v1.js?v=4.3.0"></script>
+    <script src="firebase-config.js?v=4.4.0"></script>
+    <script src="app.js?v=4.4.0"></script>
+    <script src="sindhu_v1.js?v=4.4.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

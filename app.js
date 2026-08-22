@@ -753,6 +753,7 @@ function setMasterTab(tabId) {
         'members': { title: 'Member Directory', icon: 'shield-check' },
         'cloud-sync': { title: 'Cloud Sync (Firebase)', icon: 'cloud' },
         'ai-developer': { title: 'AI & GitHub Deploy', icon: 'github' },
+        'install-app': { title: 'Install Mobile App', icon: 'download' },
         'reset-app': { title: 'Reset App', icon: 'trash-2' }
     };
 
@@ -2910,41 +2911,54 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // PWA Install Button handler
-    const installBtn = document.getElementById('btn-pwa-install');
-    if (installBtn) {
-        installBtn.addEventListener('click', async () => {
-            if (!deferredPrompt) return;
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            console.log(`User response to install: ${outcome}`);
-            deferredPrompt = null;
-            const installCard = document.getElementById('pwa-install-card');
-            if (installCard) installCard.style.display = 'none';
-        });
-    }
+    // PWA Install Button handlers
+    document.querySelectorAll('.btn-pwa-install-trigger, #btn-pwa-install').forEach(btn => {
+        btn.addEventListener('click', triggerPWAInstall);
+    });
 
     lucide.createIcons();
 });
 
-// PWA beforeinstallprompt handler
+// PWA beforeinstallprompt global handler
 let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    const installCard = document.getElementById('pwa-install-card');
-    if (installCard) {
-        installCard.style.display = 'block';
-    }
+    console.log("beforeinstallprompt event captured.");
 });
 
 window.addEventListener('appinstalled', (evt) => {
     console.log('App installed successfully!');
-    const installCard = document.getElementById('pwa-install-card');
-    if (installCard) {
-        installCard.style.display = 'none';
-    }
+    deferredPrompt = null;
 });
+
+async function triggerPWAInstall() {
+    if (deferredPrompt) {
+        try {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`User response to install: ${outcome}`);
+            if (outcome === 'accepted') {
+                alert("Thank you! Wealth Plus is being installed on your device.");
+            }
+            deferredPrompt = null;
+        } catch (err) {
+            console.error("Error triggering install prompt:", err);
+        }
+    } else {
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        if (isStandalone) {
+            alert("Wealth Plus is already installed and running as a standalone app on your device!");
+        } else {
+            const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+            if (isIos) {
+                alert("📱 How to install on iPhone/iPad:\n\n1. Tap the Share icon (at the bottom of Safari).\n2. Scroll down and tap 'Add to Home Screen'.\n3. Tap 'Add' at top right. Done!");
+            } else {
+                alert("📱 How to install on Android:\n\n1. Tap the 3 dots menu (⋮) at top-right in Chrome.\n2. Tap 'Install app' or 'Add to Home screen'.\n3. Tap 'Install' to confirm!");
+            }
+        }
+    }
+}
 
 
 
