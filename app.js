@@ -673,11 +673,12 @@ function getGlobalStats() {
 
 function getClientReportStats(clientId) {
     const client = state.clients.find(c => c.id === clientId);
-    if (!client) return { totalReceived: 0, totalSpent: 0, balance: 0, yearlyContract: 0, balanceReceivable: 0, openingBalance: 0 };
+    if (!client) return { totalReceived: 0, totalSpent: 0, balance: 0, yearlyContract: 0, balanceReceivable: 0, openingBalance: 0, totalReceivable: 0 };
 
     const monthlyPay = Number(client.monthlyPay) || 0;
     const yearlyContract = Number(client.yearlyPay) || (monthlyPay * 12);
     const openingBalance = Number(client.openingBalance) || 0;
+    const totalReceivable = yearlyContract + openingBalance;
 
     const totalReceived = state.incomeLogs
         .filter(log => log.clientId === clientId)
@@ -688,9 +689,9 @@ function getClientReportStats(clientId) {
         .reduce((sum, tx) => sum + Number(tx.amount), 0);
 
     const balance = (openingBalance + totalReceived) - totalSpent;
-    const balanceReceivable = yearlyContract - totalReceived;
+    const balanceReceivable = totalReceivable - totalReceived;
 
-    return { yearlyContract, openingBalance, totalReceived, totalSpent, balance, balanceReceivable };
+    return { yearlyContract, openingBalance, totalReceivable, totalReceived, totalSpent, balance, balanceReceivable };
 }
 
 // --- 5. NAVIGATION CONTROLLER ---
@@ -1138,19 +1139,23 @@ function renderClientsPage() {
                         <span class="c-stat-val">${fC(client.monthlyPay || 0)}</span>
                     </div>
                     <div class="c-stat-row">
-                        <span class="c-stat-label">Yearly Contract:</span>
+                        <span class="c-stat-label">Yearly Retainer:</span>
                         <span class="c-stat-val">${fC(stats.yearlyContract)}</span>
                     </div>
                     <div class="c-stat-row">
                         <span class="c-stat-label">Opening Balance:</span>
-                        <span class="c-stat-val" style="color:var(--text-secondary); font-weight:600;">${fC(client.openingBalance || 0)}</span>
+                        <span class="c-stat-val" style="color:var(--text-secondary); font-weight:600;">${fC(stats.openingBalance)}</span>
+                    </div>
+                    <div class="c-stat-row" style="background: var(--bg-primary); padding: 4px 8px; border-radius: 4px; margin: 3px 0; border: 1px solid var(--border-color);">
+                        <span class="c-stat-label" style="font-weight: 700; color: var(--text-primary);">Total Receivable:</span>
+                        <span class="c-stat-val" style="font-weight: 700; color: var(--primary);">${fC(stats.totalReceivable)}</span>
                     </div>
                     <div class="c-stat-row">
                         <span class="c-stat-label">Received Amount:</span>
-                        <span class="c-stat-val" style="color:var(--success);">${fC(stats.totalReceived)}</span>
+                        <span class="c-stat-val" style="color:var(--success); font-weight:600;">${fC(stats.totalReceived)}</span>
                     </div>
                     <div class="c-stat-row" style="border-top:1px dashed var(--border-color); padding-top:6px; margin-top:2px;">
-                        <span class="c-stat-label" style="font-weight:600;">Balance Receivable:</span>
+                        <span class="c-stat-label" style="font-weight:700;">Balance Receivable:</span>
                         <span class="c-stat-val ${receivableClass}">${receivableText}</span>
                     </div>
                     ${customFieldsHTML}
@@ -1335,8 +1340,16 @@ function renderClientReportDetails(clientId) {
 
     statsContainer.innerHTML = `
         <div class="report-stat-card val-primary">
-            <h5>Retainer Total (Yearly)</h5>
+            <h5>Yearly Retainer</h5>
             <span class="val">${fC(stats.yearlyContract)}</span>
+        </div>
+        <div class="report-stat-card val-primary">
+            <h5>Opening Balance</h5>
+            <span class="val" style="color:var(--text-secondary);">${fC(stats.openingBalance)}</span>
+        </div>
+        <div class="report-stat-card val-primary">
+            <h5>Total Receivable</h5>
+            <span class="val" style="color:var(--primary); font-weight:700;">${fC(stats.totalReceivable)}</span>
         </div>
         <div class="report-stat-card val-success">
             <h5>Total Received</h5>
@@ -1347,7 +1360,7 @@ function renderClientReportDetails(clientId) {
             <span class="val">${fC(stats.totalSpent)}</span>
         </div>
         <div class="report-stat-card val-primary">
-            <h5>Client Balance</h5>
+            <h5>Net Balance</h5>
             <span class="val" style="color: ${stats.balance >= 0 ? 'var(--success)' : 'var(--danger)'};">${fC(stats.balance)}</span>
         </div>
     `;
@@ -1767,13 +1780,14 @@ function renderMasterClients() {
     const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
 
     state.clients.forEach(client => {
-        const yearly = client.yearlyPay || (client.monthlyPay * 12);
+        const stats = getClientReportStats(client.id);
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="font-weight:600;">${client.name}</td>
             <td>${fC(client.monthlyPay || 0)}</td>
-            <td style="font-weight:500;">${fC(yearly)}</td>
-            <td style="color:var(--text-secondary); font-weight:500;">${fC(client.openingBalance || 0)}</td>
+            <td style="font-weight:500;">${fC(stats.yearlyContract)}</td>
+            <td style="color:var(--text-secondary); font-weight:500;">${fC(stats.openingBalance)}</td>
+            <td style="font-weight:700; color:var(--primary);">${fC(stats.totalReceivable)}</td>
             <td class="actions-col">
                 <div class="actions-wrapper">
                     <button class="btn-icon-only edit-btn" onclick="openEditClient('${client.id}')"><i data-lucide="edit-3"></i></button>
