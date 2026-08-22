@@ -361,6 +361,10 @@ function addClientDirect(clientObj, syncToCloud = true) {
 
 function deleteClientDirect(id, syncToCloud = true) {
     state.clients = state.clients.filter(c => c.id !== id);
+    const loanTx = state.transactions.find(t => t.id === 't_loan_' + id || (t.clientId === id && t.isLoanDisbursement));
+    if (loanTx) {
+        deleteExpenseDirect(loanTx.id, syncToCloud);
+    }
     saveStateLocalOnly();
     if (syncToCloud) firebaseDelete('clients', id);
 }
@@ -1237,10 +1241,11 @@ function renderClientsPage() {
 
             let contractInfoHTML = '';
             if (stats.creditAmount > 0) {
+                const loanSourceText = client.loanSourceAccount ? `<span class="badge" style="font-size:10px; margin-left:6px; background: rgba(13, 148, 136, 0.15); color: var(--primary);">Paid via ${client.loanSourceAccount}</span>` : '';
                 contractInfoHTML += `
-                    <div class="c-stat-row" style="background: rgba(13, 148, 136, 0.08); padding: 4px 8px; border-radius: 4px; margin: 3px 0; border: 1px solid rgba(13, 148, 136, 0.2);">
+                    <div class="c-stat-row" style="background: rgba(13, 148, 136, 0.08); padding: 4px 8px; border-radius: 4px; margin: 3px 0; border: 1px solid rgba(13, 148, 136, 0.2); align-items: center;">
                         <span class="c-stat-label" style="font-weight: 700; color: var(--primary);">Credit / Loan Given:</span>
-                        <span class="c-stat-val" style="font-weight: 700; color: var(--primary);">${fC(stats.creditAmount)}</span>
+                        <span class="c-stat-val" style="font-weight: 700; color: var(--primary);">${fC(stats.creditAmount)} ${loanSourceText}</span>
                     </div>
                 `;
             }
@@ -2546,12 +2551,25 @@ window.openClientModal = function(editId = '') {
     if (customContainer) customContainer.innerHTML = '';
 
     const creditInp = document.getElementById('client-credit-amount');
+    const loanSourceSelect = document.getElementById('client-loan-source-account');
+    const loanDateInp = document.getElementById('client-loan-date');
+    const loanDateGroup = document.getElementById('client-loan-date-group');
     const monthlyInp = document.getElementById('client-monthly-pay');
     const yearlyInp = document.getElementById('client-yearly-pay');
     const openingInp = document.getElementById('client-opening-balance');
     const groupInp = document.getElementById('client-group');
     const nameInp = document.getElementById('client-name');
     const editIdInp = document.getElementById('edit-client-id');
+
+    if (loanSourceSelect) {
+        loanSourceSelect.innerHTML = '<option value="">None / Past Old Due (No Cash/Bank deduction)</option>';
+        state.accounts.forEach(a => {
+            loanSourceSelect.innerHTML += `<option value="${a.name}">${a.type === 'Cash' ? '💵' : '🏦'} ${a.name} (${a.type} Book)</option>`;
+        });
+        loanSourceSelect.onchange = function() {
+            if (loanDateGroup) loanDateGroup.style.display = this.value ? 'block' : 'none';
+        };
+    }
 
     if (editId) {
         const client = state.clients.find(c => c.id === editId);
@@ -2561,6 +2579,10 @@ window.openClientModal = function(editId = '') {
             if (nameInp) nameInp.value = client.name;
             if (groupInp) groupInp.value = isVendorParty(client) ? 'Vendor' : 'Client';
             if (creditInp) creditInp.value = client.creditAmount !== undefined ? client.creditAmount : 0;
+            if (loanSourceSelect) loanSourceSelect.value = client.loanSourceAccount || '';
+            if (loanDateInp) loanDateInp.value = client.loanDate || new Date().toISOString().split('T')[0];
+            if (loanDateGroup) loanDateGroup.style.display = client.loanSourceAccount ? 'block' : 'none';
+
             const m = Number(client.monthlyPay) || 0;
             const y = Number(client.yearlyPay) || (m * 12);
             if (monthlyInp) monthlyInp.value = m || '';
@@ -2585,6 +2607,9 @@ window.openClientModal = function(editId = '') {
         if (nameInp) nameInp.value = '';
         if (groupInp) groupInp.value = (state.partyFilter === 'vendor' || state.partyFilter === 'creditor') ? 'Vendor' : 'Client';
         if (creditInp) creditInp.value = '0';
+        if (loanSourceSelect) loanSourceSelect.value = '';
+        if (loanDateInp) loanDateInp.value = new Date().toISOString().split('T')[0];
+        if (loanDateGroup) loanDateGroup.style.display = 'none';
         if (monthlyInp) monthlyInp.value = '';
         if (yearlyInp) yearlyInp.value = '';
         if (openingInp) openingInp.value = '0';
@@ -2623,11 +2648,13 @@ function handleClientSubmit(e) {
     const name = document.getElementById('client-name').value.trim();
     const group = document.getElementById('client-group').value || 'Client';
     const creditAmount = Number(document.getElementById('client-credit-amount').value) || 0;
+    const loanSourceAccount = document.getElementById('client-loan-source-account')?.value || '';
+    const loanDate = document.getElementById('client-loan-date')?.value || new Date().toISOString().split('T')[0];
     const monthlyPay = Number(document.getElementById('client-monthly-pay').value) || 0;
     const yearlyPay = Number(document.getElementById('client-yearly-pay').value) || (monthlyPay * 12);
     const openingBalance = Number(document.getElementById('client-opening-balance').value) || 0;
 
-    let clientObj = { name, group, creditAmount, monthlyPay, yearlyPay, openingBalance };
+    let clientObj = { name, group, creditAmount, loanSourceAccount, loanDate, monthlyPay, yearlyPay, openingBalance };
 
     state.customClientFields.forEach(f => {
         const val = document.getElementById(`custom-field-${f.name}`).value;
@@ -2638,6 +2665,27 @@ function handleClientSubmit(e) {
         clientObj.id = id;
     } else {
         clientObj.id = 'c_' + Date.now();
+    }
+
+    // Automatically manage linked loan disbursement outflow transaction in Cash/Bank
+    const loanTxId = 't_loan_' + clientObj.id;
+    if (creditAmount > 0 && loanSourceAccount) {
+        const loanTx = {
+            id: loanTxId,
+            description: `Loan given to ${clientObj.name}`,
+            category: 'Others',
+            amount: creditAmount,
+            date: loanDate,
+            mode: loanSourceAccount,
+            clientId: clientObj.id,
+            isLoanDisbursement: true
+        };
+        addExpenseDirect(loanTx);
+    } else {
+        const existing = state.transactions.find(t => t.id === loanTxId || (t.clientId === clientObj.id && t.isLoanDisbursement));
+        if (existing) {
+            deleteExpenseDirect(existing.id);
+        }
     }
 
     addClientDirect(clientObj);

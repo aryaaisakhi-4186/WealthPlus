@@ -23,7 +23,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=5.6.0">
+    <link rel="stylesheet" href="style.css?v=5.7.0">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -965,6 +965,18 @@
                     <input type="number" id="client-credit-amount" min="0" placeholder="0 (e.g. 50000)" step="any" inputmode="numeric" value="0">
                     <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Enter one-time loan / credit / udhar given to this party (if not a monthly retainer client).</span>
                 </div>
+                <div class="form-group" id="client-loan-source-group">
+                    <label for="client-loan-source-account">Loan Payment Source (Disbursed From Cash / Bank)</label>
+                    <select id="client-loan-source-account" style="font-weight: 600; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); width: 100%;">
+                        <option value="">None / Past Old Due (No Cash/Bank deduction)</option>
+                        <!-- Populated dynamically -->
+                    </select>
+                    <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Select Cash or Bank account to deduct money for this loan, or choose None for past opening balance.</span>
+                </div>
+                <div class="form-group" id="client-loan-date-group" style="display: none;">
+                    <label for="client-loan-date">Loan Disbursement Date</label>
+                    <input type="date" id="client-loan-date">
+                </div>
                 <div class="form-group-row">
                     <div class="form-group">
                         <label for="client-monthly-pay">Monthly Retainer (₹ / Mo) (Optional)</label>
@@ -1215,9 +1227,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=5.6.0"></script>
-    <script src="app.js?v=5.6.0"></script>
-    <script src="sindhu_v1.js?v=5.6.0"></script>
+    <script src="firebase-config.js?v=5.7.0"></script>
+    <script src="app.js?v=5.7.0"></script>
+    <script src="sindhu_v1.js?v=5.7.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">
