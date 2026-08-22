@@ -1405,8 +1405,23 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
+        // Helper to remove speech repetition loops
+        function deduplicateSpeechText(text) {
+            if (!text) return "";
+            let s = text.trim();
+            // 1. Remove duplicate consecutive words
+            s = s.replace(/([^\s]+)(?:\s+\1)+/gu, '$1');
+            // 2. Remove repeating long phrase chunks (length 120 down to 8)
+            for (let len = 120; len >= 8; len--) {
+                let regex = new RegExp(`(.{${len},}?)(?:\\s*\\1)+`, 'gu');
+                s = s.replace(regex, '$1');
+            }
+            return s.replace(/\s+/g, " ").trim();
+        }
+
         // Process Assistant Response
-        async function processCommand(inputText) {
+        async function processCommand(rawInputText) {
+            let inputText = deduplicateSpeechText(rawInputText);
             if (!inputText.trim()) return;
             const fileToProcess = currentAttachedFile;
             resetAttachment();
@@ -1420,7 +1435,7 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
 
             // Helper to clean update triggers out of a string
             function cleanTriggers(str) {
-                let s = str;
+                let s = deduplicateSpeechText(str);
                 for (let trigger of updateTriggers) {
                     s = s.replace(new RegExp(trigger, "gi"), "");
                 }
@@ -1728,18 +1743,21 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
         // Web Speech Recognition
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition && micBtn) {
+            const isMobileDevice = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             const recognition = new SpeechRecognition();
-            recognition.continuous = true;
+            recognition.continuous = !isMobileDevice; // Continuous mode in Android Chrome causes duplicate speech loops
             recognition.interimResults = true;
             recognition.lang = 'hi-IN'; // default to Hindi listening
 
             let isListening = false;
             let recognitionTimeout = null;
             let hasProcessedVoice = false;
+            let finalTranscript = "";
 
             recognition.onstart = () => {
                 isListening = true;
                 hasProcessedVoice = false;
+                finalTranscript = "";
                 micBtn.classList.add("active");
                 chatInput.placeholder = "Listening... Speak now!";
                 chatInput.value = "";
@@ -1757,7 +1775,7 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
                 // Submit the voice text if not already processed
                 if (!hasProcessedVoice) {
                     hasProcessedVoice = true;
-                    const text = chatInput.value.trim();
+                    const text = deduplicateSpeechText(chatInput.value.trim() || finalTranscript.trim());
                     if (text) {
                         processCommand(text);
                     }
@@ -1776,11 +1794,17 @@ Format the response strictly as a JSON object, containing nothing else. Do not w
             };
 
             recognition.onresult = (e) => {
-                let transcript = "";
-                for (let i = 0; i < e.results.length; i++) {
-                    transcript += e.results[i][0].transcript;
+                let interimTranscript = "";
+                for (let i = e.resultIndex; i < e.results.length; ++i) {
+                    if (e.results[i].isFinal) {
+                        finalTranscript += " " + e.results[i][0].transcript;
+                    } else {
+                        interimTranscript += " " + e.results[i][0].transcript;
+                    }
                 }
-                chatInput.value = transcript;
+                let rawCombined = (finalTranscript + " " + interimTranscript).trim();
+                let cleanCombined = deduplicateSpeechText(rawCombined);
+                chatInput.value = cleanCombined;
 
                 // Auto-submit after 1.8 seconds of silence
                 if (recognitionTimeout) clearTimeout(recognitionTimeout);
