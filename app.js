@@ -450,7 +450,111 @@ function saveCustomFieldsDirect(customClientFields, customTxFields, syncToCloud 
     if (syncToCloud) firebaseWriteSettings();
 }
 
-// --- 2. AUTHENTICATION CONTROLLER ---
+// --- 2. AUTHENTICATION & AUTO-LOGOUT CONTROLLER ---
+
+// 5-Minute Inactivity Auto-Logout System
+const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+let lastUserActivityTime = Date.now();
+let inactivityTimer = null;
+let backgroundInactivityInterval = null;
+
+function recordUserActivity() {
+    lastUserActivityTime = Date.now();
+    try {
+        localStorage.setItem('wealth_plus_last_activity', String(lastUserActivityTime));
+    } catch (e) {}
+
+    resetInactivityTimer();
+}
+
+function resetInactivityTimer() {
+    if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = null;
+    }
+
+    if (state.currentUser) {
+        inactivityTimer = setTimeout(checkAndExecuteAutoLogout, INACTIVITY_TIMEOUT_MS);
+    }
+}
+
+function checkAndExecuteAutoLogout() {
+    if (!state.currentUser) return;
+
+    let storedLast = 0;
+    try {
+        storedLast = Number(localStorage.getItem('wealth_plus_last_activity')) || 0;
+    } catch (e) {}
+
+    const effectiveLast = Math.max(lastUserActivityTime, storedLast);
+    const elapsed = Date.now() - effectiveLast;
+
+    if (elapsed >= INACTIVITY_TIMEOUT_MS) {
+        performAutoLogout();
+    } else {
+        const remaining = INACTIVITY_TIMEOUT_MS - elapsed;
+        inactivityTimer = setTimeout(checkAndExecuteAutoLogout, Math.max(remaining, 1000));
+    }
+}
+
+function performAutoLogout() {
+    if (!state.currentUser) return;
+    console.log('User automatically logged out due to 5 minutes of inactivity.');
+
+    state.currentUser = null;
+    saveState();
+    state.activePage = 'dashboard';
+    saveState();
+
+    initLoginSession();
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+
+    const errorMsg = document.getElementById('login-error-msg');
+    if (errorMsg) {
+        errorMsg.style.display = 'block';
+        errorMsg.style.color = '#f59e0b';
+        errorMsg.style.background = 'rgba(245, 158, 11, 0.12)';
+        errorMsg.style.borderColor = 'rgba(245, 158, 11, 0.35)';
+        errorMsg.innerHTML = '<i data-lucide="shield-alert" style="width:14px; height:14px; vertical-align:middle; margin-right:4px;"></i> Logged out automatically after 5 minutes of inactivity for security.';
+        if (window.lucide) lucide.createIcons();
+    }
+}
+
+function initInactivityTracker() {
+    const events = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll', 'click', 'wheel'];
+    let throttleTimer = null;
+
+    const handleActivity = () => {
+        if (throttleTimer) return;
+        throttleTimer = setTimeout(() => {
+            throttleTimer = null;
+        }, 1000);
+        recordUserActivity();
+    };
+
+    events.forEach(evt => {
+        window.addEventListener(evt, handleActivity, { passive: true });
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            checkAndExecuteAutoLogout();
+        }
+    });
+
+    window.addEventListener('focus', () => {
+        checkAndExecuteAutoLogout();
+    });
+
+    if (backgroundInactivityInterval) clearInterval(backgroundInactivityInterval);
+    backgroundInactivityInterval = setInterval(() => {
+        if (state.currentUser) {
+            checkAndExecuteAutoLogout();
+        }
+    }, 20000); // Check every 20 seconds
+
+    recordUserActivity();
+}
 
 function initLoginSession() {
     const loginOverlay = document.getElementById('login-screen');
@@ -471,9 +575,15 @@ function initLoginSession() {
             masterLinks.forEach(el => el.style.display = 'flex');
             document.documentElement.style.setProperty('--staff-access-display', 'inline-flex');
         }
+
+        resetInactivityTimer();
     } else {
         // Not logged in
         loginOverlay.classList.remove('hidden');
+        if (inactivityTimer) {
+            clearTimeout(inactivityTimer);
+            inactivityTimer = null;
+        }
     }
 
     if (typeof updateSindhuVisibility === 'function') updateSindhuVisibility();
@@ -495,6 +605,7 @@ function handleLoginSubmit(e) {
             role: member.role
         };
         saveState();
+        recordUserActivity();
         initLoginSession();
         
         // Reset forms inputs
@@ -502,10 +613,12 @@ function handleLoginSubmit(e) {
         
         // Refresh page view
         renderPage(state.activePage);
-        
 
     } else {
         errorMsg.style.display = 'block';
+        errorMsg.style.color = '#ef4444';
+        errorMsg.style.background = 'rgba(239, 68, 68, 0.1)';
+        errorMsg.style.borderColor = 'rgba(239, 68, 68, 0.25)';
         errorMsg.innerText = "Access Denied: Mobile number or PIN is incorrect.";
     }
 }
@@ -3639,6 +3752,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     initEventHandlers();
+    initInactivityTracker();
     
     // Cloud Sync Handlers
     document.getElementById('form-cloud-config').addEventListener('submit', handleCloudConfigSubmit);
