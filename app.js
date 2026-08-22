@@ -44,8 +44,8 @@ const defaultClients = [
 ];
 
 const defaultAccounts = [
-    { id: "acc_1", name: "Main Cash", type: "Cash" },
-    { id: "acc_2", name: "HDFC Bank", type: "Bank" }
+    { id: "acc_1", name: "Main Cash", type: "Cash", openingBalance: 0 },
+    { id: "acc_2", name: "HDFC Bank", type: "Bank", openingBalance: 0 }
 ];
 
 const defaultBudgets = {
@@ -587,11 +587,15 @@ function formatDateString(dateObj) {
 
 function formatDbDate(dateStr) {
     if (!dateStr) return '';
+    if (dateStr === 'Opening Balance' || (typeof dateStr === 'string' && dateStr.toLowerCase().includes('opening'))) {
+        return 'Opening';
+    }
     const parts = dateStr.split('-');
     if (parts.length === 3) {
         return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
-    return formatDateString(new Date(dateStr));
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? dateStr : formatDateString(d);
 }
 
 // --- 4. CORE LEDGER ENGINE CALCULATIONS ---
@@ -601,6 +605,19 @@ function getAccountLedger(accountId) {
     if (!account) return [];
 
     let ledger = [];
+    const openingBal = Number(account.openingBalance) || 0;
+
+    // Prepend Opening Balance if non-zero
+    if (openingBal !== 0) {
+        ledger.push({
+            date: 'Opening Balance',
+            particulars: 'Opening Balance (प्रारंभिक शेष)',
+            category: 'Opening Balance',
+            debit: openingBal > 0 ? openingBal : 0,
+            credit: openingBal < 0 ? Math.abs(openingBal) : 0,
+            timestamp: 0
+        });
+    }
 
     // Filter inflows
     state.incomeLogs.forEach(log => {
@@ -608,7 +625,7 @@ function getAccountLedger(accountId) {
             const client = state.clients.find(c => c.id === log.clientId);
             ledger.push({
                 date: log.date,
-                particulars: `Received from ${client ? client.name : 'Unknown Client'}`,
+                particulars: `Received from ${client ? client.name : 'Unknown Party'}`,
                 category: 'Inflow (Revenue)',
                 debit: Number(log.amount),
                 credit: 0,
@@ -623,7 +640,7 @@ function getAccountLedger(accountId) {
             const client = state.clients.find(c => c.id === tx.clientId);
             ledger.push({
                 date: tx.date,
-                particulars: `${tx.description}` + (client ? ` [Client: ${client.name}]` : ''),
+                particulars: `${tx.description}` + (client ? ` [Party: ${client.name}]` : ''),
                 category: tx.category,
                 debit: 0,
                 credit: Number(tx.amount),
@@ -632,8 +649,11 @@ function getAccountLedger(accountId) {
         }
     });
 
-    // Sort chronologically
-    ledger.sort((a, b) => a.timestamp - b.timestamp || a.particulars.localeCompare(b.particulars));
+    // Sort chronologically (Opening balance timestamp 0 stays at the top)
+    ledger.sort((a, b) => {
+        if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
+        return a.particulars.localeCompare(b.particulars);
+    });
 
     // Calculate running balance
     let runningBalance = 0;
@@ -651,7 +671,7 @@ function getGlobalStats() {
 
     state.accounts.forEach(acc => {
         const ledger = getAccountLedger(acc.id);
-        const closingBal = ledger.length > 0 ? ledger[ledger.length - 1].balance : 0;
+        const closingBal = ledger.length > 0 ? ledger[ledger.length - 1].balance : (Number(acc.openingBalance) || 0);
         
         if (acc.type === 'Cash') {
             totalCashBalance += closingBal;
@@ -1788,17 +1808,19 @@ function renderMasterAccounts() {
 
     state.accounts.forEach(acc => {
         const ledger = getAccountLedger(acc.id);
-        const closingBal = ledger.length > 0 ? ledger[ledger.length - 1].balance : 0;
+        const closingBal = ledger.length > 0 ? ledger[ledger.length - 1].balance : (Number(acc.openingBalance) || 0);
+        const openingBal = Number(acc.openingBalance) || 0;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="font-weight:600;">${acc.name}</td>
             <td><span class="badge-acctype">${acc.type} Book</span></td>
+            <td style="color:var(--text-secondary); font-weight:500;">${fC(openingBal)}</td>
             <td style="font-weight:700; color: ${closingBal < 0 ? 'var(--danger)' : 'var(--text-primary)'};">${fC(closingBal)}</td>
             <td class="actions-col">
                 <div class="actions-wrapper">
-                    <button class="btn-icon-only edit-btn" onclick="openEditAccount('${acc.id}')"><i data-lucide="edit-3"></i></button>
-                    <button class="btn-icon-only delete-btn" onclick="deleteAccount('${acc.id}')"><i data-lucide="trash-2"></i></button>
+                    <button class="btn-icon-only edit-btn" onclick="openEditAccount('${acc.id}')" title="Edit Account"><i data-lucide="edit-3"></i></button>
+                    <button class="btn-icon-only delete-btn" onclick="deleteAccount('${acc.id}')" title="Delete Account"><i data-lucide="trash-2"></i></button>
                 </div>
             </td>
         `;
@@ -2796,10 +2818,12 @@ function openAccountModal(editId = '') {
             document.getElementById('edit-account-id').value = acc.id;
             document.getElementById('account-name').value = acc.name;
             document.getElementById('account-type').value = acc.type;
+            document.getElementById('account-opening-balance').value = acc.openingBalance !== undefined ? acc.openingBalance : 0;
         }
     } else {
         title.innerText = 'Add New Account Book';
         document.getElementById('edit-account-id').value = '';
+        document.getElementById('account-opening-balance').value = '0';
     }
     modal.classList.add('active');
 }
@@ -2813,8 +2837,9 @@ function handleAccountSubmit(e) {
     const id = document.getElementById('edit-account-id').value;
     const name = document.getElementById('account-name').value.trim();
     const type = document.getElementById('account-type').value;
+    const openingBalance = Number(document.getElementById('account-opening-balance').value) || 0;
 
-    let accountObj = { name, type };
+    let accountObj = { name, type, openingBalance };
     if (id) {
         accountObj.id = id;
         const oldAcc = state.accounts.find(a => a.id === id);

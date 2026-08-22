@@ -23,7 +23,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=4.8.0">
+    <link rel="stylesheet" href="style.css?v=4.9.0">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -548,7 +548,8 @@
                                         <tr>
                                             <th>Account Name</th>
                                             <th>Account Type</th>
-                                            <th>Cumulative Balance</th>
+                                            <th>Opening Balance</th>
+                                            <th>Current Balance</th>
                                             <th class="actions-col">Actions</th>
                                         </tr>
                                     </thead>
@@ -1104,6 +1105,11 @@
                         <option value="Cash">Cash Book (Physical Cash-in-hand)</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label for="account-opening-balance">Opening Balance (₹) (प्रारंभिक शेष)</label>
+                    <input type="number" id="account-opening-balance" placeholder="0 (e.g. 50000 or -5000)" step="any" inputmode="numeric" value="0">
+                    <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Enter opening cash/bank balance (positive for credit balance, negative for overdraft).</span>
+                </div>
                 <div class="modal-footer-actions">
                     <button type="button" class="btn btn-outline" id="btn-cancel-account">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save Account</button>
@@ -1183,9 +1189,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=4.8.0"></script>
-    <script src="app.js?v=4.8.0"></script>
-    <script src="sindhu_v1.js?v=4.8.0"></script>
+    <script src="firebase-config.js?v=4.9.0"></script>
+    <script src="app.js?v=4.9.0"></script>
+    <script src="sindhu_v1.js?v=4.9.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">
