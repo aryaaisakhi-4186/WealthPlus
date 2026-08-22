@@ -597,7 +597,7 @@
         let cleanText = text.toLowerCase().trim();
         
         // Define strong/specific page keywords
-        const strongClientsKws = ["client directory", "clients & income", "clients and income", "clients page", "clients tab", "client page", "client list", "क्लाइंट डायरेक्टरी", "क्लाइंट्स डायरेक्टरी", "क्लाइंट्स एंड इनकम", "क्लाइंट पेज", "क्लाइंट टैब", "डायरेक्टरी"];
+        const strongClientsKws = ["parties", "party", "debtors", "creditors", "parties directory", "parties page", "parties tab", "party page", "party list", "पार्टी", "पार्टियाँ", "पार्टीज", "देनदार", "लेनदार", "client directory", "clients & income", "clients and income", "clients page", "clients tab", "client page", "client list", "क्लाइंट डायरेक्टरी", "क्लाइंट्स डायरेक्टरी", "क्लाइंट्स एंड इनकम", "क्लाइंट पेज", "क्लाइंट टैब", "डायरेक्टरी"];
         const strongEntriesKws = ["entries page", "transactions page", "expenses tab", "expense entry screen", "एंट्री स्क्रीन", "एंट्री पेज", "ट्रांजैक्शन स्क्रीन", "ट्रांजैक्शन पेज", "खर्चे स्क्रीन"];
         const strongReportsKws = ["reports page", "reports tab", "bookkeeping report", "रिपोर्ट स्क्रीन", "बहीखाता स्क्रीन", "मंथली रिपोर्ट", "मंथली समरी", "क्लाइंट रिपोर्ट", "अकाउंट्स लेजर"];
         const strongMasterKws = ["master settings", "settings page", "मास्टर सेटिंग्स", "सेटिंग्स पेज", "खाता सेटिंग", "खाता सेटअप", "कैटेगरी सेटिंग्स", "स्टाफ डायरेक्टरी"];

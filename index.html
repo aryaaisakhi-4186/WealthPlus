@@ -23,7 +23,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=4.7.0">
+    <link rel="stylesheet" href="style.css?v=4.8.0">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -79,7 +79,7 @@
                 </a>
                 <a href="#" class="menu-item" data-page="clients" id="nav-clients">
                     <i data-lucide="users"></i>
-                    <span>Clients & Income</span>
+                    <span>Parties (Debtors/Creditors)</span>
                 </a>
                 <a href="#" class="menu-item" data-page="expenses" id="nav-expenses">
                     <i data-lucide="arrow-up-right"></i>
@@ -232,16 +232,32 @@
                     </div>
                 </section>
 
-                <!-- 2. CLIENTS & INCOME PAGE -->
+                <!-- 2. PARTIES & LEDGER PAGE -->
                 <section id="page-clients" class="app-page">
                     <div class="section-actions-header">
-                        <h3>Clients Directory</h3>
+                        <div>
+                            <h3 style="margin-bottom: 4px;">Parties Directory</h3>
+                            <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">Manage Sundry Debtors (Clients) & Sundry Creditors (Vendors)</p>
+                        </div>
                         <button class="btn btn-primary" id="btn-add-client">
-                            <i data-lucide="user-plus"></i> Add Client
+                            <i data-lucide="user-plus"></i> Add Party
                         </button>
                     </div>
 
-                    <!-- Clients Grid -->
+                    <!-- Party Filter Pills (All / Debtors / Creditors) -->
+                    <div class="party-filter-bar" id="party-filter-bar">
+                        <button type="button" class="party-filter-btn active" data-party-filter="all">
+                            <i data-lucide="users"></i> All Parties (<span id="count-all-parties">0</span>)
+                        </button>
+                        <button type="button" class="party-filter-btn" data-party-filter="debtor">
+                            <i data-lucide="arrow-down-left"></i> Sundry Debtors / Clients (<span id="count-debtor-parties">0</span>)
+                        </button>
+                        <button type="button" class="party-filter-btn" data-party-filter="creditor">
+                            <i data-lucide="arrow-up-right"></i> Sundry Creditors / Vendors (<span id="count-creditor-parties">0</span>)
+                        </button>
+                    </div>
+
+                    <!-- Parties Grid -->
                     <div class="clients-grid" id="clients-list-container">
                         <!-- Rendered dynamically -->
                     </div>
@@ -450,11 +466,11 @@
                                 </div>
                                 <i data-lucide="check" class="check-icon"></i>
                             </div>
-                            <div class="master-dropdown-item" data-master-sub="clients-config" data-icon="users" data-title="Clients Configuration">
+                            <div class="master-dropdown-item" data-master-sub="clients-config" data-icon="users" data-title="Parties Configuration">
                                 <div class="item-icon-box"><i data-lucide="users"></i></div>
                                 <div class="item-text-box">
-                                    <strong>Clients Configuration</strong>
-                                    <span>Client retainers & monthly billing setup</span>
+                                    <strong>Parties Configuration</strong>
+                                    <span>Debtors & Creditors retainers setup</span>
                                 </div>
                                 <i data-lucide="check" class="check-icon"></i>
                             </div>
@@ -543,16 +559,17 @@
                             </div>
                         </div>
 
-                        <!-- Panel B: Clients Setup -->
+                        <!-- Panel B: Parties Setup -->
                         <div id="master-panel-clients-config" class="master-sub-panel">
                             <div class="panel-action-header">
-                                <h4>Clients Settings</h4>
+                                <h4>Parties Settings (Sundry Debtors & Creditors)</h4>
                             </div>
                             <div class="table-container">
                                 <table class="data-table">
                                     <thead>
                                         <tr>
-                                            <th>Client Name</th>
+                                            <th>Party Name</th>
+                                            <th>Group</th>
                                             <th>Monthly Retainer</th>
                                             <th>Yearly Retainer</th>
                                             <th>Opening Balance</th>
@@ -907,18 +924,26 @@
          OVERLAY MODALS
          ========================================== -->
 
-    <!-- Modal 1: Add/Edit Client -->
+    <!-- Modal 1: Add/Edit Party -->
     <div id="modal-client" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header">
-                <h4 id="modal-client-title">Add New Client</h4>
+                <h4 id="modal-client-title">Add New Party</h4>
                 <button class="btn-close-modal" id="btn-close-client-modal"><i data-lucide="x"></i></button>
             </div>
             <form id="form-client" class="modal-form">
                 <input type="hidden" id="edit-client-id">
                 <div class="form-group">
-                    <label for="client-name">Client Full Name *</label>
-                    <input type="text" id="client-name" required placeholder="e.g. Acme Corporation">
+                    <label for="client-name">Party Full Name *</label>
+                    <input type="text" id="client-name" required placeholder="e.g. Acme Corporation or Sharma Traders">
+                </div>
+                <div class="form-group">
+                    <label for="client-group">Party Group / Category *</label>
+                    <select id="client-group" required style="font-weight: 600; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); width: 100%;">
+                        <option value="Debtor">Sundry Debtors (देनदार - Client / Customer)</option>
+                        <option value="Creditor">Sundry Creditors (लेनदार - Vendor / Supplier)</option>
+                    </select>
+                    <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Debtors owe you money (Receivables); Creditors are vendors/suppliers you pay (Payables).</span>
                 </div>
                 <div class="form-group-row">
                     <div class="form-group">
@@ -940,7 +965,7 @@
                 
                 <div class="modal-footer-actions">
                     <button type="button" class="btn btn-outline" id="btn-cancel-client">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Client</button>
+                    <button type="submit" class="btn btn-primary">Save Party</button>
                 </div>
             </form>
         </div>
@@ -1158,9 +1183,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=4.7.0"></script>
-    <script src="app.js?v=4.7.0"></script>
-    <script src="sindhu_v1.js?v=4.7.0"></script>
+    <script src="firebase-config.js?v=4.8.0"></script>
+    <script src="app.js?v=4.8.0"></script>
+    <script src="sindhu_v1.js?v=4.8.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

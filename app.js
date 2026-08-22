@@ -30,6 +30,7 @@ let state = {
     activePage: 'dashboard',
     activeReportTab: 'client',
     activeMasterTab: 'accounts',
+    partyFilter: 'all',
     selectedPeriod: 'financial-year',
     customStartDate: '',
     customEndDate: '',
@@ -38,8 +39,8 @@ let state = {
 
 // Seed Data
 const defaultClients = [
-    { id: "c1", name: "Acme Corporation", monthlyPay: 35000, yearlyPay: 420000, openingBalance: 0 },
-    { id: "c2", name: "StarLabs Ltd", monthlyPay: 20000, yearlyPay: 240000, openingBalance: 0 }
+    { id: "c1", name: "Acme Corporation", group: "Debtor", monthlyPay: 35000, yearlyPay: 420000, openingBalance: 0 },
+    { id: "c2", name: "StarLabs Ltd", group: "Debtor", monthlyPay: 20000, yearlyPay: 240000, openingBalance: 0 }
 ];
 
 const defaultAccounts = [
@@ -750,7 +751,7 @@ function setMasterTab(tabId) {
 
     const tabMeta = {
         'accounts': { title: 'Accounts Master', icon: 'landmark' },
-        'clients-config': { title: 'Clients Configuration', icon: 'users' },
+        'clients-config': { title: 'Parties Configuration', icon: 'users' },
         'budgets': { title: 'Category Budgets', icon: 'pie-chart' },
         'columns': { title: 'Custom Columns', icon: 'table' },
         'members': { title: 'Member Directory', icon: 'shield-check' },
@@ -1100,20 +1101,49 @@ function renderTrendChart(txList, startDate, endDate) {
     });
 }
 
-// CLIENTS PAGE RENDERER
+// PARTIES PAGE RENDERER
 function renderClientsPage() {
     const container = document.getElementById('clients-list-container');
     container.innerHTML = '';
     const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
 
-    if (state.clients.length === 0) {
-        container.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">No clients added.</div>`;
+    const filter = state.partyFilter || 'all';
+
+    // Update Filter Counts
+    const countAll = state.clients.length;
+    const countDebtors = state.clients.filter(c => (c.group || 'Debtor').toLowerCase() === 'debtor').length;
+    const countCreditors = state.clients.filter(c => (c.group || 'Debtor').toLowerCase() === 'creditor').length;
+
+    const elAll = document.getElementById('count-all-parties');
+    const elDeb = document.getElementById('count-debtor-parties');
+    const elCred = document.getElementById('count-creditor-parties');
+    if (elAll) elAll.innerText = countAll;
+    if (elDeb) elDeb.innerText = countDebtors;
+    if (elCred) elCred.innerText = countCreditors;
+
+    // Update Active Filter Pill
+    document.querySelectorAll('.party-filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-party-filter') === filter);
+    });
+
+    let filteredClients = state.clients;
+    if (filter === 'debtor') {
+        filteredClients = state.clients.filter(c => (c.group || 'Debtor').toLowerCase() === 'debtor');
+    } else if (filter === 'creditor') {
+        filteredClients = state.clients.filter(c => (c.group || 'Debtor').toLowerCase() === 'creditor');
+    }
+
+    if (filteredClients.length === 0) {
+        const msg = filter === 'debtor' ? 'No Sundry Debtors (Clients) added yet.' : filter === 'creditor' ? 'No Sundry Creditors (Vendors) added yet.' : 'No parties added yet.';
+        container.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">${msg}</div>`;
     } else {
-        state.clients.forEach(client => {
+        filteredClients.forEach(client => {
             const stats = getClientReportStats(client.id);
             const isCompleted = stats.balanceReceivable <= 0;
             const receivableClass = isCompleted ? 'receivable-complete' : 'receivable-active';
             const receivableText = isCompleted ? 'Fully Received' : fC(stats.balanceReceivable);
+            const partyGroup = client.group || 'Debtor';
+            const isCreditor = partyGroup.toLowerCase() === 'creditor';
 
             let customFieldsHTML = '';
             state.customClientFields.forEach(field => {
@@ -1131,7 +1161,10 @@ function renderClientsPage() {
             card.innerHTML = `
                 <div class="client-card-header">
                     <h4>${client.name}</h4>
-                    <span class="badge">Active Retainer</span>
+                    <span class="party-group-badge ${isCreditor ? 'creditor' : 'debtor'}">
+                        <i data-lucide="${isCreditor ? 'arrow-up-right' : 'arrow-down-left'}" style="width:12px; height:12px;"></i>
+                        ${isCreditor ? 'Creditor (लेनदार)' : 'Debtor (देनदार)'}
+                    </span>
                 </div>
                 <div class="client-stats">
                     <div class="c-stat-row">
@@ -1161,8 +1194,8 @@ function renderClientsPage() {
                     ${customFieldsHTML}
                 </div>
                 <div class="client-card-footer">
-                    <button class="btn-icon-only edit-btn" onclick="openEditClient('${client.id}')"><i data-lucide="edit-3"></i></button>
-                    <button class="btn-icon-only delete-btn" onclick="deleteClient('${client.id}')"><i data-lucide="trash-2"></i></button>
+                    <button class="btn-icon-only edit-btn" onclick="openEditClient('${client.id}')" title="Edit Party"><i data-lucide="edit-3"></i></button>
+                    <button class="btn-icon-only delete-btn" onclick="deleteClient('${client.id}')" title="Delete Party"><i data-lucide="trash-2"></i></button>
                 </div>
             `;
             container.appendChild(card);
@@ -1781,17 +1814,24 @@ function renderMasterClients() {
 
     state.clients.forEach(client => {
         const stats = getClientReportStats(client.id);
+        const partyGroup = client.group || 'Debtor';
+        const isCreditor = partyGroup.toLowerCase() === 'creditor';
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="font-weight:600;">${client.name}</td>
+            <td>
+                <span class="party-group-badge ${isCreditor ? 'creditor' : 'debtor'}">
+                    ${isCreditor ? 'Creditor (लेनदार)' : 'Debtor (देनदार)'}
+                </span>
+            </td>
             <td>${fC(client.monthlyPay || 0)}</td>
             <td style="font-weight:500;">${fC(stats.yearlyContract)}</td>
             <td style="color:var(--text-secondary); font-weight:500;">${fC(stats.openingBalance)}</td>
             <td style="font-weight:700; color:var(--primary);">${fC(stats.totalReceivable)}</td>
             <td class="actions-col">
                 <div class="actions-wrapper">
-                    <button class="btn-icon-only edit-btn" onclick="openEditClient('${client.id}')"><i data-lucide="edit-3"></i></button>
-                    <button class="btn-icon-only delete-btn" onclick="deleteClient('${client.id}')"><i data-lucide="trash-2"></i></button>
+                    <button class="btn-icon-only edit-btn" onclick="openEditClient('${client.id}')" title="Edit Party"><i data-lucide="edit-3"></i></button>
+                    <button class="btn-icon-only delete-btn" onclick="deleteClient('${client.id}')" title="Delete Party"><i data-lucide="trash-2"></i></button>
                 </div>
             </td>
         `;
@@ -2186,6 +2226,16 @@ function initEventHandlers() {
         });
     });
 
+    // Party Group Filter Tabs (All / Debtors / Creditors)
+    document.querySelectorAll('.party-filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const filter = this.getAttribute('data-party-filter');
+            state.partyFilter = filter;
+            saveState();
+            renderClientsPage();
+        });
+    });
+
     // Modals triggers
     document.getElementById('btn-add-client').addEventListener('click', () => openClientModal());
     document.getElementById('btn-close-client-modal').addEventListener('click', () => closeClientModal());
@@ -2336,7 +2386,7 @@ window.deleteMember = function(id) {
     }
 };
 
-// Client CRUD
+// Party CRUD
 function openClientModal(editId = '') {
     const modal = document.getElementById('modal-client');
     const title = document.getElementById('modal-client-title');
@@ -2349,9 +2399,10 @@ function openClientModal(editId = '') {
     if (editId) {
         const client = state.clients.find(c => c.id === editId);
         if (client) {
-            title.innerText = 'Edit Client Details';
+            title.innerText = 'Edit Party Details';
             document.getElementById('edit-client-id').value = client.id;
             document.getElementById('client-name').value = client.name;
+            document.getElementById('client-group').value = client.group || 'Debtor';
             const m = Number(client.monthlyPay) || 0;
             const y = Number(client.yearlyPay) || (m * 12);
             document.getElementById('client-monthly-pay').value = m || '';
@@ -2369,8 +2420,9 @@ function openClientModal(editId = '') {
             });
         }
     } else {
-        title.innerText = 'Add New Client';
+        title.innerText = 'Add New Party';
         document.getElementById('edit-client-id').value = '';
+        document.getElementById('client-group').value = state.partyFilter === 'creditor' ? 'Creditor' : 'Debtor';
         document.getElementById('client-monthly-pay').value = '';
         document.getElementById('client-yearly-pay').value = '';
         document.getElementById('client-opening-balance').value = '0';
@@ -2395,11 +2447,12 @@ function handleClientSubmit(e) {
     e.preventDefault();
     const id = document.getElementById('edit-client-id').value;
     const name = document.getElementById('client-name').value.trim();
+    const group = document.getElementById('client-group').value || 'Debtor';
     const monthlyPay = Number(document.getElementById('client-monthly-pay').value) || 0;
     const yearlyPay = Number(document.getElementById('client-yearly-pay').value) || (monthlyPay * 12);
     const openingBalance = Number(document.getElementById('client-opening-balance').value) || 0;
 
-    let clientObj = { name, monthlyPay, yearlyPay, openingBalance };
+    let clientObj = { name, group, monthlyPay, yearlyPay, openingBalance };
 
     state.customClientFields.forEach(f => {
         const val = document.getElementById(`custom-field-${f.name}`).value;
