@@ -745,13 +745,36 @@ function setMasterTab(tabId) {
     state.activeMasterTab = tabId;
     saveState();
 
-    document.querySelectorAll('.master-tab').forEach(el => {
+    const tabMeta = {
+        'accounts': { title: 'Accounts Master', icon: 'landmark' },
+        'clients-config': { title: 'Clients Configuration', icon: 'users' },
+        'budgets': { title: 'Category Budgets', icon: 'pie-chart' },
+        'columns': { title: 'Custom Columns', icon: 'table' },
+        'members': { title: 'Member Directory', icon: 'shield-check' },
+        'cloud-sync': { title: 'Cloud Sync (Firebase)', icon: 'cloud' },
+        'ai-developer': { title: 'AI & GitHub Deploy', icon: 'github' },
+        'reset-app': { title: 'Reset App', icon: 'trash-2' }
+    };
+
+    const currentMeta = tabMeta[tabId] || { title: 'Accounts Master', icon: 'landmark' };
+
+    const titleEl = document.getElementById('master-selected-title');
+    if (titleEl) titleEl.innerText = currentMeta.title;
+
+    const iconBadge = document.getElementById('master-cat-icon-badge');
+    if (iconBadge) {
+        iconBadge.innerHTML = `<i data-lucide="${currentMeta.icon}"></i>`;
+    }
+
+    document.querySelectorAll('.master-dropdown-item, .master-tab').forEach(el => {
         el.classList.toggle('active', el.getAttribute('data-master-sub') === tabId);
     });
 
     document.querySelectorAll('.master-sub-panel').forEach(el => {
         el.classList.toggle('active', el.id === `master-panel-${tabId}`);
     });
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 
     renderMasterSubPanel(tabId);
 }
@@ -1451,13 +1474,13 @@ function renderMasterPage() {
     // Hide Members tab header if Staff
     const membersTabHeader = document.getElementById('tab-master-members');
     if (state.currentUser && state.currentUser.role === 'Staff') {
-        membersTabHeader.style.display = 'none';
+        if (membersTabHeader) membersTabHeader.style.display = 'none';
         if (state.activeMasterTab === 'members') {
             state.activeMasterTab = 'accounts';
             saveState();
         }
     } else {
-        membersTabHeader.style.display = 'inline-flex';
+        if (membersTabHeader) membersTabHeader.style.display = 'flex';
     }
 
     setMasterTab(state.activeMasterTab);
@@ -2113,10 +2136,31 @@ function initEventHandlers() {
         renderAccountLedgerDetails();
     });
 
-    // Master settings sub-tabs bindings
-    document.querySelectorAll('.master-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            setMasterTab(this.getAttribute('data-master-sub'));
+    // Master settings dropdown accordion trigger & items
+    const masterTrigger = document.getElementById('master-category-trigger');
+    const masterContainer = document.getElementById('master-selector-container');
+    if (masterTrigger && masterContainer) {
+        masterTrigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            masterContainer.classList.toggle('open');
+        });
+
+        // Close when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!masterContainer.contains(e.target)) {
+                masterContainer.classList.remove('open');
+            }
+        });
+    }
+
+    document.querySelectorAll('.master-dropdown-item, .master-tab').forEach(item => {
+        item.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const sub = this.getAttribute('data-master-sub');
+            if (sub) {
+                setMasterTab(sub);
+                if (masterContainer) masterContainer.classList.remove('open');
+            }
         });
     });
 

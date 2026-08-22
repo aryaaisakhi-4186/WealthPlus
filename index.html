@@ -22,7 +22,7 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="https://img.icons8.com/fluency/192/000000/accounting.png">
-    <link rel="stylesheet" href="style.css?v=4.2.0">
+    <link rel="stylesheet" href="style.css?v=4.3.0">
 </head>
 <body class="light-theme">
 
@@ -414,15 +414,91 @@
 
                 <!-- 5. MASTER SETTINGS PAGE -->
                 <section id="page-master" class="app-page">
-                    <div class="master-tabs-header">
-                        <button class="master-tab active" data-master-sub="accounts">Accounts Master</button>
-                        <button class="master-tab" data-master-sub="clients-config">Clients Configuration</button>
-                        <button class="master-tab" data-master-sub="budgets">Category Budgets</button>
-                        <button class="master-tab" data-master-sub="columns">Custom Columns</button>
-                        <button class="master-tab" data-master-sub="members" id="tab-master-members">Member Directory</button>
-                        <button class="master-tab" data-master-sub="cloud-sync" id="tab-master-cloud-sync">Cloud Sync (Firebase)</button>
-                        <button class="master-tab" data-master-sub="ai-developer" id="tab-master-ai-developer"><i data-lucide="github" style="width:14px; height:14px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> AI & GitHub Deploy</button>
-                        <button class="master-tab" data-master-sub="reset-app" id="tab-master-reset-app" style="color: var(--danger);"><i data-lucide="trash-2" style="width:14px; height:14px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> Reset App</button>
+                    <!-- Master Category Dropdown Selector (Accordion with Arrow) -->
+                    <div class="master-selector-container" id="master-selector-container">
+                        <div class="master-category-card" id="master-category-trigger">
+                            <div class="master-category-current">
+                                <div class="master-cat-icon-badge" id="master-cat-icon-badge">
+                                    <i data-lucide="landmark" id="master-selected-icon"></i>
+                                </div>
+                                <div class="master-cat-info">
+                                    <span class="master-cat-subtext">Settings Module</span>
+                                    <h3 class="master-cat-title" id="master-selected-title">Accounts Master</h3>
+                                </div>
+                            </div>
+                            <div class="master-category-arrow-wrap">
+                                <span class="master-cat-pill">Change Module</span>
+                                <i data-lucide="chevron-down" class="master-chevron-icon" id="master-chevron-icon"></i>
+                            </div>
+                        </div>
+
+                        <!-- Dropdown Menu of Settings Modules -->
+                        <div class="master-dropdown-menu" id="master-dropdown-menu">
+                            <div class="master-dropdown-item active" data-master-sub="accounts" data-icon="landmark" data-title="Accounts Master">
+                                <div class="item-icon-box"><i data-lucide="landmark"></i></div>
+                                <div class="item-text-box">
+                                    <strong>Accounts Master</strong>
+                                    <span>Cash & Bank ledger accounts setup</span>
+                                </div>
+                                <i data-lucide="check" class="check-icon"></i>
+                            </div>
+                            <div class="master-dropdown-item" data-master-sub="clients-config" data-icon="users" data-title="Clients Configuration">
+                                <div class="item-icon-box"><i data-lucide="users"></i></div>
+                                <div class="item-text-box">
+                                    <strong>Clients Configuration</strong>
+                                    <span>Client retainers & monthly billing setup</span>
+                                </div>
+                                <i data-lucide="check" class="check-icon"></i>
+                            </div>
+                            <div class="master-dropdown-item" data-master-sub="budgets" data-icon="pie-chart" data-title="Category Budgets">
+                                <div class="item-icon-box"><i data-lucide="pie-chart"></i></div>
+                                <div class="item-text-box">
+                                    <strong>Category Budgets</strong>
+                                    <span>Spending limits & expense heads</span>
+                                </div>
+                                <i data-lucide="check" class="check-icon"></i>
+                            </div>
+                            <div class="master-dropdown-item" data-master-sub="columns" data-icon="table" data-title="Custom Columns">
+                                <div class="item-icon-box"><i data-lucide="table"></i></div>
+                                <div class="item-text-box">
+                                    <strong>Custom Columns</strong>
+                                    <span>Custom table columns for clients & entries</span>
+                                </div>
+                                <i data-lucide="check" class="check-icon"></i>
+                            </div>
+                            <div class="master-dropdown-item" data-master-sub="members" data-icon="shield-check" data-title="Member Directory" id="tab-master-members">
+                                <div class="item-icon-box"><i data-lucide="shield-check"></i></div>
+                                <div class="item-text-box">
+                                    <strong>Member Directory</strong>
+                                    <span>Manage Staff, Admins, & 4-digit PINs</span>
+                                </div>
+                                <i data-lucide="check" class="check-icon"></i>
+                            </div>
+                            <div class="master-dropdown-item" data-master-sub="cloud-sync" data-icon="cloud" data-title="Cloud Sync (Firebase)" id="tab-master-cloud-sync">
+                                <div class="item-icon-box"><i data-lucide="cloud"></i></div>
+                                <div class="item-text-box">
+                                    <strong>Cloud Sync (Firebase)</strong>
+                                    <span>Real-time multi-device cloud database sync</span>
+                                </div>
+                                <i data-lucide="check" class="check-icon"></i>
+                            </div>
+                            <div class="master-dropdown-item" data-master-sub="ai-developer" data-icon="github" data-title="AI & GitHub Deploy" id="tab-master-ai-developer">
+                                <div class="item-icon-box"><i data-lucide="github"></i></div>
+                                <div class="item-text-box">
+                                    <strong>AI & GitHub Deploy</strong>
+                                    <span>One-click cloud update & deploy configuration</span>
+                                </div>
+                                <i data-lucide="check" class="check-icon"></i>
+                            </div>
+                            <div class="master-dropdown-item item-danger" data-master-sub="reset-app" data-icon="trash-2" data-title="Reset App" id="tab-master-reset-app">
+                                <div class="item-icon-box"><i data-lucide="trash-2"></i></div>
+                                <div class="item-text-box">
+                                    <strong>Reset App</strong>
+                                    <span>Permanently clear transactions & reset ledger</span>
+                                </div>
+                                <i data-lucide="check" class="check-icon"></i>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="master-content-panel">
@@ -993,9 +1069,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=4.1.0"></script>
-    <script src="app.js?v=4.1.0"></script>
-    <script src="sindhu_v1.js?v=4.1.0"></script>
+    <script src="firebase-config.js?v=4.3.0"></script>
+    <script src="app.js?v=4.3.0"></script>
+    <script src="sindhu_v1.js?v=4.3.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">
