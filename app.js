@@ -638,9 +638,10 @@ function getAccountLedger(accountId) {
     state.transactions.forEach(tx => {
         if (tx.mode === account.name) {
             const client = state.clients.find(c => c.id === tx.clientId);
+            const fundSuffix = client ? ` [Party: ${client.name}]` : (tx.clientId === 'opening_balance' || (typeof tx.clientId === 'string' && tx.clientId.startsWith('opening_')) ? ` [Fund: Bank Opening Balance]` : '');
             ledger.push({
                 date: tx.date,
-                particulars: `${tx.description}` + (client ? ` [Party: ${client.name}]` : ''),
+                particulars: `${tx.description}${fundSuffix}`,
                 category: tx.category,
                 debit: 0,
                 credit: Number(tx.amount),
@@ -921,7 +922,7 @@ function renderDashboard() {
     } else {
         latestTx.forEach(tx => {
             const client = state.clients.find(c => c.id === tx.clientId);
-            const clientLabel = client ? client.name : 'General';
+            const clientLabel = client ? client.name : (tx.clientId === 'opening_balance' || (typeof tx.clientId === 'string' && tx.clientId.startsWith('opening_')) ? 'Bank Opening Balance' : 'General');
             const firstCat = Object.keys(state.categoriesConfig)[0] || 'Others';
             const catMeta = state.categoriesConfig[tx.category] || state.categoriesConfig[firstCat] || { color: '#64748b', icon: 'tag' };
             
@@ -1323,7 +1324,10 @@ function renderExpensesPage() {
 
     sorted.forEach(tx => {
         const client = state.clients.find(c => c.id === tx.clientId);
-        const clientLabel = client ? client.name : '<span style="color:var(--text-muted); font-style:italic;">General</span>';
+        let clientLabel = client ? client.name : '<span style="color:var(--text-muted); font-style:italic;">General</span>';
+        if (tx.clientId === 'opening_balance' || (typeof tx.clientId === 'string' && tx.clientId.startsWith('opening_'))) {
+            clientLabel = '<span style="color:var(--primary); font-weight:600;"><i data-lucide="landmark" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:2px;"></i> Bank Opening Balance</span>';
+        }
         
         let customCells = '';
         state.customTxFields.forEach(f => {
@@ -2765,10 +2769,15 @@ function openExpenseModal(editId = '') {
     const accSelect = document.getElementById('expense-account-select');
     form.reset();
 
-    clientSelect.innerHTML = '<option value="">None / General Expense</option>';
-    state.clients.forEach(c => {
-        clientSelect.innerHTML += `<option value="${c.id}">${c.name}</option>`;
-    });
+    clientSelect.innerHTML = `
+        <option value="">None / General Expense</option>
+        <optgroup label="Capital / Opening Funds">
+            <option value="opening_balance">🏦 Bank / Cash Opening Balance</option>
+        </optgroup>
+        <optgroup label="Party / Client Funds">
+            ${state.clients.map(c => `<option value="${c.id}">👤 ${c.name} (${c.group || 'Client'})</option>`).join('')}
+        </optgroup>
+    `;
 
     accSelect.innerHTML = '';
     state.accounts.forEach(a => {
@@ -3066,7 +3075,7 @@ function exportToExcel() {
             "Description": tx.description,
             "Category": tx.category,
             "Paid From Account": tx.mode,
-            "Fund Source Client": client ? client.name : 'General',
+            "Fund Source Client": client ? client.name : (tx.clientId === 'opening_balance' || (typeof tx.clientId === 'string' && tx.clientId.startsWith('opening_')) ? 'Bank Opening Balance' : 'General'),
             "Amount Spent (INR)": tx.amount
         };
         state.customTxFields.forEach(f => {

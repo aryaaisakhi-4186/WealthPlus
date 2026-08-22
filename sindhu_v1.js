@@ -830,23 +830,28 @@
         if (parsed.action === 'addExpense') {
             let clientId = '';
             if (parsed.clientName && typeof state !== 'undefined') {
-                let client = state.clients.find(c => c.name.toLowerCase() === parsed.clientName.toLowerCase());
-                if (!client) {
-                    client = {
-                        id: 'c_' + Date.now(),
-                        name: parsed.clientName,
-                        monthlyPay: 0
-                    };
-                    if (state.customClientFields) {
-                        state.customClientFields.forEach(f => {
-                            client[f.name] = f.type === 'number' ? 0 : '';
-                        });
+                const cLow = parsed.clientName.toLowerCase();
+                if (cLow.includes('opening balance') || cLow.includes('bank opening') || cLow === 'opening') {
+                    clientId = 'opening_balance';
+                } else {
+                    let client = state.clients.find(c => c.name.toLowerCase() === parsed.clientName.toLowerCase());
+                    if (!client) {
+                        client = {
+                            id: 'c_' + Date.now(),
+                            name: parsed.clientName,
+                            monthlyPay: 0
+                        };
+                        if (state.customClientFields) {
+                            state.customClientFields.forEach(f => {
+                                client[f.name] = f.type === 'number' ? 0 : '';
+                            });
+                        }
+                        if (typeof addClientDirect === 'function') {
+                            addClientDirect(client);
+                        }
                     }
-                    if (typeof addClientDirect === 'function') {
-                        addClientDirect(client);
-                    }
+                    clientId = client.id;
                 }
-                clientId = client.id;
             }
             
             let dateStr = parsed.date;
