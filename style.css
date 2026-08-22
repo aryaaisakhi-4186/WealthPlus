@@ -1404,10 +1404,11 @@ h1, h2, h3, h4, h5, h6 {
     height: var(--bottom-nav-height);
     background: var(--bg-secondary);
     border-top: 1px solid var(--border-color);
-    z-index: 100;
+    z-index: 9995;
     justify-content: space-around;
     align-items: center;
     box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.02);
+    pointer-events: auto;
 }
 
 .bottom-nav-item {
@@ -1423,9 +1424,15 @@ h1, h2, h3, h4, h5, h6 {
     flex: 1;
     height: 100%;
     transition: var(--transition);
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    pointer-events: auto;
 }
 
-.bottom-nav-item i { width: 18px; height: 18px; }
+.bottom-nav-item i { width: 18px; height: 18px; pointer-events: none; }
+.bottom-nav-item span { pointer-events: none; }
 .bottom-nav-item.active { color: var(--primary); }
 
 /* Keyframes & Animations */
@@ -1570,6 +1577,7 @@ h1, h2, h3, h4, h5, h6 {
     right: 24px;
     z-index: 10000;
     font-family: 'Plus Jakarta Sans', sans-serif;
+    pointer-events: none;
 }
 
 .sindhu-toggle-btn {
@@ -1586,6 +1594,7 @@ h1, h2, h3, h4, h5, h6 {
     justify-content: center;
     transition: var(--transition);
     position: relative;
+    pointer-events: auto;
 }
 
 .sindhu-toggle-btn:hover {
@@ -1626,6 +1635,7 @@ h1, h2, h3, h4, h5, h6 {
     overflow: hidden;
     transition: var(--transition);
     transform-origin: bottom right;
+    pointer-events: auto;
 }
 
 .sindhu-chat-window.active {
@@ -2017,22 +2027,31 @@ h1, h2, h3, h4, h5, h6 {
 /* Mobile responsive fixes */
 @media (max-width: 576px) {
     .sindhu-widget {
-        right: 12px !important;
-        bottom: 12px !important;
-        left: 12px !important;
+        position: fixed !important;
+        bottom: calc(var(--bottom-nav-height) + 14px) !important;
+        right: 16px !important;
+        left: auto !important;
         width: auto !important;
+        pointer-events: none !important;
+        z-index: 10000 !important;
+    }
+
+    .sindhu-toggle-btn {
+        pointer-events: auto !important;
     }
     
     .sindhu-chat-window {
         position: fixed !important;
         top: 12px !important;
         right: 12px !important;
-        bottom: 80px !important;
+        bottom: calc(var(--bottom-nav-height) + 16px) !important;
         left: 12px !important;
         width: auto !important;
         height: auto !important;
         border-radius: var(--radius-lg) !important;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
+        pointer-events: auto !important;
+        z-index: 10001 !important;
     }
     
     .form-group-row {

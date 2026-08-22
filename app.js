@@ -2022,7 +2022,9 @@ function initEventHandlers() {
     document.querySelectorAll('.menu-item, .bottom-nav-item').forEach(el => {
         el.addEventListener('click', function(e) {
             e.preventDefault();
-            navigateToPage(this.getAttribute('data-page'));
+            e.stopPropagation();
+            const page = this.getAttribute('data-page');
+            if (page) navigateToPage(page);
         });
     });
 
