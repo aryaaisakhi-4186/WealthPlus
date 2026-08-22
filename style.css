@@ -1106,6 +1106,162 @@ h1, h2, h3, h4, h5, h6 {
     padding-top: 10px;
 }
 
+/* Expense Category Accordion Cards */
+.expense-category-card {
+    background: var(--bg-secondary);
+    border: 1.5px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 6px;
+}
+
+.expense-category-card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary);
+}
+
+.expense-category-card.expanded {
+    border-color: var(--primary);
+    background: var(--bg-secondary);
+    box-shadow: 0 4px 16px rgba(13, 148, 136, 0.1);
+}
+
+.exp-cat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.expense-category-card.expanded .exp-cat-header {
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 8px;
+}
+
+.exp-cat-title-col {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.exp-cat-color-pill {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.exp-cat-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.exp-cat-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.exp-cat-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.exp-cat-count-badge {
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 4px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.exp-cat-total-col {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.exp-cat-amount {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--danger);
+    font-family: 'Outfit', sans-serif;
+    text-align: right;
+}
+
+.exp-cat-pct {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+.exp-chevron-icon {
+    width: 15px;
+    height: 15px;
+    transition: transform 0.25s ease;
+}
+
+.expense-category-card.expanded .exp-chevron-icon {
+    transform: rotate(180deg);
+}
+
+.exp-cat-body {
+    padding-top: 4px;
+    animation: fadeInSlideDown 0.2s ease forwards;
+}
+
+.exp-cat-table-wrapper {
+    overflow-x: auto;
+    margin-top: 6px;
+}
+
+.exp-cat-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.exp-cat-table th {
+    text-align: left;
+    padding: 6px 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    font-weight: 600;
+}
+
+.exp-cat-table td {
+    padding: 8px 8px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.exp-cat-table tr:last-child td {
+    border-bottom: none;
+}
+
+.exp-cat-table tr:hover td {
+    background: rgba(13, 148, 136, 0.04);
+}
+
 /* Reports Page Layout */
 .reports-header-bar {
     display: flex;

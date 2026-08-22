@@ -23,7 +23,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=5.8.0">
+    <link rel="stylesheet" href="style.css?v=5.9.0">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -308,13 +308,55 @@
                 <!-- 3. EXPENSES PAGE -->
                 <section id="page-expenses" class="app-page">
                     <div class="section-actions-header">
-                        <h3>Wealth Plus Entries</h3>
+                        <div>
+                            <h3 style="margin-bottom: 4px;">Wealth Plus Expenses</h3>
+                            <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">Category-wise expense breakdown & records</p>
+                        </div>
                         <button class="btn btn-primary" id="btn-add-expense">
                             <i data-lucide="plus"></i> Add Expense
                         </button>
                     </div>
 
-                    <div class="table-container">
+                    <!-- Expense Search & Category Filter Bar -->
+                    <div class="party-filter-dropdown-wrapper" style="margin-bottom: 16px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                            <label style="font-size: 13px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                <i data-lucide="tags" style="width: 16px; height: 16px; color: var(--primary);"></i>
+                                Expense Categories:
+                            </label>
+                            <span id="expense-total-badge" class="badge" style="font-size: 12px; padding: 4px 10px;">Total: ₹0 (0 Entries)</span>
+                        </div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                            <div class="searchable-input-wrapper" style="flex: 1; min-width: 220px; position: relative;">
+                                <i data-lucide="search" class="search-input-icon" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted);"></i>
+                                <input type="text" id="expense-search-input" class="searchable-input" placeholder="🔍 Search expenses by description, fund, amount..." autocomplete="off" style="width: 100%; padding: 9px 36px 9px 36px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 13px;">
+                                <button type="button" class="btn-clear-search" id="btn-clear-expense-search" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;" title="Clear search">
+                                    <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                                </button>
+                            </div>
+                            <div style="min-width: 180px; flex-shrink: 0;">
+                                <select id="expense-category-filter-select" class="party-category-select" style="width: 100%; padding: 9px 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-weight: 600; font-size: 13px;">
+                                    <option value="all">📁 All Categories</option>
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Category-Wise Accordion Cards Grid -->
+                    <div id="expense-categories-accordion-container" class="clients-grid" style="margin-bottom: 20px;">
+                        <!-- Rendered dynamically -->
+                    </div>
+
+                    <!-- All Transactions Flat Table (Collapsible) -->
+                    <div class="section-actions-header" style="margin-top: 16px; margin-bottom: 12px;">
+                        <h4 style="margin: 0; font-size: 15px; color: var(--text-primary);">All Expense Transactions</h4>
+                        <button class="btn btn-outline btn-sm" id="btn-toggle-expense-flat-table" onclick="toggleExpenseFlatTable()" style="font-size: 11px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 5px;">
+                            <i data-lucide="table" style="width: 12px; height: 12px;"></i> <span id="toggle-flat-table-text">Hide Table View</span>
+                        </button>
+                    </div>
+
+                    <div class="table-container" id="expense-flat-table-container">
                         <table class="data-table" id="table-expenses">
                             <thead>
                                 <tr id="expense-table-headers">
@@ -1238,9 +1280,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=5.8.0"></script>
-    <script src="app.js?v=5.8.0"></script>
-    <script src="sindhu_v1.js?v=5.8.0"></script>
+    <script src="firebase-config.js?v=5.9.0"></script>
+    <script src="app.js?v=5.9.0"></script>
+    <script src="sindhu_v1.js?v=5.9.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

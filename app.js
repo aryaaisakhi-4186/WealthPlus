@@ -1422,60 +1422,271 @@ function renderIncomeLogsTable() {
     lucide.createIcons();
 }
 
+// EXPENSES ACCORDION & HELPERS
+window.toggleExpenseCategoryCard = function(catKey) {
+    const card = document.getElementById(`exp-cat-card-${catKey}`);
+    if (!card) return;
+    const body = card.querySelector('.exp-cat-body');
+    if (!body) return;
+    
+    const isExpanded = card.classList.contains('expanded');
+    if (isExpanded) {
+        card.classList.remove('expanded');
+        body.style.display = 'none';
+    } else {
+        card.classList.add('expanded');
+        body.style.display = 'block';
+        if (window.lucide) lucide.createIcons();
+    }
+};
+
+window.openAddExpenseForCategory = function(catName) {
+    openExpenseModal();
+    const select = document.getElementById('expense-category');
+    if (select) select.value = catName;
+};
+
+window.toggleExpenseFlatTable = function() {
+    const container = document.getElementById('expense-flat-table-container');
+    const textSpan = document.getElementById('toggle-flat-table-text');
+    if (!container) return;
+    if (container.style.display === 'none') {
+        container.style.display = 'block';
+        if (textSpan) textSpan.innerText = 'Hide Table View';
+    } else {
+        container.style.display = 'none';
+        if (textSpan) textSpan.innerText = 'Show Table View';
+    }
+};
+
 // EXPENSES PAGE RENDERER
 function renderExpensesPage() {
-    const trHeaders = document.getElementById('expense-table-headers');
-    trHeaders.innerHTML = `
-        <th>Date</th>
-        <th>Description</th>
-        <th>Category</th>
-        <th>Paid From Account</th>
-        <th>Fund Source Client</th>
-        <th>Amount</th>
-    `;
-    state.customTxFields.forEach(f => {
-        trHeaders.innerHTML += `<th>${f.name}</th>`;
-    });
-    trHeaders.innerHTML += `<th class="actions-col">Actions</th>`;
+    const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
+    const totalBadge = document.getElementById('expense-total-badge');
+    const catSelect = document.getElementById('expense-category-filter-select');
+    const searchInput = document.getElementById('expense-search-input');
+    const searchQuery = (searchInput ? searchInput.value : '').trim().toLowerCase();
+    const selectedCat = (catSelect ? catSelect.value : 'all') || 'all';
 
-    const tbody = document.getElementById('expenses-tbody');
-    tbody.innerHTML = '';
-    const sorted = [...state.transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // Compute Overall Statistics
+    const allExpenses = state.transactions;
+    const totalAllAmount = allExpenses.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const totalAllCount = allExpenses.length;
 
-    if (sorted.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${7 + state.customTxFields.length}" style="text-align:center; color:var(--text-muted); padding:32px;">No expense entries logged.</td></tr>`;
-        lucide.createIcons();
-        return;
+    if (totalBadge) {
+        totalBadge.innerText = `Total: ${fC(totalAllAmount)} (${totalAllCount} Entries)`;
     }
 
-    sorted.forEach(tx => {
-        const clientLabel = resolveFundSourceLabel(tx.clientId);
+    // Populate Category Filter Dropdown if options not yet matching or updated
+    if (catSelect) {
+        const currentVal = catSelect.value || 'all';
+        let catOptions = `<option value="all">📁 All Categories (${totalAllCount})</option>`;
         
-        let customCells = '';
-        state.customTxFields.forEach(f => {
-            const val = tx[f.name] || '-';
-            customCells += `<td>${val}</td>`;
+        const allCatNames = Array.from(new Set([
+            ...Object.keys(state.categoriesConfig),
+            ...state.transactions.map(t => t.category).filter(Boolean)
+        ]));
+
+        allCatNames.forEach(cat => {
+            const catTxs = state.transactions.filter(t => t.category === cat);
+            const catSum = catTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+            catOptions += `<option value="${cat}">${cat} (${catTxs.length} • ${fC(catSum)})</option>`;
         });
 
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${formatDbDate(tx.date)}</td>
-            <td style="font-weight:600;">${tx.description}</td>
-            <td><span class="cat-pill" style="background:${state.categoriesConfig[tx.category]?.color || '#64748b'}">${tx.category}</span></td>
-            <td><span class="badge-acctype">${tx.mode}</span></td>
-            <td>${clientLabel}</td>
-            <td style="font-weight:700;">-₹${Number(tx.amount).toLocaleString('en-IN')}</td>
-            ${customCells}
-            <td class="actions-col">
-                <div class="actions-wrapper">
-                    <button class="btn-icon-only edit-btn" onclick="openEditExpense('${tx.id}')"><i data-lucide="edit-3"></i></button>
-                    <button class="btn-icon-only delete-btn" style="display: var(--staff-access-display, inline-flex);" onclick="deleteExpense('${tx.id}')"><i data-lucide="trash-2"></i></button>
-                </div>
-            </td>
+        catSelect.innerHTML = catOptions;
+        if (currentVal && Array.from(catSelect.options).some(o => o.value === currentVal)) {
+            catSelect.value = currentVal;
+        }
+    }
+
+    // Filter transactions by Category and Search Query
+    let filteredTxs = allExpenses;
+    if (selectedCat !== 'all') {
+        filteredTxs = filteredTxs.filter(t => t.category === selectedCat);
+    }
+
+    if (searchQuery) {
+        filteredTxs = filteredTxs.filter(tx => {
+            const descMatch = tx.description && tx.description.toLowerCase().includes(searchQuery);
+            const catMatch = tx.category && tx.category.toLowerCase().includes(searchQuery);
+            const modeMatch = tx.mode && tx.mode.toLowerCase().includes(searchQuery);
+            const amountMatch = tx.amount && String(tx.amount).includes(searchQuery);
+            const fundText = resolveFundSourceText(tx.clientId).toLowerCase();
+            const fundMatch = fundText.includes(searchQuery);
+            return descMatch || catMatch || modeMatch || amountMatch || fundMatch;
+        });
+    }
+
+    // Sort transactions by date descending
+    const sorted = [...filteredTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // 1. RENDER CATEGORY ACCORDION CARDS
+    const accordionContainer = document.getElementById('expense-categories-accordion-container');
+    if (accordionContainer) {
+        accordionContainer.innerHTML = '';
+
+        if (sorted.length === 0) {
+            const msg = searchQuery 
+                ? `No expense entries found matching "${searchQuery}".` 
+                : (selectedCat !== 'all') ? `No expenses logged in category "${selectedCat}".` : 'No expense entries logged yet.';
+            accordionContainer.innerHTML = `<div class="empty-state" style="grid-column: 1/-1; padding: 32px 16px; text-align: center;">${msg}</div>`;
+        } else {
+            // Group filtered transactions by Category
+            const groups = {};
+            sorted.forEach(tx => {
+                const cat = tx.category || 'Others';
+                if (!groups[cat]) groups[cat] = [];
+                groups[cat].push(tx);
+            });
+
+            const catKeys = Object.keys(groups);
+
+            catKeys.forEach(cat => {
+                const txList = groups[cat];
+                const catTotal = txList.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+                const catMeta = state.categoriesConfig[cat] || { color: '#64748b', icon: 'tag' };
+                const pct = totalAllAmount > 0 ? Math.round((catTotal / totalAllAmount) * 100) : 0;
+                const safeKey = cat.replace(/[^a-zA-Z0-9]/g, '_');
+                const autoExpand = Boolean(searchQuery);
+
+                let rowsHTML = '';
+                txList.forEach(tx => {
+                    const clientLabel = resolveFundSourceLabel(tx.clientId);
+                    let customCells = '';
+                    state.customTxFields.forEach(f => {
+                        const val = tx[f.name] || '-';
+                        customCells += `<span>${f.name}: <strong>${val}</strong></span>`;
+                    });
+
+                    rowsHTML += `
+                        <tr>
+                            <td><span style="font-weight:600; color:var(--text-secondary); font-size:11px;">${formatDbDate(tx.date)}</span></td>
+                            <td>
+                                <div style="font-weight:600; color:var(--text-primary);">${tx.description}</div>
+                                ${customCells ? `<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${customCells}</div>` : ''}
+                            </td>
+                            <td><span class="badge-acctype" style="font-size:10px; padding:2px 6px;">${tx.mode}</span></td>
+                            <td><span style="font-size:11px;">${clientLabel}</span></td>
+                            <td style="font-weight:700; color:var(--danger); white-space:nowrap;">-₹${Number(tx.amount).toLocaleString('en-IN')}</td>
+                            <td style="text-align:right; white-space:nowrap;">
+                                <div class="actions-wrapper" style="justify-content:flex-end;">
+                                    <button class="btn-icon-only edit-btn" onclick="event.stopPropagation(); openEditExpense('${tx.id}')" title="Edit Expense"><i data-lucide="edit-3" style="width:13px; height:13px;"></i></button>
+                                    <button class="btn-icon-only delete-btn" style="display: var(--staff-access-display, inline-flex);" onclick="event.stopPropagation(); deleteExpense('${tx.id}')" title="Delete Expense"><i data-lucide="trash-2" style="width:13px; height:13px;"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                const card = document.createElement('div');
+                card.className = `expense-category-card ${autoExpand ? 'expanded' : ''}`;
+                card.id = `exp-cat-card-${safeKey}`;
+                card.onclick = () => toggleExpenseCategoryCard(safeKey);
+
+                card.innerHTML = `
+                    <div class="exp-cat-header">
+                        <div class="exp-cat-title-col">
+                            <span class="exp-cat-color-pill" style="background: ${catMeta.color};"></span>
+                            <div class="exp-cat-info">
+                                <div class="exp-cat-name-row">
+                                    <h4 class="exp-cat-name">${cat}</h4>
+                                    <span class="exp-cat-count-badge">${txList.length} ${txList.length === 1 ? 'entry' : 'entries'}</span>
+                                </div>
+                                <span class="exp-cat-pct">${pct}% of total expenses</span>
+                            </div>
+                        </div>
+                        <div class="exp-cat-total-col">
+                            <div class="exp-cat-amount">-₹${Math.round(catTotal).toLocaleString('en-IN')}</div>
+                            <div class="party-card-toggle-btn" title="Click to view/hide transactions">
+                                <i data-lucide="chevron-down" class="exp-chevron-icon"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="exp-cat-body" style="display: ${autoExpand ? 'block' : 'none'};">
+                        <div class="exp-cat-table-wrapper">
+                            <table class="exp-cat-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Description</th>
+                                        <th>Account</th>
+                                        <th>Fund Source</th>
+                                        <th>Amount</th>
+                                        <th style="text-align:right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rowsHTML}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style="display:flex; justify-content:flex-end; margin-top:10px; padding-top:8px; border-top:1px dashed var(--border-color);" onclick="event.stopPropagation()">
+                            <button class="btn btn-outline btn-sm" onclick="openAddExpenseForCategory('${cat}')" style="font-size:11px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px; color:var(--primary); border-color:var(--primary); font-weight:600;">
+                                <i data-lucide="plus" style="width:12px; height:12px;"></i> Add to ${cat}
+                            </button>
+                        </div>
+                    </div>
+                `;
+                accordionContainer.appendChild(card);
+            });
+        }
+    }
+
+    // 2. RENDER DETAILED FLAT TABLE
+    const trHeaders = document.getElementById('expense-table-headers');
+    if (trHeaders) {
+        trHeaders.innerHTML = `
+            <th>Date</th>
+            <th>Description</th>
+            <th>Category</th>
+            <th>Paid From Account</th>
+            <th>Fund Source Client</th>
+            <th>Amount</th>
         `;
-        tbody.appendChild(tr);
-    });
-    lucide.createIcons();
+        state.customTxFields.forEach(f => {
+            trHeaders.innerHTML += `<th>${f.name}</th>`;
+        });
+        trHeaders.innerHTML += `<th class="actions-col">Actions</th>`;
+    }
+
+    const tbody = document.getElementById('expenses-tbody');
+    if (tbody) {
+        tbody.innerHTML = '';
+
+        if (sorted.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="${7 + state.customTxFields.length}" style="text-align:center; color:var(--text-muted); padding:32px;">No expense entries logged.</td></tr>`;
+        } else {
+            sorted.forEach(tx => {
+                const clientLabel = resolveFundSourceLabel(tx.clientId);
+                
+                let customCells = '';
+                state.customTxFields.forEach(f => {
+                    const val = tx[f.name] || '-';
+                    customCells += `<td>${val}</td>`;
+                });
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${formatDbDate(tx.date)}</td>
+                    <td style="font-weight:600;">${tx.description}</td>
+                    <td><span class="cat-pill" style="background:${state.categoriesConfig[tx.category]?.color || '#64748b'}">${tx.category}</span></td>
+                    <td><span class="badge-acctype">${tx.mode}</span></td>
+                    <td>${clientLabel}</td>
+                    <td style="font-weight:700; color:var(--danger);">-₹${Number(tx.amount).toLocaleString('en-IN')}</td>
+                    ${customCells}
+                    <td class="actions-col">
+                        <div class="actions-wrapper">
+                            <button class="btn-icon-only edit-btn" onclick="openEditExpense('${tx.id}')"><i data-lucide="edit-3"></i></button>
+                            <button class="btn-icon-only delete-btn" style="display: var(--staff-access-display, inline-flex);" onclick="deleteExpense('${tx.id}')"><i data-lucide="trash-2"></i></button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    }
+
+    if (window.lucide) lucide.createIcons();
 }
 
 // REPORTS PAGE RENDERER
@@ -2471,6 +2682,34 @@ function initEventHandlers() {
             btnClearPartySearch.style.display = 'none';
             partySearchInput.focus();
             renderClientsPage();
+        });
+    }
+
+    // Expense Category Filter Dropdown
+    const expenseCatSelect = document.getElementById('expense-category-filter-select');
+    if (expenseCatSelect) {
+        expenseCatSelect.addEventListener('change', function() {
+            renderExpensesPage();
+        });
+    }
+
+    // Expense Live Search Input
+    const expenseSearchInput = document.getElementById('expense-search-input');
+    const btnClearExpenseSearch = document.getElementById('btn-clear-expense-search');
+    if (expenseSearchInput) {
+        expenseSearchInput.addEventListener('input', function() {
+            if (btnClearExpenseSearch) {
+                btnClearExpenseSearch.style.display = this.value ? 'block' : 'none';
+            }
+            renderExpensesPage();
+        });
+    }
+    if (btnClearExpenseSearch && expenseSearchInput) {
+        btnClearExpenseSearch.addEventListener('click', function() {
+            expenseSearchInput.value = '';
+            btnClearExpenseSearch.style.display = 'none';
+            expenseSearchInput.focus();
+            renderExpensesPage();
         });
     }
 
