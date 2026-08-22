@@ -23,7 +23,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=5.5.0">
+    <link rel="stylesheet" href="style.css?v=5.6.0">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -239,7 +239,7 @@
                             <h3 style="margin-bottom: 4px;">Parties Directory</h3>
                             <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">Manage Clients (Debtors) & Vendors (Creditors)</p>
                         </div>
-                        <button class="btn btn-primary" id="btn-add-client">
+                        <button class="btn btn-primary" id="btn-add-client" onclick="openClientModal()">
                             <i data-lucide="user-plus"></i> Add Party
                         </button>
                     </div>
@@ -569,8 +569,14 @@
 
                         <!-- Panel B: Parties Setup -->
                         <div id="master-panel-clients-config" class="master-sub-panel">
-                            <div class="panel-action-header">
-                                <h4>Parties Settings (Sundry Debtors & Creditors)</h4>
+                            <div class="panel-action-header" style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
+                                <div>
+                                    <h4>Parties Settings (Clients & Vendors)</h4>
+                                    <p style="font-size:12px; color:var(--text-secondary);">Manage debtors, creditors, credit amounts and retainers.</p>
+                                </div>
+                                <button type="button" class="btn btn-primary btn-sm" id="btn-master-add-party" onclick="openClientModal()" style="display:inline-flex; align-items:center; gap:6px;">
+                                    <i data-lucide="user-plus" style="width:14px; height:14px;"></i> + Add Party
+                                </button>
                             </div>
                             <div class="table-container">
                                 <table class="data-table">
@@ -938,7 +944,7 @@
         <div class="modal-box">
             <div class="modal-header">
                 <h4 id="modal-client-title">Add New Party</h4>
-                <button class="btn-close-modal" id="btn-close-client-modal"><i data-lucide="x"></i></button>
+                <button class="btn-close-modal" id="btn-close-client-modal" onclick="closeClientModal()"><i data-lucide="x"></i></button>
             </div>
             <form id="form-client" class="modal-form">
                 <input type="hidden" id="edit-client-id">
@@ -978,7 +984,7 @@
                 <div id="client-modal-custom-fields-container"></div>
                 
                 <div class="modal-footer-actions">
-                    <button type="button" class="btn btn-outline" id="btn-cancel-client">Cancel</button>
+                    <button type="button" class="btn btn-outline" id="btn-cancel-client" onclick="closeClientModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save Party</button>
                 </div>
             </form>
@@ -1209,9 +1215,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=5.5.0"></script>
-    <script src="app.js?v=5.5.0"></script>
-    <script src="sindhu_v1.js?v=5.5.0"></script>
+    <script src="firebase-config.js?v=5.6.0"></script>
+    <script src="app.js?v=5.6.0"></script>
+    <script src="sindhu_v1.js?v=5.6.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

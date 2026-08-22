@@ -2535,62 +2535,86 @@ window.deleteMember = function(id) {
 };
 
 // Party CRUD
-function openClientModal(editId = '') {
+window.openClientModal = function(editId = '') {
     const modal = document.getElementById('modal-client');
     const title = document.getElementById('modal-client-title');
     const form = document.getElementById('form-client');
-    form.reset();
+    if (!modal) return;
+    if (form) form.reset();
 
     const customContainer = document.getElementById('client-modal-custom-fields-container');
-    customContainer.innerHTML = '';
+    if (customContainer) customContainer.innerHTML = '';
+
+    const creditInp = document.getElementById('client-credit-amount');
+    const monthlyInp = document.getElementById('client-monthly-pay');
+    const yearlyInp = document.getElementById('client-yearly-pay');
+    const openingInp = document.getElementById('client-opening-balance');
+    const groupInp = document.getElementById('client-group');
+    const nameInp = document.getElementById('client-name');
+    const editIdInp = document.getElementById('edit-client-id');
 
     if (editId) {
         const client = state.clients.find(c => c.id === editId);
         if (client) {
-            title.innerText = 'Edit Party Details';
-            document.getElementById('edit-client-id').value = client.id;
-            document.getElementById('client-name').value = client.name;
-            document.getElementById('client-group').value = isVendorParty(client) ? 'Vendor' : 'Client';
-            document.getElementById('client-credit-amount').value = client.creditAmount !== undefined ? client.creditAmount : 0;
+            if (title) title.innerText = 'Edit Party Details';
+            if (editIdInp) editIdInp.value = client.id;
+            if (nameInp) nameInp.value = client.name;
+            if (groupInp) groupInp.value = isVendorParty(client) ? 'Vendor' : 'Client';
+            if (creditInp) creditInp.value = client.creditAmount !== undefined ? client.creditAmount : 0;
             const m = Number(client.monthlyPay) || 0;
             const y = Number(client.yearlyPay) || (m * 12);
-            document.getElementById('client-monthly-pay').value = m || '';
-            document.getElementById('client-yearly-pay').value = y || '';
-            document.getElementById('client-opening-balance').value = client.openingBalance !== undefined ? client.openingBalance : 0;
+            if (monthlyInp) monthlyInp.value = m || '';
+            if (yearlyInp) yearlyInp.value = y || '';
+            if (openingInp) openingInp.value = client.openingBalance !== undefined ? client.openingBalance : 0;
             
+            if (customContainer && state.customClientFields) {
+                state.customClientFields.forEach(f => {
+                    const val = client[f.name] || '';
+                    customContainer.innerHTML += `
+                        <div class="form-group">
+                            <label for="custom-field-${f.name}">${f.name}</label>
+                            <input type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" id="custom-field-${f.name}" name="${f.name}" value="${val}" placeholder="Enter ${f.name}...">
+                        </div>
+                    `;
+                });
+            }
+        }
+    } else {
+        if (title) title.innerText = 'Add New Party';
+        if (editIdInp) editIdInp.value = '';
+        if (nameInp) nameInp.value = '';
+        if (groupInp) groupInp.value = (state.partyFilter === 'vendor' || state.partyFilter === 'creditor') ? 'Vendor' : 'Client';
+        if (creditInp) creditInp.value = '0';
+        if (monthlyInp) monthlyInp.value = '';
+        if (yearlyInp) yearlyInp.value = '';
+        if (openingInp) openingInp.value = '0';
+        
+        if (customContainer && state.customClientFields) {
             state.customClientFields.forEach(f => {
-                const val = client[f.name] || '';
                 customContainer.innerHTML += `
                     <div class="form-group">
                         <label for="custom-field-${f.name}">${f.name}</label>
-                        <input type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" id="custom-field-${f.name}" name="${f.name}" value="${val}" placeholder="Enter ${f.name}...">
+                        <input type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" id="custom-field-${f.name}" name="${f.name}" placeholder="Enter ${f.name}...">
                     </div>
                 `;
             });
         }
-    } else {
-        title.innerText = 'Add New Party';
-        document.getElementById('edit-client-id').value = '';
-        document.getElementById('client-group').value = (state.partyFilter === 'vendor' || state.partyFilter === 'creditor') ? 'Vendor' : 'Client';
-        document.getElementById('client-credit-amount').value = '0';
-        document.getElementById('client-monthly-pay').value = '';
-        document.getElementById('client-yearly-pay').value = '';
-        document.getElementById('client-opening-balance').value = '0';
-        
-        state.customClientFields.forEach(f => {
-            customContainer.innerHTML += `
-                <div class="form-group">
-                    <label for="custom-field-${f.name}">${f.name}</label>
-                    <input type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" id="custom-field-${f.name}" name="${f.name}" placeholder="Enter ${f.name}...">
-                </div>
-            `;
-        });
     }
     modal.classList.add('active');
+    if (window.lucide) lucide.createIcons();
+};
+
+window.closeClientModal = function() {
+    const modal = document.getElementById('modal-client');
+    if (modal) modal.classList.remove('active');
+};
+
+function openClientModal(editId = '') {
+    window.openClientModal(editId);
 }
 
 function closeClientModal() {
-    document.getElementById('modal-client').classList.remove('active');
+    window.closeClientModal();
 }
 
 function handleClientSubmit(e) {
