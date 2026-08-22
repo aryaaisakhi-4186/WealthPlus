@@ -21,8 +21,16 @@
     <!-- PWA Manifest & Mobile Web App support -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4f46e5">
-    <link rel="apple-touch-icon" href="https://img.icons8.com/fluency/192/000000/accounting.png">
-    <link rel="stylesheet" href="style.css?v=4.5.0">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="stylesheet" href="style.css?v=4.6.0">
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('PWA Service Worker registered:', reg.scope))
+          .catch(err => console.error('PWA Service Worker registration failed:', err));
+      }
+    </script>
 </head>
 <body class="light-theme">
 

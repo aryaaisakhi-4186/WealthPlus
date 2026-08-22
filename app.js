@@ -3029,11 +3029,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('Service Worker registered:', reg.scope))
-                .catch(err => console.error('Service Worker registration failed:', err));
-        });
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('Service Worker active:', reg.scope))
+            .catch(err => console.error('Service Worker registration failed:', err));
     }
 
     // PWA Install Button handlers
@@ -3064,7 +3062,7 @@ async function triggerPWAInstall() {
             const { outcome } = await deferredPrompt.userChoice;
             console.log(`User response to install: ${outcome}`);
             if (outcome === 'accepted') {
-                alert("Thank you! Wealth Plus is being installed on your device.");
+                alert("धन्यवाद! Wealth Plus आपके फ़ोन/डिवाइस में इंस्टॉल हो रही है।");
             }
             deferredPrompt = null;
         } catch (err) {
@@ -3073,14 +3071,21 @@ async function triggerPWAInstall() {
     } else {
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
         if (isStandalone) {
-            alert("Wealth Plus is already installed and running as a standalone app on your device!");
+            alert("Wealth Plus पहले से ही आपके डिवाइस में एक स्वतंत्र ऐप के रूप में इंस्टॉल है!");
+            return;
+        }
+
+        const isWebView = /(wv|WhatsApp|FB_IAB|FBAN|FBAV|Instagram)/i.test(navigator.userAgent);
+        if (isWebView) {
+            alert("⚠️ ध्यान दें: यह लिंक WhatsApp / अन्य ऐप के अंदर खुला है।\n\nऐप इंस्टॉल करने के लिए:\n1. ऊपर दाएँ कोने में 3 डॉट्स (⋮) पर टैप करें।\n2. 'Open in Chrome' (क्रोम में खोलें) चुनें।\n3. फिर यहाँ आकर 'Install App' पर क्लिक करें।");
+            return;
+        }
+
+        const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        if (isIos) {
+            alert("📱 iPhone / iPad में इंस्टॉल करने का तरीका:\n\n1. Safari ब्राउज़र में नीचे शेयर बटन (Share Icon) पर टैप करें।\n2. नीचे स्क्रॉल करके 'Add to Home Screen' चुनें।\n3. ऊपर दाएँ 'Add' पर क्लिक करें। ऐप होम स्क्रीन पर आ जाएगी!");
         } else {
-            const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-            if (isIos) {
-                alert("📱 How to install on iPhone/iPad:\n\n1. Tap the Share icon (at the bottom of Safari).\n2. Scroll down and tap 'Add to Home Screen'.\n3. Tap 'Add' at top right. Done!");
-            } else {
-                alert("📱 How to install on Android:\n\n1. Tap the 3 dots menu (⋮) at top-right in Chrome.\n2. Tap 'Install app' or 'Add to Home screen'.\n3. Tap 'Install' to confirm!");
-            }
+            alert("📱 Android (Chrome) में इंस्टॉल करने का तरीका:\n\n1. Chrome ब्राउज़र में सबसे ऊपर दाएँ कोने में 3 डॉट्स (⋮) पर टैप करें।\n2. लिस्ट में से 'Install app' (ऐप इंस्टॉल करें) या 'Add to Home screen' (होम स्क्रीन में जोड़ें) चुनें।\n3. 'Install' पर टैप करें — ऐप सीधे आपके फोन में आ जाएगी!");
         }
     }
 }

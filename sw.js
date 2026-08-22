@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wealth-plus-cache-v6';
+const CACHE_NAME = 'wealth-plus-cache-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -7,17 +7,25 @@ const ASSETS = [
   './sindhu_v1.js',
   './firebase-config.js',
   './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
   'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js',
-  'https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js',
+  'https://unpkg.com/lucide@latest',
   'https://cdn.jsdelivr.net/npm/chart.js',
-  'https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js'
+  'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
 ];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      for (const asset of ASSETS) {
+        try {
+          await cache.add(asset);
+        } catch (err) {
+          console.warn('SW: Failed to pre-cache', asset, err);
+        }
+      }
     }).then(() => self.skipWaiting())
   );
 });
