@@ -23,7 +23,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=5.7.0">
+    <link rel="stylesheet" href="style.css?v=5.8.0">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -244,20 +244,31 @@
                         </button>
                     </div>
 
-                    <!-- Party Category Dropdown Selector -->
-                    <div class="party-filter-dropdown-wrapper">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
-                            <label for="party-category-dropdown" style="font-size: 13px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
-                                <i data-lucide="layers" style="width: 16px; height: 16px; color: var(--primary);"></i>
-                                Filter by Category:
+                    <!-- Party Search & Category Filter Bar -->
+                    <div class="party-filter-dropdown-wrapper" style="margin-bottom: 16px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                            <label style="font-size: 13px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                <i data-lucide="users" style="width: 16px; height: 16px; color: var(--primary);"></i>
+                                Parties Directory:
                             </label>
                             <span id="party-category-count-badge" class="badge" style="font-size: 12px; padding: 4px 10px;">All Parties (0)</span>
                         </div>
-                        <select id="party-category-dropdown" class="party-category-select">
-                            <option value="all">📁 All Parties (Complete List)</option>
-                            <option value="client">🏢 Clients (Debtors — Receivables)</option>
-                            <option value="vendor">🏭 Vendors (Creditors — Payables)</option>
-                        </select>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                            <div class="searchable-input-wrapper" style="flex: 1; min-width: 220px; position: relative;">
+                                <i data-lucide="search" class="search-input-icon" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted);"></i>
+                                <input type="text" id="party-search-input" class="searchable-input" placeholder="🔍 Search party by name..." autocomplete="off" style="width: 100%; padding: 9px 36px 9px 36px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 13px;">
+                                <button type="button" class="btn-clear-search" id="btn-clear-party-search" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;" title="Clear search">
+                                    <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                                </button>
+                            </div>
+                            <div style="min-width: 180px; flex-shrink: 0;">
+                                <select id="party-category-dropdown" class="party-category-select" style="width: 100%; padding: 9px 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-weight: 600; font-size: 13px;">
+                                    <option value="all">📁 All Parties (Complete List)</option>
+                                    <option value="client">🏢 Clients (Debtors — Receivables)</option>
+                                    <option value="vendor">🏭 Vendors (Creditors — Payables)</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Parties Grid -->
@@ -1227,9 +1238,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=5.7.0"></script>
-    <script src="app.js?v=5.7.0"></script>
-    <script src="sindhu_v1.js?v=5.7.0"></script>
+    <script src="firebase-config.js?v=5.8.0"></script>
+    <script src="app.js?v=5.8.0"></script>
+    <script src="sindhu_v1.js?v=5.8.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

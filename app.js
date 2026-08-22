@@ -1181,6 +1181,37 @@ function isVendorParty(c) {
     return g === 'vendor' || g === 'creditor';
 }
 
+// PARTIES PAGE HELPERS & ACCORDION
+window.togglePartyCard = function(id) {
+    const card = document.getElementById(`party-card-${id}`);
+    if (!card) return;
+    const body = card.querySelector('.client-card-body');
+    if (!body) return;
+    
+    const isExpanded = card.classList.contains('expanded');
+    if (isExpanded) {
+        card.classList.remove('expanded');
+        body.style.display = 'none';
+    } else {
+        card.classList.add('expanded');
+        body.style.display = 'block';
+        if (window.lucide) lucide.createIcons();
+    }
+};
+
+window.quickReceiveForParty = function(clientId) {
+    openIncomeModal();
+    const select = document.getElementById('income-client-select');
+    const searchInput = document.getElementById('income-client-search-input');
+    const matched = state.clients.find(c => c.id === clientId);
+    if (select) select.value = clientId;
+    if (searchInput && matched) {
+        searchInput.value = matched.name;
+        const clearBtn = document.getElementById('btn-clear-income-client-search');
+        if (clearBtn) clearBtn.style.display = 'block';
+    }
+};
+
 // PARTIES PAGE RENDERER
 function renderClientsPage() {
     const container = document.getElementById('clients-list-container');
@@ -1188,6 +1219,8 @@ function renderClientsPage() {
     const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
 
     const filter = (state.partyFilter || 'all').toLowerCase();
+    const searchInput = document.getElementById('party-search-input');
+    const searchQuery = (searchInput ? searchInput.value : '').trim().toLowerCase();
 
     // Update Filter Counts
     const countAll = state.clients.length;
@@ -1217,9 +1250,20 @@ function renderClientsPage() {
         filteredClients = state.clients.filter(isVendorParty);
     }
 
+    // Apply Live Search Filter
+    if (searchQuery) {
+        filteredClients = filteredClients.filter(c => {
+            const nameMatch = c.name && c.name.toLowerCase().includes(searchQuery);
+            const groupMatch = c.group && c.group.toLowerCase().includes(searchQuery);
+            return nameMatch || groupMatch;
+        });
+    }
+
     if (filteredClients.length === 0) {
-        const msg = (filter === 'client' || filter === 'debtor') ? 'No clients added yet.' : (filter === 'vendor' || filter === 'creditor') ? 'No vendors added yet.' : 'No parties added yet.';
-        container.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">${msg}</div>`;
+        const msg = searchQuery 
+            ? `No parties found matching "${searchQuery}".` 
+            : (filter === 'client' || filter === 'debtor') ? 'No clients added yet.' : (filter === 'vendor' || filter === 'creditor') ? 'No vendors added yet.' : 'No parties added yet.';
+        container.innerHTML = `<div class="empty-state" style="grid-column:1/-1; padding:32px 16px; text-align:center;">${msg}</div>`;
     } else {
         filteredClients.forEach(client => {
             const stats = getClientReportStats(client.id);
@@ -1264,37 +1308,58 @@ function renderClientsPage() {
 
             const card = document.createElement('div');
             card.className = 'client-card';
+            card.id = `party-card-${client.id}`;
+            card.onclick = () => togglePartyCard(client.id);
+
             card.innerHTML = `
                 <div class="client-card-header">
-                    <h4>${client.name}</h4>
-                    <span class="party-group-badge ${isVendor ? 'vendor' : 'client'}">
-                        <i data-lucide="${isVendor ? 'truck' : 'user-check'}" style="width:12px; height:12px;"></i>
-                        ${isVendor ? 'Vendor' : 'Client'}
-                    </span>
+                    <div class="party-card-title-col">
+                        <div class="party-card-name-row">
+                            <h4 class="party-card-name">${client.name}</h4>
+                            <span class="party-group-badge ${isVendor ? 'vendor' : 'client'}">
+                                <i data-lucide="${isVendor ? 'truck' : 'user-check'}" style="width:12px; height:12px;"></i>
+                                ${isVendor ? 'Vendor' : 'Client'}
+                            </span>
+                        </div>
+                        <div class="party-card-summary-preview">
+                            <span class="preview-receivable">
+                                ${isVendor ? 'Payable: ' : 'Balance: '}<strong class="${receivableClass}">${receivableText}</strong>
+                            </span>
+                            ${stats.creditAmount > 0 ? `<span class="preview-loan-tag">Loan: ${fC(stats.creditAmount)}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="party-card-toggle-btn" title="Click to open/close details">
+                        <i data-lucide="chevron-down" class="party-chevron-icon"></i>
+                    </div>
                 </div>
-                <div class="client-stats">
-                    ${contractInfoHTML}
-                    <div class="c-stat-row">
-                        <span class="c-stat-label">Opening Balance:</span>
-                        <span class="c-stat-val" style="color:var(--text-secondary); font-weight:600;">${fC(stats.openingBalance)}</span>
+                <div class="client-card-body" style="display: none;">
+                    <div class="client-stats">
+                        ${contractInfoHTML}
+                        <div class="c-stat-row">
+                            <span class="c-stat-label">Opening Balance:</span>
+                            <span class="c-stat-val" style="color:var(--text-secondary); font-weight:600;">${fC(stats.openingBalance)}</span>
+                        </div>
+                        <div class="c-stat-row" style="background: var(--bg-primary); padding: 5px 8px; border-radius: 4px; margin: 3px 0; border: 1px solid var(--border-color);">
+                            <span class="c-stat-label" style="font-weight: 700; color: var(--text-primary);">Total Receivable:</span>
+                            <span class="c-stat-val" style="font-weight: 700; color: var(--primary);">${fC(stats.totalReceivable)}</span>
+                        </div>
+                        <div class="c-stat-row">
+                            <span class="c-stat-label">Received Amount:</span>
+                            <span class="c-stat-val" style="color:var(--success); font-weight:600;">${fC(stats.totalReceived)}</span>
+                        </div>
+                        <div class="c-stat-row" style="border-top:1px dashed var(--border-color); padding-top:6px; margin-top:2px;">
+                            <span class="c-stat-label" style="font-weight:700;">Balance Receivable:</span>
+                            <span class="c-stat-val ${receivableClass}">${receivableText}</span>
+                        </div>
+                        ${customFieldsHTML}
                     </div>
-                    <div class="c-stat-row" style="background: var(--bg-primary); padding: 4px 8px; border-radius: 4px; margin: 3px 0; border: 1px solid var(--border-color);">
-                        <span class="c-stat-label" style="font-weight: 700; color: var(--text-primary);">Total Receivable:</span>
-                        <span class="c-stat-val" style="font-weight: 700; color: var(--primary);">${fC(stats.totalReceivable)}</span>
+                    <div class="client-card-footer" onclick="event.stopPropagation()">
+                        <button class="btn btn-outline btn-sm" onclick="quickReceiveForParty('${client.id}')" title="Log Received Amount" style="font-size:11px; padding:4px 9px; display:inline-flex; align-items:center; gap:4px; color:var(--success); border-color:rgba(16, 185, 129, 0.4); background:rgba(16, 185, 129, 0.06); font-weight:600;">
+                            <i data-lucide="plus-circle" style="width:12px; height:12px;"></i> Receive
+                        </button>
+                        <button class="btn-icon-only edit-btn" onclick="openEditClient('${client.id}')" title="Edit Party"><i data-lucide="edit-3"></i></button>
+                        <button class="btn-icon-only delete-btn" onclick="deleteClient('${client.id}')" title="Delete Party"><i data-lucide="trash-2"></i></button>
                     </div>
-                    <div class="c-stat-row">
-                        <span class="c-stat-label">Received Amount:</span>
-                        <span class="c-stat-val" style="color:var(--success); font-weight:600;">${fC(stats.totalReceived)}</span>
-                    </div>
-                    <div class="c-stat-row" style="border-top:1px dashed var(--border-color); padding-top:6px; margin-top:2px;">
-                        <span class="c-stat-label" style="font-weight:700;">Balance Receivable:</span>
-                        <span class="c-stat-val ${receivableClass}">${receivableText}</span>
-                    </div>
-                    ${customFieldsHTML}
-                </div>
-                <div class="client-card-footer">
-                    <button class="btn-icon-only edit-btn" onclick="openEditClient('${client.id}')" title="Edit Party"><i data-lucide="edit-3"></i></button>
-                    <button class="btn-icon-only delete-btn" onclick="deleteClient('${client.id}')" title="Delete Party"><i data-lucide="trash-2"></i></button>
                 </div>
             `;
             container.appendChild(card);
@@ -2385,6 +2450,26 @@ function initEventHandlers() {
         partyCatDropdown.addEventListener('change', function() {
             state.partyFilter = this.value;
             saveState();
+            renderClientsPage();
+        });
+    }
+
+    // Party Live Search Input
+    const partySearchInput = document.getElementById('party-search-input');
+    const btnClearPartySearch = document.getElementById('btn-clear-party-search');
+    if (partySearchInput) {
+        partySearchInput.addEventListener('input', function() {
+            if (btnClearPartySearch) {
+                btnClearPartySearch.style.display = this.value ? 'block' : 'none';
+            }
+            renderClientsPage();
+        });
+    }
+    if (btnClearPartySearch && partySearchInput) {
+        btnClearPartySearch.addEventListener('click', function() {
+            partySearchInput.value = '';
+            btnClearPartySearch.style.display = 'none';
+            partySearchInput.focus();
             renderClientsPage();
         });
     }
