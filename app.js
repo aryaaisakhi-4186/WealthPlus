@@ -1121,40 +1121,54 @@ function renderTrendChart(txList, startDate, endDate) {
     });
 }
 
+function isClientParty(c) {
+    const g = (c.group || 'Client').toLowerCase();
+    return g === 'client' || g === 'debtor';
+}
+
+function isVendorParty(c) {
+    const g = (c.group || 'Client').toLowerCase();
+    return g === 'vendor' || g === 'creditor';
+}
+
 // PARTIES PAGE RENDERER
 function renderClientsPage() {
     const container = document.getElementById('clients-list-container');
     container.innerHTML = '';
     const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
 
-    const filter = state.partyFilter || 'all';
+    const filter = (state.partyFilter || 'all').toLowerCase();
 
     // Update Filter Counts
     const countAll = state.clients.length;
-    const countDebtors = state.clients.filter(c => (c.group || 'Debtor').toLowerCase() === 'debtor').length;
-    const countCreditors = state.clients.filter(c => (c.group || 'Debtor').toLowerCase() === 'creditor').length;
+    const countClients = state.clients.filter(isClientParty).length;
+    const countVendors = state.clients.filter(isVendorParty).length;
 
-    const elAll = document.getElementById('count-all-parties');
-    const elDeb = document.getElementById('count-debtor-parties');
-    const elCred = document.getElementById('count-creditor-parties');
-    if (elAll) elAll.innerText = countAll;
-    if (elDeb) elDeb.innerText = countDebtors;
-    if (elCred) elCred.innerText = countCreditors;
+    const dropdown = document.getElementById('party-category-dropdown');
+    if (dropdown) {
+        dropdown.value = (filter === 'debtor') ? 'client' : (filter === 'creditor') ? 'vendor' : filter;
+    }
 
-    // Update Active Filter Pill
-    document.querySelectorAll('.party-filter-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.getAttribute('data-party-filter') === filter);
-    });
+    const countBadge = document.getElementById('party-category-count-badge');
+    if (countBadge) {
+        if (filter === 'client' || filter === 'debtor') {
+            countBadge.innerText = `Clients (${countClients})`;
+        } else if (filter === 'vendor' || filter === 'creditor') {
+            countBadge.innerText = `Vendors (${countVendors})`;
+        } else {
+            countBadge.innerText = `All Parties (${countAll})`;
+        }
+    }
 
     let filteredClients = state.clients;
-    if (filter === 'debtor') {
-        filteredClients = state.clients.filter(c => (c.group || 'Debtor').toLowerCase() === 'debtor');
-    } else if (filter === 'creditor') {
-        filteredClients = state.clients.filter(c => (c.group || 'Debtor').toLowerCase() === 'creditor');
+    if (filter === 'client' || filter === 'debtor') {
+        filteredClients = state.clients.filter(isClientParty);
+    } else if (filter === 'vendor' || filter === 'creditor') {
+        filteredClients = state.clients.filter(isVendorParty);
     }
 
     if (filteredClients.length === 0) {
-        const msg = filter === 'debtor' ? 'No Sundry Debtors (Clients) added yet.' : filter === 'creditor' ? 'No Sundry Creditors (Vendors) added yet.' : 'No parties added yet.';
+        const msg = (filter === 'client' || filter === 'debtor') ? 'No clients added yet.' : (filter === 'vendor' || filter === 'creditor') ? 'No vendors added yet.' : 'No parties added yet.';
         container.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">${msg}</div>`;
     } else {
         filteredClients.forEach(client => {
@@ -1162,8 +1176,7 @@ function renderClientsPage() {
             const isCompleted = stats.balanceReceivable <= 0;
             const receivableClass = isCompleted ? 'receivable-complete' : 'receivable-active';
             const receivableText = isCompleted ? 'Fully Received' : fC(stats.balanceReceivable);
-            const partyGroup = client.group || 'Debtor';
-            const isCreditor = partyGroup.toLowerCase() === 'creditor';
+            const isVendor = isVendorParty(client);
 
             let customFieldsHTML = '';
             state.customClientFields.forEach(field => {
@@ -1181,9 +1194,9 @@ function renderClientsPage() {
             card.innerHTML = `
                 <div class="client-card-header">
                     <h4>${client.name}</h4>
-                    <span class="party-group-badge ${isCreditor ? 'creditor' : 'debtor'}">
-                        <i data-lucide="${isCreditor ? 'arrow-up-right' : 'arrow-down-left'}" style="width:12px; height:12px;"></i>
-                        ${isCreditor ? 'Creditor (Supplier)' : 'Debtor (Client)'}
+                    <span class="party-group-badge ${isVendor ? 'vendor' : 'client'}">
+                        <i data-lucide="${isVendor ? 'truck' : 'user-check'}" style="width:12px; height:12px;"></i>
+                        ${isVendor ? 'Vendor' : 'Client'}
                     </span>
                 </div>
                 <div class="client-stats">
@@ -1836,14 +1849,13 @@ function renderMasterClients() {
 
     state.clients.forEach(client => {
         const stats = getClientReportStats(client.id);
-        const partyGroup = client.group || 'Debtor';
-        const isCreditor = partyGroup.toLowerCase() === 'creditor';
+        const isVendor = isVendorParty(client);
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="font-weight:600;">${client.name}</td>
             <td>
-                <span class="party-group-badge ${isCreditor ? 'creditor' : 'debtor'}">
-                    ${isCreditor ? 'Creditor (Supplier)' : 'Debtor (Client)'}
+                <span class="party-group-badge ${isVendor ? 'vendor' : 'client'}">
+                    ${isVendor ? 'Vendor' : 'Client'}
                 </span>
             </td>
             <td>${fC(client.monthlyPay || 0)}</td>
@@ -2248,15 +2260,15 @@ function initEventHandlers() {
         });
     });
 
-    // Party Group Filter Tabs (All / Debtors / Creditors)
-    document.querySelectorAll('.party-filter-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const filter = this.getAttribute('data-party-filter');
-            state.partyFilter = filter;
+    // Party Category Dropdown Selector (All / Clients / Vendors)
+    const partyCatDropdown = document.getElementById('party-category-dropdown');
+    if (partyCatDropdown) {
+        partyCatDropdown.addEventListener('change', function() {
+            state.partyFilter = this.value;
             saveState();
             renderClientsPage();
         });
-    });
+    }
 
     // Modals triggers
     document.getElementById('btn-add-client').addEventListener('click', () => openClientModal());
@@ -2424,7 +2436,7 @@ function openClientModal(editId = '') {
             title.innerText = 'Edit Party Details';
             document.getElementById('edit-client-id').value = client.id;
             document.getElementById('client-name').value = client.name;
-            document.getElementById('client-group').value = client.group || 'Debtor';
+            document.getElementById('client-group').value = isVendorParty(client) ? 'Vendor' : 'Client';
             const m = Number(client.monthlyPay) || 0;
             const y = Number(client.yearlyPay) || (m * 12);
             document.getElementById('client-monthly-pay').value = m || '';
@@ -2444,7 +2456,7 @@ function openClientModal(editId = '') {
     } else {
         title.innerText = 'Add New Party';
         document.getElementById('edit-client-id').value = '';
-        document.getElementById('client-group').value = state.partyFilter === 'creditor' ? 'Creditor' : 'Debtor';
+        document.getElementById('client-group').value = (state.partyFilter === 'vendor' || state.partyFilter === 'creditor') ? 'Vendor' : 'Client';
         document.getElementById('client-monthly-pay').value = '';
         document.getElementById('client-yearly-pay').value = '';
         document.getElementById('client-opening-balance').value = '0';
@@ -2469,7 +2481,7 @@ function handleClientSubmit(e) {
     e.preventDefault();
     const id = document.getElementById('edit-client-id').value;
     const name = document.getElementById('client-name').value.trim();
-    const group = document.getElementById('client-group').value || 'Debtor';
+    const group = document.getElementById('client-group').value || 'Client';
     const monthlyPay = Number(document.getElementById('client-monthly-pay').value) || 0;
     const yearlyPay = Number(document.getElementById('client-yearly-pay').value) || (monthlyPay * 12);
     const openingBalance = Number(document.getElementById('client-opening-balance').value) || 0;
@@ -3154,7 +3166,7 @@ async function triggerPWAInstall() {
             const { outcome } = await deferredPrompt.userChoice;
             console.log(`User response to install: ${outcome}`);
             if (outcome === 'accepted') {
-                alert("धन्यवाद! Wealth Plus आपके फ़ोन/डिवाइस में इंस्टॉल हो रही है।");
+                alert("Thank you! Wealth Plus is being installed on your device.");
             }
             deferredPrompt = null;
         } catch (err) {
@@ -3163,21 +3175,21 @@ async function triggerPWAInstall() {
     } else {
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
         if (isStandalone) {
-            alert("Wealth Plus पहले से ही आपके डिवाइस में एक स्वतंत्र ऐप के रूप में इंस्टॉल है!");
+            alert("Wealth Plus is already installed and running as a standalone app on your device!");
             return;
         }
 
         const isWebView = /(wv|WhatsApp|FB_IAB|FBAN|FBAV|Instagram)/i.test(navigator.userAgent);
         if (isWebView) {
-            alert("⚠️ ध्यान दें: यह लिंक WhatsApp / अन्य ऐप के अंदर खुला है।\n\nऐप इंस्टॉल करने के लिए:\n1. ऊपर दाएँ कोने में 3 डॉट्स (⋮) पर टैप करें।\n2. 'Open in Chrome' (क्रोम में खोलें) चुनें।\n3. फिर यहाँ आकर 'Install App' पर क्लिक करें।");
+            alert("⚠️ Note: This link is open inside an In-App browser (e.g. WhatsApp).\n\nTo install the app:\n1. Tap the 3 dots menu (⋮) at the top-right corner.\n2. Select 'Open in Chrome'.\n3. Return here and tap 'Install App Now'.");
             return;
         }
 
         const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
         if (isIos) {
-            alert("📱 iPhone / iPad में इंस्टॉल करने का तरीका:\n\n1. Safari ब्राउज़र में नीचे शेयर बटन (Share Icon) पर टैप करें।\n2. नीचे स्क्रॉल करके 'Add to Home Screen' चुनें।\n3. ऊपर दाएँ 'Add' पर क्लिक करें। ऐप होम स्क्रीन पर आ जाएगी!");
+            alert("📱 How to install on iPhone/iPad (Safari):\n\n1. Tap the Share icon at the bottom of Safari.\n2. Scroll down and tap 'Add to Home Screen'.\n3. Tap 'Add' in the top-right corner. Done!");
         } else {
-            alert("📱 Android (Chrome) में इंस्टॉल करने का तरीका:\n\n1. Chrome ब्राउज़र में सबसे ऊपर दाएँ कोने में 3 डॉट्स (⋮) पर टैप करें।\n2. लिस्ट में से 'Install app' (ऐप इंस्टॉल करें) या 'Add to Home screen' (होम स्क्रीन में जोड़ें) चुनें।\n3. 'Install' पर टैप करें — ऐप सीधे आपके फोन में आ जाएगी!");
+            alert("📱 How to install on Android (Chrome):\n\n1. Tap the 3 dots menu (⋮) at the top-right corner of Chrome.\n2. Tap 'Install app' or 'Add to Home screen'.\n3. Tap 'Install' to confirm. Wealth Plus will appear on your phone!");
         }
     }
 }

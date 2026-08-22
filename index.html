@@ -23,7 +23,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=5.0.0">
+    <link rel="stylesheet" href="style.css?v=5.1.0">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -237,45 +237,27 @@
                     <div class="section-actions-header">
                         <div>
                             <h3 style="margin-bottom: 4px;">Parties Directory</h3>
-                            <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">Manage Sundry Debtors (Clients) & Sundry Creditors (Vendors)</p>
+                            <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">Manage Clients (Debtors) & Vendors (Creditors)</p>
                         </div>
                         <button class="btn btn-primary" id="btn-add-client">
                             <i data-lucide="user-plus"></i> Add Party
                         </button>
                     </div>
 
-                    <!-- Party Category Selector (Vertical Up-to-Down Stack) -->
-                    <div class="party-filter-bar" id="party-filter-bar">
-                        <button type="button" class="party-filter-btn active" data-party-filter="all">
-                            <div class="party-filter-info">
-                                <div class="party-filter-icon"><i data-lucide="users"></i></div>
-                                <div class="party-filter-text">
-                                    <strong>All Parties</strong>
-                                    <span>Complete directory of all registered accounts</span>
-                                </div>
-                            </div>
-                            <span class="badge" id="count-all-parties">0</span>
-                        </button>
-                        <button type="button" class="party-filter-btn" data-party-filter="debtor">
-                            <div class="party-filter-info">
-                                <div class="party-filter-icon debtor"><i data-lucide="arrow-down-left"></i></div>
-                                <div class="party-filter-text">
-                                    <strong>Clients (Sundry Debtors)</strong>
-                                    <span>Customers & pending receivables</span>
-                                </div>
-                            </div>
-                            <span class="party-group-badge debtor" id="count-debtor-parties">0</span>
-                        </button>
-                        <button type="button" class="party-filter-btn" data-party-filter="creditor">
-                            <div class="party-filter-info">
-                                <div class="party-filter-icon creditor"><i data-lucide="arrow-up-right"></i></div>
-                                <div class="party-filter-text">
-                                    <strong>Suppliers (Sundry Creditors)</strong>
-                                    <span>Vendors, service providers & payables</span>
-                                </div>
-                            </div>
-                            <span class="party-group-badge creditor" id="count-creditor-parties">0</span>
-                        </button>
+                    <!-- Party Category Dropdown Selector -->
+                    <div class="party-filter-dropdown-wrapper">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                            <label for="party-category-dropdown" style="font-size: 13px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                <i data-lucide="layers" style="width: 16px; height: 16px; color: var(--primary);"></i>
+                                Filter by Category:
+                            </label>
+                            <span id="party-category-count-badge" class="badge" style="font-size: 12px; padding: 4px 10px;">All Parties (0)</span>
+                        </div>
+                        <select id="party-category-dropdown" class="party-category-select">
+                            <option value="all">📁 All Parties (Complete List)</option>
+                            <option value="client">🏢 Clients (Debtors — Receivables)</option>
+                            <option value="vendor">🏭 Vendors (Creditors — Payables)</option>
+                        </select>
                     </div>
 
                     <!-- Parties Grid -->
@@ -962,10 +944,10 @@
                 <div class="form-group">
                     <label for="client-group">Party Group / Category *</label>
                     <select id="client-group" required style="font-weight: 600; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); width: 100%;">
-                        <option value="Debtor">Sundry Debtors (Clients / Customers)</option>
-                        <option value="Creditor">Sundry Creditors (Suppliers / Vendors)</option>
+                        <option value="Client">Client (Debtor — Money Receivable)</option>
+                        <option value="Vendor">Vendor (Creditor — Money Payable)</option>
                     </select>
-                    <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Debtors owe you money (Receivables); Creditors are suppliers/vendors you pay (Payables).</span>
+                    <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Clients pay you for services; Vendors are suppliers/contractors you pay.</span>
                 </div>
                 <div class="form-group-row">
                     <div class="form-group">
@@ -1210,9 +1192,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=5.0.0"></script>
-    <script src="app.js?v=5.0.0"></script>
-    <script src="sindhu_v1.js?v=5.0.0"></script>
+    <script src="firebase-config.js?v=5.1.0"></script>
+    <script src="app.js?v=5.1.0"></script>
+    <script src="sindhu_v1.js?v=5.1.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">
@@ -1242,7 +1224,7 @@
             <!-- Chat Messages View -->
             <div id="sindhu-messages" class="sindhu-messages">
                 <div class="sindhu-msg msg-sindhu">
-                    <p>नमस्ते! मैं हूँ सिन्धु (Sindhu), आपकी AI मुनीम। मैं आपकी आवाज़ या लिखित निर्देश से नए क्लाइंट जोड़ सकती हूँ या ख़र्चों का हिसाब रख सकती हूँ।</p>
+                    <p>Hello! I am Sindhu, your AI Bookkeeping Assistant. I can help you register clients & vendors, record income, track expenses, and manage your ledger books.</p>
                     <span class="msg-time">Just now</span>
                 </div>
             </div>
