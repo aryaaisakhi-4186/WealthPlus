@@ -22,7 +22,7 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="https://img.icons8.com/fluency/192/000000/accounting.png">
-    <link rel="stylesheet" href="style.css?v=4.4.0">
+    <link rel="stylesheet" href="style.css?v=4.5.0">
 </head>
 <body class="light-theme">
 
@@ -947,10 +947,20 @@
             <form id="form-income" class="modal-form">
                 <input type="hidden" id="edit-income-id">
                 <div class="form-group">
-                    <label for="income-client-select">Select Client *</label>
-                    <select id="income-client-select" required>
-                        <!-- Populated dynamically -->
-                    </select>
+                    <label for="income-client-search-input">Select Client *</label>
+                    <div class="searchable-select-container" id="income-client-searchable-container">
+                        <div class="searchable-input-wrapper">
+                            <i data-lucide="search" class="search-input-icon"></i>
+                            <input type="text" id="income-client-search-input" class="searchable-input" placeholder="🔍 Search client by name..." autocomplete="off">
+                            <button type="button" class="btn-clear-search" id="btn-clear-income-client-search" style="display: none;" title="Clear client">
+                                <i data-lucide="x"></i>
+                            </button>
+                        </div>
+                        <select id="income-client-select" required style="position: absolute; opacity: 0; pointer-events: none; height: 0; width: 0;">
+                            <!-- Populated dynamically -->
+                        </select>
+                        <div class="searchable-dropdown-menu" id="income-client-dropdown-menu" style="display: none;"></div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="income-amount">Amount Received (INR) *</label>
@@ -1139,9 +1149,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=4.4.0"></script>
-    <script src="app.js?v=4.4.0"></script>
-    <script src="sindhu_v1.js?v=4.4.0"></script>
+    <script src="firebase-config.js?v=4.5.0"></script>
+    <script src="app.js?v=4.5.0"></script>
+    <script src="sindhu_v1.js?v=4.5.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

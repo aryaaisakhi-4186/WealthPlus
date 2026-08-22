@@ -2235,6 +2235,14 @@ function initEventHandlers() {
     if (btnAddCategory) {
         btnAddCategory.addEventListener('click', addCategoryPrompt);
     }
+
+    // Initialize Searchable Client Selectors
+    setupSearchableClientDropdown({
+        inputId: 'income-client-search-input',
+        selectId: 'income-client-select',
+        menuId: 'income-client-dropdown-menu',
+        clearBtnId: 'btn-clear-income-client-search'
+    });
 }
 
 // --- 8. MODALS CRUD LOGIC (MEMBERS SETUP & DYNAMIC COLUMNS) ---
@@ -2407,13 +2415,91 @@ window.deleteClient = function(id) {
 };
 
 // Income logs
+// Searchable Client Dropdown Component
+function setupSearchableClientDropdown({ inputId, selectId, menuId, clearBtnId }) {
+    const input = document.getElementById(inputId);
+    const select = document.getElementById(selectId);
+    const menu = document.getElementById(menuId);
+    const clearBtn = document.getElementById(clearBtnId);
+
+    if (!input || !select || !menu) return;
+
+    function renderList(query = '') {
+        const q = (query || '').toLowerCase().trim();
+        const filtered = state.clients.filter(c => c.name.toLowerCase().includes(q));
+
+        if (filtered.length === 0) {
+            menu.innerHTML = `<div class="searchable-no-results">No clients found matching "${query}"</div>`;
+        } else {
+            menu.innerHTML = filtered.map(c => `
+                <div class="searchable-dropdown-item ${select.value === c.id ? 'active' : ''}" data-id="${c.id}" data-name="${c.name}">
+                    <span class="searchable-item-name">${c.name}</span>
+                    <span class="searchable-item-meta">₹${(c.monthlyPay || 0).toLocaleString('en-IN')}/mo</span>
+                </div>
+            `).join('');
+
+            menu.querySelectorAll('.searchable-dropdown-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const id = this.getAttribute('data-id');
+                    const name = this.getAttribute('data-name');
+                    select.value = id;
+                    input.value = name;
+                    if (clearBtn) clearBtn.style.display = 'flex';
+                    menu.style.display = 'none';
+                });
+            });
+        }
+        menu.style.display = 'block';
+    }
+
+    input.addEventListener('focus', function() {
+        renderList(this.value);
+    });
+
+    input.addEventListener('input', function() {
+        renderList(this.value);
+        if (clearBtn) {
+            clearBtn.style.display = this.value ? 'flex' : 'none';
+        }
+        const exactMatch = state.clients.find(c => c.name.toLowerCase() === this.value.toLowerCase().trim());
+        if (exactMatch) {
+            select.value = exactMatch.id;
+        } else {
+            select.value = '';
+        }
+    });
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            input.value = '';
+            select.value = '';
+            clearBtn.style.display = 'none';
+            renderList('');
+            input.focus();
+        });
+    }
+
+    document.addEventListener('click', function(e) {
+        if (!input.contains(e.target) && !menu.contains(e.target) && (!clearBtn || !clearBtn.contains(e.target))) {
+            menu.style.display = 'none';
+        }
+    });
+}
+
 function openIncomeModal(editId = '') {
     const modal = document.getElementById('modal-income');
     const title = document.getElementById('modal-income-title');
     const form = document.getElementById('form-income');
     const clientSelect = document.getElementById('income-client-select');
+    const clientSearchInput = document.getElementById('income-client-search-input');
+    const clientClearBtn = document.getElementById('btn-clear-income-client-search');
+    const clientMenu = document.getElementById('income-client-dropdown-menu');
     const accSelect = document.getElementById('income-account-select');
     form.reset();
+
+    if (clientMenu) clientMenu.style.display = 'none';
 
     clientSelect.innerHTML = '<option value="" disabled selected>Choose Client...</option>';
     state.clients.forEach(c => {
@@ -2436,6 +2522,13 @@ function openIncomeModal(editId = '') {
             title.innerText = 'Edit Income Record';
             document.getElementById('edit-income-id').value = log.id;
             clientSelect.value = log.clientId;
+            const matchedClient = state.clients.find(c => c.id === log.clientId);
+            if (clientSearchInput) {
+                clientSearchInput.value = matchedClient ? matchedClient.name : '';
+            }
+            if (clientClearBtn) {
+                clientClearBtn.style.display = matchedClient ? 'flex' : 'none';
+            }
             document.getElementById('income-amount').value = log.amount;
             document.getElementById('income-date').value = log.date;
             accSelect.value = log.mode;
@@ -2453,6 +2546,9 @@ function openIncomeModal(editId = '') {
     } else {
         title.innerText = 'Log Received Amount';
         document.getElementById('edit-income-id').value = '';
+        if (clientSearchInput) clientSearchInput.value = '';
+        if (clientClearBtn) clientClearBtn.style.display = 'none';
+        clientSelect.value = '';
 
         state.customClientFields.forEach(f => {
             customContainer.innerHTML += `
@@ -2464,6 +2560,7 @@ function openIncomeModal(editId = '') {
         });
     }
     modal.classList.add('active');
+    lucide.createIcons();
 }
 
 function closeIncomeModal() {
@@ -2474,6 +2571,12 @@ function handleIncomeSubmit(e) {
     e.preventDefault();
     const id = document.getElementById('edit-income-id').value;
     const clientId = document.getElementById('income-client-select').value;
+    if (!clientId) {
+        alert("Please select a valid client from the search dropdown.");
+        const searchInput = document.getElementById('income-client-search-input');
+        if (searchInput) searchInput.focus();
+        return;
+    }
     const amount = Number(document.getElementById('income-amount').value);
     const date = document.getElementById('income-date').value;
     const mode = document.getElementById('income-account-select').value;
