@@ -1423,6 +1423,16 @@ function renderClientsPage() {
                 `;
             }
 
+            let discountRowHTML = '';
+            if (stats.totalDiscount > 0) {
+                discountRowHTML = `
+                    <div class="c-stat-row" style="background: rgba(245, 158, 11, 0.08); padding: 4px 8px; border-radius: 4px; margin: 3px 0; border: 1px solid rgba(245, 158, 11, 0.25); align-items: center;">
+                        <span class="c-stat-label" style="font-weight: 700; color: #d97706;">Discount Given:</span>
+                        <span class="c-stat-val" style="font-weight: 700; color: #d97706;">${fC(stats.totalDiscount)}</span>
+                    </div>
+                `;
+            }
+
             const card = document.createElement('div');
             card.className = 'client-card';
             card.id = `party-card-${client.id}`;
@@ -1443,6 +1453,7 @@ function renderClientsPage() {
                                 ${isVendor ? 'Payable: ' : 'Balance: '}<strong class="${receivableClass}">${receivableText}</strong>
                             </span>
                             ${stats.creditAmount > 0 ? `<span class="preview-loan-tag">Loan: ${fC(stats.creditAmount)}</span>` : ''}
+                            ${stats.totalDiscount > 0 ? `<span class="preview-loan-tag" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3);">Disc: ${fC(stats.totalDiscount)}</span>` : ''}
                         </div>
                     </div>
                     <div class="party-card-toggle-btn" title="Click to open/close details">
@@ -1464,6 +1475,7 @@ function renderClientsPage() {
                             <span class="c-stat-label">Received Amount:</span>
                             <span class="c-stat-val" style="color:var(--success); font-weight:600;">${fC(stats.totalReceived)}</span>
                         </div>
+                        ${discountRowHTML}
                         <div class="c-stat-row" style="border-top:1px dashed var(--border-color); padding-top:6px; margin-top:2px;">
                             <span class="c-stat-label" style="font-weight:700;">Balance Receivable:</span>
                             <span class="c-stat-val ${receivableClass}">${receivableText}</span>
