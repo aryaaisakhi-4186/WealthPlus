@@ -23,7 +23,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=6.0.0">
+    <link rel="stylesheet" href="style.css?v=6.1.0">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -294,6 +294,8 @@
                                     <th>Received Date</th>
                                     <th>Destination Account</th>
                                     <th>Amount</th>
+                                    <th>Discount (₹)</th>
+                                    <th>Remark</th>
                                     <!-- Custom columns injected here -->
                                     <th class="actions-col">Actions</th>
                                 </tr>
@@ -1081,9 +1083,15 @@
                         <div class="searchable-dropdown-menu" id="income-client-dropdown-menu" style="display: none;"></div>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="income-amount">Amount Received (INR) *</label>
-                    <input type="number" id="income-amount" required min="1" placeholder="e.g. 50000">
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="income-amount">Amount Received (INR) *</label>
+                        <input type="number" id="income-amount" required min="1" placeholder="e.g. 50000">
+                    </div>
+                    <div class="form-group">
+                        <label for="income-discount">Discount (INR) (Optional)</label>
+                        <input type="number" id="income-discount" min="0" placeholder="0 (e.g. 2000)" step="any">
+                    </div>
                 </div>
                 <div class="form-group-row">
                     <div class="form-group">
@@ -1096,6 +1104,10 @@
                             <!-- Populated dynamically with dynamic accounts -->
                         </select>
                     </div>
+                </div>
+                <div class="form-group">
+                    <label for="income-remark">Remark / Notes (Optional)</label>
+                    <input type="text" id="income-remark" placeholder="e.g. Early payment discount / Cheque #12345 / Online transfer">
                 </div>
                 <!-- Dynamic income custom fields container -->
                 <div id="income-modal-custom-fields-container"></div>
@@ -1280,9 +1292,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.0.0"></script>
-    <script src="app.js?v=6.0.0"></script>
-    <script src="sindhu_v1.js?v=6.0.0"></script>
+    <script src="firebase-config.js?v=6.1.0"></script>
+    <script src="app.js?v=6.1.0"></script>
+    <script src="sindhu_v1.js?v=6.1.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

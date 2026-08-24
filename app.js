@@ -853,7 +853,7 @@ function getGlobalStats() {
 
 function getClientReportStats(clientId) {
     const client = state.clients.find(c => c.id === clientId);
-    if (!client) return { totalReceived: 0, totalSpent: 0, balance: 0, yearlyContract: 0, balanceReceivable: 0, openingBalance: 0, totalReceivable: 0, creditAmount: 0 };
+    if (!client) return { totalReceived: 0, totalDiscount: 0, totalSpent: 0, balance: 0, yearlyContract: 0, balanceReceivable: 0, openingBalance: 0, totalReceivable: 0, creditAmount: 0 };
 
     const creditAmount = Number(client.creditAmount) || 0;
     const monthlyPay = Number(client.monthlyPay) || 0;
@@ -865,14 +865,18 @@ function getClientReportStats(clientId) {
         .filter(log => log.clientId === clientId)
         .reduce((sum, log) => sum + Number(log.amount), 0);
 
+    const totalDiscount = state.incomeLogs
+        .filter(log => log.clientId === clientId)
+        .reduce((sum, log) => sum + (Number(log.discount) || 0), 0);
+
     const totalSpent = state.transactions
         .filter(tx => tx.clientId === clientId)
         .reduce((sum, tx) => sum + Number(tx.amount), 0);
 
     const balance = (openingBalance + totalReceived) - totalSpent;
-    const balanceReceivable = totalReceivable - totalReceived;
+    const balanceReceivable = totalReceivable - (totalReceived + totalDiscount);
 
-    return { creditAmount, yearlyContract, openingBalance, totalReceivable, totalReceived, totalSpent, balance, balanceReceivable };
+    return { creditAmount, yearlyContract, openingBalance, totalReceivable, totalReceived, totalDiscount, totalSpent, balance, balanceReceivable };
 }
 
 // --- 5. NAVIGATION CONTROLLER ---
@@ -1490,6 +1494,8 @@ function renderIncomeLogsTable() {
         <th>Received Date</th>
         <th>Destination Account</th>
         <th>Amount</th>
+        <th>Discount (₹)</th>
+        <th>Remark</th>
     `;
     state.customClientFields.forEach(f => {
         trHeaders.innerHTML += `<th>${f.name}</th>`;
@@ -1501,7 +1507,7 @@ function renderIncomeLogsTable() {
     const sorted = [...state.incomeLogs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     if (sorted.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${5 + state.customClientFields.length}" style="text-align:center; color:var(--text-muted); padding:24px;">No income logged.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${7 + state.customClientFields.length}" style="text-align:center; color:var(--text-muted); padding:24px;">No income logged.</td></tr>`;
         lucide.createIcons();
         return;
     }
@@ -1509,6 +1515,12 @@ function renderIncomeLogsTable() {
     sorted.forEach(log => {
         const client = state.clients.find(c => c.id === log.clientId);
         const clientName = client ? client.name : 'Unknown Client';
+        const discountVal = Number(log.discount) > 0 
+            ? `<span style="color:#d97706; font-weight:700; background:rgba(245, 158, 11, 0.12); padding:2px 8px; border-radius:4px; border:1px solid rgba(245, 158, 11, 0.25);">₹${Number(log.discount).toLocaleString('en-IN')}</span>` 
+            : '<span style="color:var(--text-muted);">-</span>';
+        const remarkVal = log.remark 
+            ? `<span style="font-size:12px; color:var(--text-secondary); max-width:200px; display:inline-block; word-break:break-word;">${log.remark}</span>` 
+            : '<span style="color:var(--text-muted);">-</span>';
         
         let customCells = '';
         state.customClientFields.forEach(f => {
@@ -1522,6 +1534,8 @@ function renderIncomeLogsTable() {
             <td>${formatDbDate(log.date)}</td>
             <td><span class="badge-acctype">${log.mode}</span></td>
             <td style="font-weight:700; color:var(--success);">+₹${Number(log.amount).toLocaleString('en-IN')}</td>
+            <td>${discountVal}</td>
+            <td>${remarkVal}</td>
             ${customCells}
             <td class="actions-col" style="display: var(--staff-access-display, table-cell);">
                 <div class="actions-wrapper">
@@ -1868,6 +1882,16 @@ function renderClientReportDetails(clientId) {
         `;
     }
 
+    let discountCardHTML = '';
+    if (stats.totalDiscount > 0) {
+        discountCardHTML = `
+            <div class="report-stat-card val-primary" style="border-left: 4px solid #f59e0b;">
+                <h5>Total Discount</h5>
+                <span class="val" style="color:#d97706; font-weight:700;">${fC(stats.totalDiscount)}</span>
+            </div>
+        `;
+    }
+
     statsContainer.innerHTML = `
         ${creditCardHTML}
         <div class="report-stat-card val-primary">
@@ -1886,12 +1910,17 @@ function renderClientReportDetails(clientId) {
             <h5>Total Received</h5>
             <span class="val">${fC(stats.totalReceived)}</span>
         </div>
+        ${discountCardHTML}
+        <div class="report-stat-card ${stats.balanceReceivable > 0 ? 'val-primary' : 'val-success'}">
+            <h5>Balance Receivable</h5>
+            <span class="val" style="color: ${stats.balanceReceivable > 0 ? 'var(--primary)' : 'var(--success)'}; font-weight:700;">${stats.balanceReceivable <= 0 ? 'Settled (₹0)' : fC(stats.balanceReceivable)}</span>
+        </div>
         <div class="report-stat-card val-danger">
             <h5>Spent (Allocated)</h5>
             <span class="val">${fC(stats.totalSpent)}</span>
         </div>
         <div class="report-stat-card val-primary">
-            <h5>Net Balance</h5>
+            <h5>Net Fund Balance</h5>
             <span class="val" style="color: ${stats.balance >= 0 ? 'var(--success)' : 'var(--danger)'};">${fC(stats.balance)}</span>
         </div>
     `;
@@ -3257,8 +3286,10 @@ function openIncomeModal(editId = '') {
                 clientClearBtn.style.display = matchedClient ? 'flex' : 'none';
             }
             document.getElementById('income-amount').value = log.amount;
+            document.getElementById('income-discount').value = log.discount !== undefined ? log.discount : '';
             document.getElementById('income-date').value = log.date;
-            accSelect.value = log.mode;
+            document.getElementById('income-account-select').value = log.mode;
+            document.getElementById('income-remark').value = log.remark || '';
 
             state.customClientFields.forEach(f => {
                 const val = log[f.name] || '';
@@ -3276,6 +3307,9 @@ function openIncomeModal(editId = '') {
         if (clientSearchInput) clientSearchInput.value = '';
         if (clientClearBtn) clientClearBtn.style.display = 'none';
         clientSelect.value = '';
+        document.getElementById('income-amount').value = '';
+        document.getElementById('income-discount').value = '';
+        document.getElementById('income-remark').value = '';
 
         state.customClientFields.forEach(f => {
             customContainer.innerHTML += `
@@ -3305,10 +3339,12 @@ function handleIncomeSubmit(e) {
         return;
     }
     const amount = Number(document.getElementById('income-amount').value);
+    const discount = Number(document.getElementById('income-discount').value) || 0;
     const date = document.getElementById('income-date').value;
     const mode = document.getElementById('income-account-select').value;
+    const remark = (document.getElementById('income-remark').value || '').trim();
 
-    let logObj = { clientId, amount, date, mode };
+    let logObj = { clientId, amount, discount, date, mode, remark };
 
     state.customClientFields.forEach(f => {
         const val = document.getElementById(`custom-income-${f.name}`).value;
@@ -3654,7 +3690,9 @@ function exportToExcel() {
             "Client Name": client ? client.name : 'Unknown Client',
             "Received Date": formatDbDate(log.date),
             "Destination Account": log.mode,
-            "Amount Received (INR)": log.amount
+            "Amount Received (INR)": log.amount,
+            "Discount (INR)": log.discount || 0,
+            "Remark / Notes": log.remark || ''
         };
         state.customClientFields.forEach(f => {
             rowObj[f.name] = log[f.name] || '';
