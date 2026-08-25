@@ -8,6 +8,7 @@ let state = {
     incomeLogs: [],
     transactions: [],
     transfers: [], // Contra internal fund transfers: { id, fromAccount, toAccount, amount, date, type, remark }
+    loans: [],     // Multi-entry loans & udhaar: { id, clientId, type: 'given'|'taken', amount, date, account, remark, timestamp }
     accounts: [], // Dynamic Accounts: { id, name, type }
     budgets: {},  // Monthly Budgets: { Category: Amount }
     customClientFields: [], // Custom Columns: { id, name, type }
@@ -31,6 +32,7 @@ let state = {
     activePage: 'dashboard',
     activeReportTab: 'client',
     activeMasterTab: 'accounts',
+    activeLoansTab: 'given',
     partyFilter: 'all',
     selectedPeriod: 'financial-year',
     customStartDate: '',
@@ -131,12 +133,14 @@ function seedState() {
     state.incomeLogs = [...defaultIncomeLogs];
     state.transactions = [...defaultTransactions];
     state.transfers = [];
+    state.loans = [];
     state.customClientFields = [];
     state.customTxFields = [];
     state.categoriesConfig = { ...defaultCategoriesConfig };
     state.activePage = 'dashboard';
     state.activeReportTab = 'client';
     state.activeMasterTab = 'accounts';
+    state.activeLoansTab = 'given';
     state.selectedPeriod = 'financial-year';
     state.selectedLedgerAccountId = state.accounts[0]?.id || '';
     saveState();
@@ -147,7 +151,30 @@ function runStateMigrations() {
     let updated = false;
 
     if (!state.transfers) { state.transfers = []; updated = true; }
+    if (!state.loans) { state.loans = []; updated = true; }
+    if (!state.activeLoansTab) { state.activeLoansTab = 'given'; updated = true; }
     if (!state.accounts || state.accounts.length === 0) { state.accounts = [...defaultAccounts]; updated = true; }
+
+    // Auto-migrate legacy client creditAmount into state.loans records
+    (state.clients || []).forEach(c => {
+        const credit = Number(c.creditAmount) || 0;
+        if (credit > 0) {
+            const hasLoan = state.loans.some(l => l.clientId === c.id);
+            if (!hasLoan) {
+                state.loans.push({
+                    id: 'loan_' + c.id + '_initial',
+                    clientId: c.id,
+                    type: 'given',
+                    amount: credit,
+                    date: c.loanDate || new Date().toISOString().split('T')[0],
+                    account: c.loanSourceAccount || (state.accounts[0]?.name || 'Main Cash'),
+                    remark: 'Initial loan / credit entry',
+                    timestamp: Date.now()
+                });
+                updated = true;
+            }
+        }
+    });
     if (!state.budgets || Object.keys(state.budgets).length === 0) { state.budgets = { ...defaultBudgets }; updated = true; }
     if (!state.members || state.members.length === 0) { state.members = [...defaultMembers]; updated = true; }
     if (!state.customClientFields) { state.customClientFields = []; updated = true; }
@@ -361,9 +388,39 @@ function initFirebaseSyncListeners() {
             renderPage(state.activePage);
         }
     }, err => console.error("Transfers sync error:", err));
+
+    // 8. Multi-Entry Loans & Udhaar
+    firebaseDb.collection('loans').onSnapshot(snapshot => {
+        let items = [];
+        if (!snapshot.empty) {
+            snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+        }
+        if (!isSame(state.loans, items)) {
+            state.loans = items;
+            saveStateLocalOnly();
+            renderPage(state.activePage);
+        }
+    }, err => console.error("Loans sync error:", err));
 }
 
 // --- CENTRAL DATA MUTATION FUNCTIONS ---
+function addLoanDirect(loanObj, syncToCloud = true) {
+    const idx = state.loans.findIndex(l => l.id === loanObj.id);
+    if (idx !== -1) {
+        state.loans[idx] = { ...state.loans[idx], ...loanObj };
+    } else {
+        state.loans.push(loanObj);
+    }
+    saveStateLocalOnly();
+    if (syncToCloud) firebaseWrite('loans', loanObj.id, loanObj);
+}
+
+function deleteLoanDirect(id, syncToCloud = true) {
+    state.loans = state.loans.filter(l => l.id !== id);
+    saveStateLocalOnly();
+    if (syncToCloud) firebaseDelete('loans', id);
+}
+
 function addTransferDirect(transferObj, syncToCloud = true) {
     const idx = state.transfers.findIndex(t => t.id === transferObj.id);
     if (idx !== -1) {
@@ -820,8 +877,11 @@ function getAccountLedger(accountId) {
         }
     });
 
-    // Filter outflows
+    // Filter outflows (Expenses - excluding legacy loan transactions now tracked in loans array)
     state.transactions.forEach(tx => {
+        if (tx.isLoanDisbursement || tx.id.startsWith('t_loan_') || tx.category === 'Loan Given') {
+            return; // Managed strictly through loans system
+        }
         if (tx.mode === account.name) {
             const client = state.clients.find(c => c.id === tx.clientId);
             let fundSuffix = '';
@@ -838,6 +898,43 @@ function getAccountLedger(accountId) {
                 credit: Number(tx.amount),
                 timestamp: new Date(tx.date).getTime()
             });
+        }
+    });
+
+    // Filter Multi-Entry Loans & Udhaar (Given / Taken)
+    (state.loans || []).forEach(loan => {
+        if (loan.account === account.name) {
+            const client = state.clients.find(c => c.id === loan.clientId);
+            const partyName = client ? client.name : 'Party';
+            const remarkSuffix = loan.remark ? ` (${loan.remark})` : '';
+
+            if (loan.type === 'given') {
+                // Cash/Bank Outflow (Credit) when giving loan to party
+                ledger.push({
+                    id: loan.id,
+                    loanId: loan.id,
+                    date: loan.date,
+                    particulars: `Loan given to ${partyName}${remarkSuffix}`,
+                    category: 'Loan Disbursement',
+                    debit: 0,
+                    credit: Number(loan.amount),
+                    timestamp: new Date(loan.date).getTime(),
+                    isLoan: true
+                });
+            } else if (loan.type === 'taken') {
+                // Cash/Bank Inflow (Debit) when taking loan from party
+                ledger.push({
+                    id: loan.id,
+                    loanId: loan.id,
+                    date: loan.date,
+                    particulars: `Loan taken from ${partyName}${remarkSuffix}`,
+                    category: 'Loan Borrowed',
+                    debit: Number(loan.amount),
+                    credit: 0,
+                    timestamp: new Date(loan.date).getTime(),
+                    isLoan: true
+                });
+            }
         }
     });
 
@@ -907,27 +1004,53 @@ function getGlobalStats() {
         }
     });
 
-    // Period Filtered Expenses
+    // Period Filtered Expenses: STRICTLY OPERATING EXPENSES (EXCLUDES LOANS GIVEN/TAKEN)
     const bounds = getPeriodFilterBounds();
     const periodExpenses = state.transactions
         .filter(tx => {
+            const isLoan = tx.isLoanDisbursement || tx.id.startsWith('t_loan_') || tx.category === 'Loan Given' || tx.category === 'Loan';
+            if (isLoan) return false;
             const txDate = new Date(tx.date);
             return txDate >= bounds.start && txDate <= bounds.end;
         })
         .reduce((sum, tx) => sum + Number(tx.amount), 0);
 
-    return { cashBalance: totalCashBalance, bankBalance: totalBankBalance, periodExpenses };
+    // Loans Overview Statistics
+    let totalLoansGiven = 0;
+    let totalLoansTaken = 0;
+    (state.loans || []).forEach(l => {
+        if (l.type === 'given') totalLoansGiven += Number(l.amount) || 0;
+        else if (l.type === 'taken') totalLoansTaken += Number(l.amount) || 0;
+    });
+
+    // Also account for any legacy creditAmount not yet migrated
+    state.clients.forEach(c => {
+        const credit = Number(c.creditAmount) || 0;
+        if (credit > 0 && !(state.loans || []).some(l => l.clientId === c.id)) {
+            totalLoansGiven += credit;
+        }
+    });
+
+    return { cashBalance: totalCashBalance, bankBalance: totalBankBalance, periodExpenses, totalLoansGiven, totalLoansTaken };
 }
 
 function getClientReportStats(clientId) {
     const client = state.clients.find(c => c.id === clientId);
-    if (!client) return { totalReceived: 0, totalDiscount: 0, totalSpent: 0, balance: 0, yearlyContract: 0, balanceReceivable: 0, openingBalance: 0, totalReceivable: 0, creditAmount: 0 };
+    if (!client) return { totalReceived: 0, totalDiscount: 0, totalSpent: 0, balance: 0, yearlyContract: 0, balanceReceivable: 0, openingBalance: 0, totalReceivable: 0, creditAmount: 0, loansGiven: 0, loansTaken: 0, loansList: [] };
 
-    const creditAmount = Number(client.creditAmount) || 0;
+    const clientLoans = (state.loans || []).filter(l => l.clientId === clientId);
+    let loansGiven = clientLoans.filter(l => l.type === 'given').reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+    let loansTaken = clientLoans.filter(l => l.type === 'taken').reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+
+    // Fallback for legacy static creditAmount if no loans in state.loans yet
+    if (loansGiven === 0 && Number(client.creditAmount) > 0) {
+        loansGiven = Number(client.creditAmount);
+    }
+
     const monthlyPay = Number(client.monthlyPay) || 0;
     const yearlyContract = Number(client.yearlyPay) || (monthlyPay * 12);
     const openingBalance = Number(client.openingBalance) || 0;
-    const totalReceivable = creditAmount + yearlyContract + openingBalance;
+    const totalReceivable = loansGiven + yearlyContract + openingBalance;
 
     const totalReceived = state.incomeLogs
         .filter(log => log.clientId === clientId)
@@ -938,13 +1061,26 @@ function getClientReportStats(clientId) {
         .reduce((sum, log) => sum + (Number(log.discount) || 0), 0);
 
     const totalSpent = state.transactions
-        .filter(tx => tx.clientId === clientId)
+        .filter(tx => tx.clientId === clientId && !tx.isLoanDisbursement && !tx.id.startsWith('t_loan_') && tx.category !== 'Loan Given')
         .reduce((sum, tx) => sum + Number(tx.amount), 0);
 
     const balance = (openingBalance + totalReceived) - totalSpent;
     const balanceReceivable = totalReceivable - (totalReceived + totalDiscount);
 
-    return { creditAmount, yearlyContract, openingBalance, totalReceivable, totalReceived, totalDiscount, totalSpent, balance, balanceReceivable };
+    return { 
+        creditAmount: loansGiven, 
+        loansGiven, 
+        loansTaken, 
+        yearlyContract, 
+        openingBalance, 
+        totalReceivable, 
+        totalReceived, 
+        totalDiscount, 
+        totalSpent, 
+        balance, 
+        balanceReceivable,
+        loansList: clientLoans 
+    };
 }
 
 // --- 5. NAVIGATION CONTROLLER ---
@@ -1055,6 +1191,9 @@ function renderPage(pageId) {
         case 'clients':
             renderClientsPage();
             break;
+        case 'loans':
+            renderLoansPage();
+            break;
         case 'expenses':
             renderExpensesPage();
             break;
@@ -1082,6 +1221,16 @@ function updateGlobalStatsUI() {
     document.getElementById('stat-cash-balance').innerText = fC(stats.cashBalance);
     document.getElementById('stat-bank-balance').innerText = fC(stats.bankBalance);
     document.getElementById('stat-period-expenses').innerText = fC(stats.periodExpenses);
+
+    const elLoanDash = document.getElementById('stat-loans-overview-balance');
+    if (elLoanDash) {
+        let pendingLoanReceivable = 0;
+        state.clients.forEach(c => {
+            const cs = getClientReportStats(c.id);
+            if (cs.loansGiven > 0) pendingLoanReceivable += Math.max(0, cs.balanceReceivable);
+        });
+        elLoanDash.innerText = fC(pendingLoanReceivable);
+    }
 }
 
 // DASHBOARD RENDERER
@@ -1120,6 +1269,8 @@ function renderDashboard() {
     });
 
     const filteredTx = state.transactions.filter(tx => {
+        const isLoan = tx.isLoanDisbursement || tx.id.startsWith('t_loan_') || tx.category === 'Loan Given' || tx.category === 'Loan';
+        if (isLoan) return false;
         const d = new Date(tx.date);
         return d >= bounds.start && d <= bounds.end;
     });
@@ -1145,7 +1296,7 @@ function renderDashboard() {
     const recentContainer = document.getElementById('dashboard-recent-transactions');
     recentContainer.innerHTML = '';
     
-    const sortedAll = [...state.transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const sortedAll = [...state.transactions].filter(tx => !tx.isLoanDisbursement && !tx.id.startsWith('t_loan_') && tx.category !== 'Loan Given').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const latestTx = sortedAll.slice(0, 5);
 
     if (latestTx.length === 0) {
@@ -1184,6 +1335,8 @@ function renderDashboard() {
     // 4. Render Yearly Budget Progress list
     const currentFYBounds = getIndianFinancialYearBounds(new Date());
     const fyTx = state.transactions.filter(tx => {
+        const isLoan = tx.isLoanDisbursement || tx.id.startsWith('t_loan_') || tx.category === 'Loan Given' || tx.category === 'Loan';
+        if (isLoan) return false;
         const d = new Date(tx.date);
         return d >= currentFYBounds.startDate && d <= currentFYBounds.endDate;
     });
@@ -1472,13 +1625,27 @@ function renderClientsPage() {
             });
 
             let contractInfoHTML = '';
-            if (stats.creditAmount > 0) {
-                const loanSourceText = client.loanSourceAccount ? `<span class="badge" style="font-size:10px; margin-left:6px; background: rgba(13, 148, 136, 0.15); color: var(--primary);">Paid via ${client.loanSourceAccount}</span>` : '';
+            let loanItemizedHTML = '';
+            if (stats.loansList && stats.loansList.length > 0) {
+                loanItemizedHTML = stats.loansList.map(l => {
+                    const isGiven = l.type === 'given';
+                    const rem = l.remark ? ` — <em style="color:var(--text-secondary);">${l.remark}</em>` : '';
+                    return `
+                        <div class="c-stat-row" style="font-size:11px; padding:3px 6px; background:rgba(13, 148, 136, 0.05); border-radius:3px; margin:2px 0;">
+                            <span>${isGiven ? '💵 Given' : '🏦 Taken'} ${formatDbDate(l.date)} (${l.account || 'Direct'})${rem}:</span>
+                            <span style="font-weight:700; color:${isGiven ? 'var(--primary)' : '#d97706'};">${fC(l.amount)}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            if (stats.loansGiven > 0) {
                 contractInfoHTML += `
-                    <div class="c-stat-row" style="background: rgba(13, 148, 136, 0.08); padding: 4px 8px; border-radius: 4px; margin: 3px 0; border: 1px solid rgba(13, 148, 136, 0.2); align-items: center;">
-                        <span class="c-stat-label" style="font-weight: 700; color: var(--primary);">Credit / Loan Given:</span>
-                        <span class="c-stat-val" style="font-weight: 700; color: var(--primary);">${fC(stats.creditAmount)} ${loanSourceText}</span>
+                    <div class="c-stat-row" style="background: rgba(13, 148, 136, 0.08); padding: 5px 8px; border-radius: 4px; margin: 3px 0; border: 1px solid rgba(13, 148, 136, 0.2); align-items: center;">
+                        <span class="c-stat-label" style="font-weight: 700; color: var(--primary);">Total Loans / Udhaar Given:</span>
+                        <span class="c-stat-val" style="font-weight: 700; color: var(--primary);">${fC(stats.loansGiven)}</span>
                     </div>
+                    ${loanItemizedHTML}
                 `;
             }
             if (Number(client.monthlyPay) > 0 || stats.yearlyContract > 0) {
@@ -1554,6 +1721,9 @@ function renderClientsPage() {
                         ${customFieldsHTML}
                     </div>
                     <div class="client-card-footer" onclick="event.stopPropagation()">
+                        <button class="btn btn-outline btn-sm" onclick="openLoanModal('given', '${client.id}')" title="Give Loan / Add Debit" style="font-size:11px; padding:4px 9px; display:inline-flex; align-items:center; gap:4px; color:var(--primary); border-color:rgba(13, 148, 136, 0.4); background:rgba(13, 148, 136, 0.06); font-weight:600;">
+                            <i data-lucide="hand-coins" style="width:12px; height:12px;"></i> Give Loan
+                        </button>
                         <button class="btn btn-outline btn-sm" onclick="quickReceiveForParty('${client.id}')" title="Log Received Amount" style="font-size:11px; padding:4px 9px; display:inline-flex; align-items:center; gap:4px; color:var(--success); border-color:rgba(16, 185, 129, 0.4); background:rgba(16, 185, 129, 0.06); font-weight:600;">
                             <i data-lucide="plus-circle" style="width:12px; height:12px;"></i> Receive
                         </button>
@@ -2823,6 +2993,13 @@ function initEventHandlers() {
         navigateToPage('expenses');
     });
 
+    const cardLoansDash = document.getElementById('card-loans-overview');
+    if (cardLoansDash) {
+        cardLoansDash.addEventListener('click', () => {
+            navigateToPage('loans');
+        });
+    }
+
     document.getElementById('dash-view-all-tx').addEventListener('click', () => {
         navigateToPage('expenses');
     });
@@ -2932,6 +3109,26 @@ function initEventHandlers() {
         });
     }
 
+    // Loans Live Search Input
+    const loanSearchInput = document.getElementById('loan-search-input');
+    const btnClearLoanSearch = document.getElementById('btn-clear-loan-search');
+    if (loanSearchInput) {
+        loanSearchInput.addEventListener('input', function() {
+            if (btnClearLoanSearch) {
+                btnClearLoanSearch.style.display = this.value ? 'block' : 'none';
+            }
+            renderLoansPage();
+        });
+    }
+    if (btnClearLoanSearch && loanSearchInput) {
+        btnClearLoanSearch.addEventListener('click', function() {
+            loanSearchInput.value = '';
+            btnClearLoanSearch.style.display = 'none';
+            loanSearchInput.focus();
+            renderLoansPage();
+        });
+    }
+
     // Modals triggers
     document.getElementById('btn-add-client').addEventListener('click', () => openClientModal());
     document.getElementById('btn-close-client-modal').addEventListener('click', () => closeClientModal());
@@ -2979,6 +3176,8 @@ function initEventHandlers() {
     document.getElementById('form-account').addEventListener('submit', handleAccountSubmit);
     const formTransfer = document.getElementById('form-transfer');
     if (formTransfer) formTransfer.addEventListener('submit', handleTransferSubmit);
+    const formLoan = document.getElementById('form-loan');
+    if (formLoan) formLoan.addEventListener('submit', handleLoanSubmit);
     document.getElementById('form-field').addEventListener('submit', handleFieldSubmit);
     document.getElementById('form-member').addEventListener('submit', handleMemberSubmit);
     document.getElementById('form-category-budgets').addEventListener('submit', handleCategoryBudgetsSubmit);
@@ -3004,6 +3203,13 @@ function initEventHandlers() {
         selectId: 'income-client-select',
         menuId: 'income-client-dropdown-menu',
         clearBtnId: 'btn-clear-income-client-search'
+    });
+
+    setupSearchableClientDropdown({
+        inputId: 'loan-client-search-input',
+        selectId: 'loan-client-select',
+        menuId: 'loan-client-dropdown-menu',
+        clearBtnId: 'btn-clear-loan-client-search'
     });
 }
 
@@ -3863,6 +4069,460 @@ function renderMasterTransfers() {
     if (window.lucide) lucide.createIcons();
 }
 
+// --- LOANS & UDHAAR CONTROLLER (Loan Given & Loan Taken) ---
+let currentLoanPresetType = 'given';
+
+window.setLoanTypePreset = function(type) {
+    currentLoanPresetType = type;
+    document.querySelectorAll('#modal-loan .transfer-type-pill').forEach(btn => btn.classList.remove('active'));
+
+    const input = document.getElementById('loan-type-input');
+    const label = document.getElementById('loan-account-label');
+    const helper = document.getElementById('loan-account-helper');
+
+    if (input) input.value = type;
+
+    if (type === 'given') {
+        const pill = document.getElementById('pill-loan-given');
+        if (pill) pill.classList.add('active');
+        if (label) label.innerText = 'Paid / Disbursed From Account *';
+        if (helper) helper.innerText = 'Amount will be deducted from this account book (Cash/Bank Outflow).';
+    } else {
+        const pill = document.getElementById('pill-loan-taken');
+        if (pill) pill.classList.add('active');
+        if (label) label.innerText = 'Deposited / Received Into Account *';
+        if (helper) helper.innerText = 'Amount will be added into this account book (Cash/Bank Inflow).';
+    }
+};
+
+window.openLoanModal = function(presetType = 'given', presetPartyId = '', editId = '') {
+    const modal = document.getElementById('modal-loan');
+    if (!modal) return;
+    const form = document.getElementById('form-loan');
+    const title = document.getElementById('modal-loan-title');
+    const accountSelect = document.getElementById('loan-account-select');
+    const clientSelect = document.getElementById('loan-client-select');
+    const searchInput = document.getElementById('loan-client-search-input');
+    const clearBtn = document.getElementById('btn-clear-loan-client-search');
+
+    form.reset();
+    document.getElementById('edit-loan-id').value = '';
+
+    // Populate Account dropdown with Cash and Bank accounts
+    if (accountSelect) {
+        accountSelect.innerHTML = '';
+        state.accounts.forEach(a => {
+            accountSelect.innerHTML += `<option value="${a.name}">${a.name} (${a.type})</option>`;
+        });
+    }
+
+    // Populate Client select
+    if (clientSelect) {
+        clientSelect.innerHTML = '<option value="">-- Select Party --</option>';
+        state.clients.forEach(c => {
+            clientSelect.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        });
+    }
+
+    document.getElementById('loan-date').value = new Date().toISOString().split('T')[0];
+
+    if (editId) {
+        const loan = (state.loans || []).find(l => l.id === editId);
+        if (loan) {
+            title.innerHTML = `<i data-lucide="edit-3" style="width:20px; height:20px; color:var(--primary);"></i> Edit Loan Entry`;
+            document.getElementById('edit-loan-id').value = loan.id;
+            setLoanTypePreset(loan.type || 'given');
+            document.getElementById('loan-amount').value = loan.amount;
+            document.getElementById('loan-date').value = loan.date;
+            if (accountSelect) accountSelect.value = loan.account || '';
+            document.getElementById('loan-remark').value = loan.remark || '';
+
+            const matchedClient = state.clients.find(c => c.id === loan.clientId);
+            if (matchedClient) {
+                if (clientSelect) clientSelect.value = matchedClient.id;
+                if (searchInput) searchInput.value = matchedClient.name;
+                if (clearBtn) clearBtn.style.display = 'flex';
+            }
+        }
+    } else {
+        title.innerHTML = `<i data-lucide="hand-coins" style="width:20px; height:20px; color:var(--primary);"></i> Add Loan / Udhaar Entry`;
+        setLoanTypePreset(presetType);
+        if (presetPartyId) {
+            const matchedClient = state.clients.find(c => c.id === presetPartyId);
+            if (matchedClient) {
+                if (clientSelect) clientSelect.value = matchedClient.id;
+                if (searchInput) searchInput.value = matchedClient.name;
+                if (clearBtn) clearBtn.style.display = 'flex';
+            }
+        } else {
+            if (clearBtn) clearBtn.style.display = 'none';
+        }
+    }
+
+    modal.classList.add('active');
+    if (window.lucide) lucide.createIcons();
+};
+
+window.closeLoanModal = function() {
+    const modal = document.getElementById('modal-loan');
+    if (modal) modal.classList.remove('active');
+};
+
+function handleLoanSubmit(e) {
+    e.preventDefault();
+    const id = document.getElementById('edit-loan-id').value;
+    const type = document.getElementById('loan-type-input').value || 'given';
+    let clientId = document.getElementById('loan-client-select').value;
+    const searchInput = document.getElementById('loan-client-search-input');
+    const typedPartyName = (searchInput ? searchInput.value : '').trim();
+    const amount = Number(document.getElementById('loan-amount').value);
+    const date = document.getElementById('loan-date').value;
+    const account = document.getElementById('loan-account-select').value;
+    const remark = (document.getElementById('loan-remark').value || '').trim();
+
+    if (!clientId && typedPartyName) {
+        // Find existing or auto-create party
+        const existing = state.clients.find(c => c.name.toLowerCase() === typedPartyName.toLowerCase());
+        if (existing) {
+            clientId = existing.id;
+        } else {
+            // Auto create new party
+            const newParty = {
+                id: 'client_' + Date.now(),
+                name: typedPartyName,
+                group: type === 'given' ? 'Debtor' : 'Creditor',
+                monthlyPay: 0,
+                yearlyPay: 0,
+                openingBalance: 0,
+                creditAmount: 0
+            };
+            addClientDirect(newParty);
+            clientId = newParty.id;
+        }
+    }
+
+    if (!clientId) {
+        alert("Please select or enter a valid Party Name for the loan.");
+        if (searchInput) searchInput.focus();
+        return;
+    }
+
+    if (amount <= 0) {
+        alert("Please enter a valid loan amount greater than ₹0.");
+        return;
+    }
+
+    const loanObj = {
+        id: id || ('loan_' + Date.now()),
+        clientId,
+        type,
+        amount,
+        date,
+        account,
+        remark,
+        timestamp: Date.now()
+    };
+
+    addLoanDirect(loanObj);
+    closeLoanModal();
+    renderPage(state.activePage);
+}
+
+window.deleteLoan = function(id) {
+    if (confirm("Are you sure you want to delete this loan entry? Account balances and party ledger will be updated accordingly.")) {
+        deleteLoanDirect(id);
+        renderPage(state.activePage);
+    }
+};
+
+window.openEditLoan = function(id) {
+    const loan = (state.loans || []).find(l => l.id === id);
+    if (loan) {
+        openLoanModal(loan.type, loan.clientId, id);
+    }
+};
+
+window.setLoansTab = function(tab) {
+    state.activeLoansTab = tab;
+    saveState();
+
+    document.querySelectorAll('#page-loans .master-tab').forEach(el => {
+        el.classList.toggle('active', el.id === `tab-loans-${tab}`);
+    });
+
+    const panelGiven = document.getElementById('loans-panel-given');
+    const panelTaken = document.getElementById('loans-panel-taken');
+    const panelHistory = document.getElementById('loans-panel-history');
+
+    if (panelGiven) panelGiven.style.display = tab === 'given' ? 'block' : 'none';
+    if (panelTaken) panelTaken.style.display = tab === 'taken' ? 'block' : 'none';
+    if (panelHistory) panelHistory.style.display = tab === 'history' ? 'block' : 'none';
+
+    renderLoansPage();
+};
+
+function renderLoansPage() {
+    const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
+    const searchInput = document.getElementById('loan-search-input');
+    const searchQuery = (searchInput ? searchInput.value : '').trim().toLowerCase();
+
+    // 1. Calculate KPI Statistics
+    let totalGiven = 0;
+    let totalTaken = 0;
+    let totalReceived = 0;
+    let totalDiscount = 0;
+    let countGiven = 0;
+
+    (state.loans || []).forEach(l => {
+        const amt = Number(l.amount) || 0;
+        if (l.type === 'given') {
+            totalGiven += amt;
+            countGiven++;
+        } else if (l.type === 'taken') {
+            totalTaken += amt;
+        }
+    });
+
+    // Also account for legacy static creditAmount if any client has it without loan record
+    state.clients.forEach(c => {
+        const credit = Number(c.creditAmount) || 0;
+        if (credit > 0 && !(state.loans || []).some(l => l.clientId === c.id)) {
+            totalGiven += credit;
+            countGiven++;
+        }
+    });
+
+    // Compute received & discount across parties with loans
+    state.clients.forEach(c => {
+        const stats = getClientReportStats(c.id);
+        if (stats.loansGiven > 0) {
+            totalReceived += stats.totalReceived;
+            totalDiscount += stats.totalDiscount;
+        }
+    });
+
+    const pendingToRecover = Math.max(0, totalGiven - (totalReceived + totalDiscount));
+
+    const elGivenTotal = document.getElementById('stat-loans-given-total');
+    const elGivenCount = document.getElementById('stat-loans-given-count');
+    const elRecTotal = document.getElementById('stat-loans-received-total');
+    const elDiscText = document.getElementById('stat-loans-discount-text');
+    const elPendingTotal = document.getElementById('stat-loans-pending-total');
+    const elTakenTotal = document.getElementById('stat-loans-taken-total');
+
+    if (elGivenTotal) elGivenTotal.innerText = fC(totalGiven);
+    if (elGivenCount) elGivenCount.innerText = `${countGiven} Loans Disbursed`;
+    if (elRecTotal) elRecTotal.innerText = fC(totalReceived);
+    if (elDiscText) elDiscText.innerText = `${fC(totalDiscount)} Discount Allowed`;
+    if (elPendingTotal) elPendingTotal.innerText = fC(pendingToRecover);
+    if (elTakenTotal) elTakenTotal.innerText = fC(totalTaken);
+
+    // Set Active Sub-tab Panel
+    const activeTab = state.activeLoansTab || 'given';
+    document.querySelectorAll('#page-loans .master-tab').forEach(el => {
+        el.classList.toggle('active', el.id === `tab-loans-${activeTab}`);
+    });
+    const panelGiven = document.getElementById('loans-panel-given');
+    const panelTaken = document.getElementById('loans-panel-taken');
+    const panelHistory = document.getElementById('loans-panel-history');
+    if (panelGiven) panelGiven.style.display = activeTab === 'given' ? 'block' : 'none';
+    if (panelTaken) panelTaken.style.display = activeTab === 'taken' ? 'block' : 'none';
+    if (panelHistory) panelHistory.style.display = activeTab === 'history' ? 'block' : 'none';
+
+    // 2. Render Loans Given Panel
+    const containerGiven = document.getElementById('loans-given-list-container');
+    if (containerGiven) {
+        containerGiven.innerHTML = '';
+        let debtorsWithLoans = state.clients.filter(c => {
+            const stats = getClientReportStats(c.id);
+            return stats.loansGiven > 0 || isClientParty(c);
+        });
+
+        if (searchQuery) {
+            debtorsWithLoans = debtorsWithLoans.filter(c => c.name && c.name.toLowerCase().includes(searchQuery));
+        }
+
+        if (debtorsWithLoans.length === 0) {
+            containerGiven.innerHTML = `<div class="empty-state" style="grid-column:1/-1; padding:32px; text-align:center;">No loan given entries found. Click "+ Give Loan" to disburse loan to a party.</div>`;
+        } else {
+            debtorsWithLoans.forEach(client => {
+                const stats = getClientReportStats(client.id);
+                if (stats.loansGiven <= 0 && !searchQuery) return; // Only show relevant with loans
+
+                const card = document.createElement('div');
+                card.className = 'client-card';
+                card.id = `loan-party-card-${client.id}`;
+                card.onclick = () => togglePartyCard(client.id);
+
+                let loanEntriesHTML = '';
+                if (stats.loansList && stats.loansList.length > 0) {
+                    stats.loansList.filter(l => l.type === 'given').forEach(l => {
+                        const remText = l.remark ? ` — <em style="color:var(--text-secondary);">${l.remark}</em>` : '';
+                        loanEntriesHTML += `
+                            <div class="c-stat-row" style="font-size:11px; padding:3px 6px; background:rgba(13, 148, 136, 0.05); border-radius:3px; margin:2px 0;">
+                                <span>📅 ${formatDbDate(l.date)} (${l.account || 'Direct'})${remText}:</span>
+                                <span style="font-weight:700; color:var(--primary);">${fC(l.amount)}</span>
+                            </div>
+                        `;
+                    });
+                }
+
+                card.innerHTML = `
+                    <div class="client-card-header">
+                        <div class="party-card-title-col">
+                            <div class="party-card-name-row">
+                                <h4 class="party-card-name">${client.name}</h4>
+                                <span class="party-group-badge client"><i data-lucide="arrow-up-right" style="width:12px; height:12px;"></i> Debtor</span>
+                            </div>
+                            <div class="party-card-summary-preview">
+                                <span class="preview-receivable">Balance: <strong>${fC(stats.balanceReceivable)}</strong></span>
+                                <span class="preview-loan-tag">Loan: ${fC(stats.loansGiven)}</span>
+                            </div>
+                        </div>
+                        <div class="party-card-toggle-btn">
+                            <i data-lucide="chevron-down" class="party-chevron-icon"></i>
+                        </div>
+                    </div>
+                    <div class="client-card-body" style="display:none;">
+                        <div class="client-stats">
+                            <div class="c-stat-row" style="font-weight:700; color:var(--primary); background:rgba(13, 148, 136, 0.08); padding:5px 8px; border-radius:4px;">
+                                <span>Total Loan Principal:</span>
+                                <span>${fC(stats.loansGiven)}</span>
+                            </div>
+                            ${loanEntriesHTML}
+                            <div class="c-stat-row">
+                                <span>Total Received Back:</span>
+                                <span style="color:var(--success); font-weight:600;">${fC(stats.totalReceived)}</span>
+                            </div>
+                            ${stats.totalDiscount > 0 ? `<div class="c-stat-row"><span>Discount Given:</span><span style="color:#d97706; font-weight:600;">${fC(stats.totalDiscount)}</span></div>` : ''}
+                            <div class="c-stat-row" style="border-top:1px dashed var(--border-color); padding-top:6px; margin-top:4px;">
+                                <span style="font-weight:700;">Remaining Balance Due:</span>
+                                <span style="font-weight:700; color:${stats.balanceReceivable > 0 ? 'var(--danger)' : 'var(--success)'};">${stats.balanceReceivable <= 0 ? 'Fully Recovered (₹0)' : fC(stats.balanceReceivable)}</span>
+                            </div>
+                        </div>
+                        <div class="client-card-footer" onclick="event.stopPropagation()">
+                            <button class="btn btn-outline btn-sm" onclick="openLoanModal('given', '${client.id}')" style="font-size:11px; padding:4px 9px; display:inline-flex; align-items:center; gap:4px; color:var(--primary); border-color:rgba(13, 148, 136, 0.4); background:rgba(13, 148, 136, 0.06); font-weight:600;">
+                                <i data-lucide="plus" style="width:12px; height:12px;"></i> Give Loan
+                            </button>
+                            <button class="btn btn-outline btn-sm" onclick="quickReceiveForParty('${client.id}')" style="font-size:11px; padding:4px 9px; display:inline-flex; align-items:center; gap:4px; color:var(--success); border-color:rgba(16, 185, 129, 0.4); background:rgba(16, 185, 129, 0.06); font-weight:600;">
+                                <i data-lucide="wallet" style="width:12px; height:12px;"></i> Receive
+                            </button>
+                        </div>
+                    </div>
+                `;
+                containerGiven.appendChild(card);
+            });
+        }
+    }
+
+    // 3. Render Loans Taken Panel
+    const containerTaken = document.getElementById('loans-taken-list-container');
+    if (containerTaken) {
+        containerTaken.innerHTML = '';
+        let takenLoans = (state.loans || []).filter(l => l.type === 'taken');
+        if (searchQuery) {
+            takenLoans = takenLoans.filter(l => {
+                const c = state.clients.find(cl => cl.id === l.clientId);
+                return (c && c.name.toLowerCase().includes(searchQuery)) || (l.remark && l.remark.toLowerCase().includes(searchQuery));
+            });
+        }
+
+        if (takenLoans.length === 0) {
+            containerTaken.innerHTML = `<div class="empty-state" style="grid-column:1/-1; padding:32px; text-align:center;">No loans taken logged. Click "+ Take Loan" to log funds borrowed from a creditor or party.</div>`;
+        } else {
+            takenLoans.forEach(loan => {
+                const client = state.clients.find(c => c.id === loan.clientId);
+                const partyName = client ? client.name : 'Creditor / Lender';
+
+                const card = document.createElement('div');
+                card.className = 'client-card';
+                card.innerHTML = `
+                    <div class="client-card-header">
+                        <div class="party-card-title-col">
+                            <div class="party-card-name-row">
+                                <h4 class="party-card-name">${partyName}</h4>
+                                <span class="party-group-badge vendor"><i data-lucide="arrow-down-left" style="width:12px; height:12px;"></i> Loan Taken</span>
+                            </div>
+                            <div class="party-card-summary-preview">
+                                <span class="preview-receivable" style="color:#d97706;">Borrowed: <strong>${fC(loan.amount)}</strong></span>
+                                <span class="preview-loan-tag">Account: ${loan.account || 'Direct'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="client-card-body" style="display:block; padding-top:6px;">
+                        <div class="client-stats">
+                            <div class="c-stat-row">
+                                <span>Borrow Date:</span>
+                                <span>${formatDbDate(loan.date)}</span>
+                            </div>
+                            <div class="c-stat-row">
+                                <span>Deposited Into:</span>
+                                <span class="badge-acctype">${loan.account || 'Direct Cash/Bank'}</span>
+                            </div>
+                            <div class="c-stat-row">
+                                <span>Remark:</span>
+                                <span>${loan.remark || '-'}</span>
+                            </div>
+                        </div>
+                        <div class="client-card-footer" onclick="event.stopPropagation()">
+                            <button class="btn-icon-only edit-btn" onclick="openEditLoan('${loan.id}')" title="Edit Loan"><i data-lucide="edit-3"></i></button>
+                            <button class="btn-icon-only delete-btn" onclick="deleteLoan('${loan.id}')" title="Delete Loan"><i data-lucide="trash-2"></i></button>
+                        </div>
+                    </div>
+                `;
+                containerTaken.appendChild(card);
+            });
+        }
+    }
+
+    // 4. Render Loans History Log Table
+    const tbodyHistory = document.getElementById('loans-history-tbody');
+    if (tbodyHistory) {
+        tbodyHistory.innerHTML = '';
+        let sortedLoans = [...(state.loans || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        if (searchQuery) {
+            sortedLoans = sortedLoans.filter(l => {
+                const c = state.clients.find(cl => cl.id === l.clientId);
+                return (c && c.name.toLowerCase().includes(searchQuery)) || (l.remark && l.remark.toLowerCase().includes(searchQuery));
+            });
+        }
+
+        if (sortedLoans.length === 0) {
+            tbodyHistory.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:24px;">No loan transactions recorded yet.</td></tr>`;
+        } else {
+            sortedLoans.forEach(loan => {
+                const client = state.clients.find(c => c.id === loan.clientId);
+                const partyName = client ? client.name : 'Unknown Party';
+                const isGiven = loan.type === 'given';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${formatDbDate(loan.date)}</td>
+                    <td style="font-weight:600;">${partyName}</td>
+                    <td>
+                        <span class="badge-transfer-type ${isGiven ? 'cash-to-bank' : 'bank-to-cash'}" style="font-size:11px; padding:2px 8px;">
+                            ${isGiven ? '💵 Loan Given (उधार दिया)' : '🏦 Loan Taken (उधार लिया)'}
+                        </span>
+                    </td>
+                    <td><span class="badge-acctype">${loan.account || '-'}</span></td>
+                    <td style="font-weight:700; color:${isGiven ? 'var(--primary)' : '#d97706'};">${fC(loan.amount)}</td>
+                    <td style="font-size:12px; color:var(--text-secondary); max-width:200px; word-break:break-word;">${loan.remark || '-'}</td>
+                    <td class="actions-col">
+                        <div class="actions-wrapper">
+                            <button class="btn-icon-only edit-btn" onclick="openEditLoan('${loan.id}')" title="Edit Loan"><i data-lucide="edit-3"></i></button>
+                            <button class="btn-icon-only delete-btn" onclick="deleteLoan('${loan.id}')" title="Delete Loan"><i data-lucide="trash-2"></i></button>
+                        </div>
+                    </td>
+                `;
+                tbodyHistory.appendChild(tr);
+            });
+        }
+    }
+
+    if (window.lucide) lucide.createIcons();
+}
+
 // Custom Fields
 function openFieldModal(scope) {
     const modal = document.getElementById('modal-field');
@@ -4050,6 +4710,18 @@ function exportToExcel() {
         "Remark / Notes": tr.remark || ''
     }));
 
+    const loansData = (state.loans || []).map(loan => {
+        const client = state.clients.find(c => c.id === loan.clientId);
+        return {
+            "Date": formatDbDate(loan.date),
+            "Party Name": client ? client.name : 'Unknown Party',
+            "Loan Direction": loan.type === 'given' ? 'Loan Given (उधार दिया)' : 'Loan Taken (उधार लिया)',
+            "Account": loan.account || '',
+            "Loan Amount (INR)": loan.amount,
+            "Remark / Purpose": loan.remark || ''
+        };
+    });
+
     const wb = XLSX.utils.book_new();
 
     const addSheet = (data, sheetName) => {
@@ -4058,6 +4730,7 @@ function exportToExcel() {
     };
 
     addSheet(clientsData, "Clients Overview");
+    addSheet(loansData, "Loans & Udhaar");
     addSheet(incomeData, "Received Income Logs");
     addSheet(expensesData, "Expenses Ledger");
     addSheet(transfersData, "Internal Transfers");

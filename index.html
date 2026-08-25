@@ -23,7 +23,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=6.3.2">
+    <link rel="stylesheet" href="style.css?v=6.4.0">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -80,6 +80,10 @@
                 <a href="#" class="menu-item" data-page="clients" id="nav-clients">
                     <i data-lucide="users"></i>
                     <span>Parties (Debtors/Creditors)</span>
+                </a>
+                <a href="#" class="menu-item" data-page="loans" id="nav-loans">
+                    <i data-lucide="hand-coins"></i>
+                    <span>Loans & Udhaar (उधार खाता)</span>
                 </a>
                 <a href="#" class="menu-item" data-page="expenses" id="nav-expenses">
                     <i data-lucide="arrow-up-right"></i>
@@ -165,6 +169,16 @@
                                 <h3>Period Expenses</h3>
                                 <span class="amount" id="stat-period-expenses">₹0</span>
                                 <span class="helper-text">Click to view Expenses</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" id="card-loans-overview" style="cursor: pointer;">
+                            <div class="stat-icon" style="background: rgba(13, 148, 136, 0.1); color: var(--primary);">
+                                <i data-lucide="hand-coins"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Loans Given (उधार लेना बाकी)</h3>
+                                <span class="amount" id="stat-loans-overview-balance" style="color:var(--primary);">₹0</span>
+                                <span class="helper-text">Click to view Loans & Udhaar</span>
                             </div>
                         </div>
                     </div>
@@ -307,6 +321,133 @@
                                 <!-- Rendered dynamically -->
                             </tbody>
                         </table>
+                    </div>
+                </section>
+
+                <!-- 2.5 LOANS & UDHAAR (उधार खाता) PAGE -->
+                <section id="page-loans" class="app-page">
+                    <div class="section-actions-header" style="flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h3 style="margin-bottom: 4px; display:flex; align-items:center; gap:8px;">
+                                <i data-lucide="hand-coins" style="color:var(--primary); width:24px; height:24px;"></i> Loans & Udhaar Manager (उधार खाता)
+                            </h3>
+                            <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">Track Loans Given (उधार दिया) & Loans Taken (उधार लिया) with full repayment records</p>
+                        </div>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button class="btn btn-primary" id="btn-loans-give" onclick="openLoanModal('given')" style="display:inline-flex; align-items:center; gap:6px;">
+                                <i data-lucide="plus-circle" style="width:15px; height:15px;"></i> Give Loan (उधार दें)
+                            </button>
+                            <button class="btn btn-outline" id="btn-loans-take" onclick="openLoanModal('taken')" style="display:inline-flex; align-items:center; gap:6px;">
+                                <i data-lucide="arrow-down-left" style="width:15px; height:15px;"></i> Take Loan (उधार लें)
+                            </button>
+                            <button class="btn btn-success" id="btn-loans-receive" onclick="openIncomeModal()" style="display:inline-flex; align-items:center; gap:6px;">
+                                <i data-lucide="wallet" style="width:15px; height:15px;"></i> Log Repayment Received
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Loans KPI Summary Cards -->
+                    <div class="stats-grid" style="margin-bottom: 16px;">
+                        <div class="stat-card" style="border-left: 4px solid var(--primary);">
+                            <div class="stat-icon" style="background: rgba(13, 148, 136, 0.1); color: var(--primary);">
+                                <i data-lucide="arrow-up-right"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Total Loans Given (उधार दिया)</h3>
+                                <span class="amount" id="stat-loans-given-total" style="color:var(--primary);">₹0</span>
+                                <span class="helper-text" id="stat-loans-given-count">0 Loans Disbursed</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid var(--success);">
+                            <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--success);">
+                                <i data-lucide="check-circle-2"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Total Repaid / Received (वापस मिला)</h3>
+                                <span class="amount" id="stat-loans-received-total" style="color:var(--success);">₹0</span>
+                                <span class="helper-text" id="stat-loans-discount-text">₹0 Discount Allowed</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid var(--danger);">
+                            <div class="stat-icon" style="background: rgba(225, 29, 72, 0.1); color: var(--danger);">
+                                <i data-lucide="hourglass"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Pending to Recover (लेना बाकी)</h3>
+                                <span class="amount" id="stat-loans-pending-total" style="color:var(--danger);">₹0</span>
+                                <span class="helper-text">Net Outstanding Asset</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid #f59e0b;">
+                            <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                                <i data-lucide="arrow-down-left"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Loans Taken / Borrowed (उधार लिया)</h3>
+                                <span class="amount" id="stat-loans-taken-total" style="color:#f59e0b;">₹0</span>
+                                <span class="helper-text">Liability Payable</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Loans Sub-Tabs Navigation -->
+                    <div class="master-tabs-bar" style="margin-bottom: 16px;">
+                        <button type="button" class="master-tab active" id="tab-loans-given" onclick="setLoansTab('given')">
+                            <i data-lucide="arrow-up-right" style="width:14px; height:14px;"></i> Loans Given (उधार दिया - Debtors)
+                        </button>
+                        <button type="button" class="master-tab" id="tab-loans-taken" onclick="setLoansTab('taken')">
+                            <i data-lucide="arrow-down-left" style="width:14px; height:14px;"></i> Loans Taken (उधार लिया - Creditors)
+                        </button>
+                        <button type="button" class="master-tab" id="tab-loans-history" onclick="setLoansTab('history')">
+                            <i data-lucide="history" style="width:14px; height:14px;"></i> Loans Transaction History Log
+                        </button>
+                    </div>
+
+                    <!-- Loans Search Filter Bar -->
+                    <div class="party-filter-dropdown-wrapper" style="margin-bottom: 16px;">
+                        <div class="searchable-input-wrapper" style="position: relative;">
+                            <i data-lucide="search" class="search-input-icon" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted);"></i>
+                            <input type="text" id="loan-search-input" class="searchable-input" placeholder="🔍 Search loan by party name, remark, amount..." autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 9px 36px 9px 36px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 13px;">
+                            <button type="button" class="btn-clear-search" id="btn-clear-loan-search" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;" title="Clear search">
+                                <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Loans Given Panel -->
+                    <div id="loans-panel-given" class="loans-sub-panel">
+                        <div class="clients-grid" id="loans-given-list-container">
+                            <!-- Populated dynamically with Loan Given Party Cards -->
+                        </div>
+                    </div>
+
+                    <!-- Loans Taken Panel -->
+                    <div id="loans-panel-taken" class="loans-sub-panel" style="display:none;">
+                        <div class="clients-grid" id="loans-taken-list-container">
+                            <!-- Populated dynamically with Loan Taken Party Cards -->
+                        </div>
+                    </div>
+
+                    <!-- Loans History Log Table Panel -->
+                    <div id="loans-panel-history" class="loans-sub-panel" style="display:none;">
+                        <div class="table-container">
+                            <table class="data-table" id="table-loans-history">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Party Name</th>
+                                        <th>Direction</th>
+                                        <th>Account (Cash/Bank)</th>
+                                        <th>Amount (₹)</th>
+                                        <th>Remark / Description</th>
+                                        <th class="actions-col">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="loans-history-tbody">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </section>
 
@@ -1020,7 +1161,11 @@
             </a>
             <a href="#" class="bottom-nav-item" data-page="clients">
                 <i data-lucide="users"></i>
-                <span>Clients</span>
+                <span>Parties</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-page="loans">
+                <i data-lucide="hand-coins"></i>
+                <span>Loans</span>
             </a>
             <a href="#" class="bottom-nav-item" data-page="expenses">
                 <i data-lucide="arrow-up-right"></i>
@@ -1339,6 +1484,79 @@
         </div>
     </div>
 
+    <!-- Modal 6: Multi-Entry Loan Given / Taken Manager -->
+    <div id="modal-loan" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h4 id="modal-loan-title" style="display:flex; align-items:center; gap:8px;">
+                    <i data-lucide="hand-coins" style="width:20px; height:20px; color:var(--primary);"></i> Add Loan / Udhaar Entry
+                </h4>
+                <button class="btn-close-modal" id="btn-close-loan-modal" onclick="closeLoanModal()"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-loan" class="modal-form">
+                <input type="hidden" id="edit-loan-id">
+                
+                <!-- Loan Direction / Type Selector -->
+                <div class="form-group">
+                    <label>Loan Direction / Nature *</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <button type="button" class="btn btn-outline btn-sm transfer-type-pill active" id="pill-loan-given" onclick="setLoanTypePreset('given')" style="padding: 9px 8px; font-size: 11px; font-weight: 700; text-align: center;">
+                            💵 ➔ 👤 Loan Given (उधार दिया)
+                        </button>
+                        <button type="button" class="btn btn-outline btn-sm transfer-type-pill" id="pill-loan-taken" onclick="setLoanTypePreset('taken')" style="padding: 9px 8px; font-size: 11px; font-weight: 700; text-align: center;">
+                            👤 ➔ 🏦 Loan Taken (उधार लिया)
+                        </button>
+                    </div>
+                    <input type="hidden" id="loan-type-input" value="given">
+                </div>
+
+                <div class="form-group">
+                    <label for="loan-client-search-input">Party / Person Name *</label>
+                    <div class="searchable-input-wrapper" style="position: relative;">
+                        <i data-lucide="user" class="search-input-icon" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted);"></i>
+                        <input type="text" id="loan-client-search-input" class="searchable-input" placeholder="🔍 Type or search party (e.g. Saanvi)..." autocomplete="off" required style="width: 100%; box-sizing: border-box; padding: 10px 36px 10px 36px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 13px;">
+                        <button type="button" class="btn-clear-search" id="btn-clear-loan-client-search" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;" title="Clear selection">
+                            <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                        </button>
+                        <div id="loan-client-dropdown-menu" class="searchable-dropdown-menu" style="display: none;"></div>
+                    </div>
+                    <select id="loan-client-select" style="display: none;" required></select>
+                </div>
+
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="loan-amount">Loan Amount (INR) *</label>
+                        <input type="number" id="loan-amount" required min="1" step="any" placeholder="e.g. 50000">
+                    </div>
+                    <div class="form-group">
+                        <label for="loan-date">Loan Date *</label>
+                        <input type="date" id="loan-date" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="loan-account-select" id="loan-account-label">Paid / Disbursed From Account *</label>
+                    <select id="loan-account-select" required>
+                        <!-- Populated dynamically with Cash and Bank accounts -->
+                    </select>
+                    <span class="field-helper-text" id="loan-account-helper" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Amount will be deducted from this account book.</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="loan-remark">Remark / Purpose (Optional)</label>
+                    <input type="text" id="loan-remark" placeholder="e.g. 2nd loan tranche / Emergency advance / Hand loan">
+                </div>
+
+                <div class="modal-footer-actions">
+                    <button type="button" class="btn btn-outline" id="btn-cancel-loan" onclick="closeLoanModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-loan" style="display:inline-flex; align-items:center; gap:6px;">
+                        <i data-lucide="check-circle" style="width:14px; height:14px;"></i> Save Loan Entry
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Modal 5: Add Custom Column Field -->
     <div id="modal-field" class="modal-overlay">
         <div class="modal-box">
@@ -1410,9 +1628,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.3.2"></script>
-    <script src="app.js?v=6.3.2"></script>
-    <script src="sindhu_v1.js?v=6.3.2"></script>
+    <script src="firebase-config.js?v=6.4.0"></script>
+    <script src="app.js?v=6.4.0"></script>
+    <script src="sindhu_v1.js?v=6.4.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">
