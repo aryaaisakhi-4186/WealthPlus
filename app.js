@@ -1158,6 +1158,9 @@ function renderDashboard() {
             
             const item = document.createElement('div');
             item.className = 'recent-item';
+            item.style.cursor = 'pointer';
+            item.title = 'Click to edit this expense';
+            item.onclick = () => openEditExpense(tx.id);
             item.innerHTML = `
                 <div class="item-left">
                     <div class="item-cat-icon" style="background: ${catMeta.color}15; color: ${catMeta.color};">
@@ -1648,9 +1651,7 @@ window.toggleExpenseCategoryCard = function(catKey) {
 };
 
 window.openAddExpenseForCategory = function(catName) {
-    openExpenseModal();
-    const select = document.getElementById('expense-category');
-    if (select) select.value = catName;
+    openExpenseModal('', catName);
 };
 
 window.toggleExpenseFlatTable = function() {
@@ -1762,26 +1763,32 @@ function renderExpensesPage() {
                     let customCells = '';
                     state.customTxFields.forEach(f => {
                         const val = tx[f.name] || '-';
-                        customCells += `<span>${f.name}: <strong>${val}</strong></span>`;
+                        customCells += `<span class="exp-tx-custom-tag" style="background:rgba(15, 23, 42, 0.05); padding:1px 6px; border-radius:3px;">${f.name}: <strong>${val}</strong></span>`;
                     });
 
                     rowsHTML += `
-                        <tr>
-                            <td><span style="font-weight:600; color:var(--text-secondary); font-size:11px;">${formatDbDate(tx.date)}</span></td>
-                            <td>
-                                <div style="font-weight:600; color:var(--text-primary);">${tx.description}</div>
-                                ${customCells ? `<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${customCells}</div>` : ''}
-                            </td>
-                            <td><span class="badge-acctype" style="font-size:10px; padding:2px 6px;">${tx.mode}</span></td>
-                            <td><span style="font-size:11px;">${clientLabel}</span></td>
-                            <td style="font-weight:700; color:var(--danger); white-space:nowrap;">-₹${Number(tx.amount).toLocaleString('en-IN')}</td>
-                            <td style="text-align:right; white-space:nowrap;">
-                                <div class="actions-wrapper" style="justify-content:flex-end;">
-                                    <button class="btn-icon-only edit-btn" onclick="event.stopPropagation(); openEditExpense('${tx.id}')" title="Edit Expense"><i data-lucide="edit-3" style="width:13px; height:13px;"></i></button>
-                                    <button class="btn-icon-only delete-btn" style="display: var(--staff-access-display, inline-flex);" onclick="event.stopPropagation(); deleteExpense('${tx.id}')" title="Delete Expense"><i data-lucide="trash-2" style="width:13px; height:13px;"></i></button>
+                        <div class="exp-entry-row" onclick="openEditExpense('${tx.id}')" title="Click to edit this expense entry">
+                            <div class="exp-entry-main">
+                                <div class="exp-entry-title">${tx.description}</div>
+                                <div class="exp-entry-meta">
+                                    <span style="font-weight:600; color:var(--text-secondary);"><i data-lucide="calendar" style="width:11px; height:11px; display:inline-block; vertical-align:middle; margin-right:2px;"></i> ${formatDbDate(tx.date)}</span>
+                                    <span class="badge-acctype">${tx.mode}</span>
+                                    ${tx.clientId ? `<span style="color:var(--primary); font-weight:600; font-size:11px;">${clientLabel}</span>` : ''}
+                                    ${customCells}
                                 </div>
-                            </td>
-                        </tr>
+                            </div>
+                            <div class="exp-entry-right" onclick="event.stopPropagation()">
+                                <div class="exp-entry-amount">-₹${Number(tx.amount).toLocaleString('en-IN')}</div>
+                                <div class="exp-entry-actions">
+                                    <button type="button" class="btn-exp-row-edit" onclick="openEditExpense('${tx.id}')" title="Edit Expense">
+                                        <i data-lucide="edit-3" style="width:12px; height:12px;"></i> Edit
+                                    </button>
+                                    <button type="button" class="btn-exp-row-delete" style="display: var(--staff-access-display, inline-flex);" onclick="deleteExpense('${tx.id}')" title="Delete Expense">
+                                        <i data-lucide="trash-2" style="width:12px; height:12px;"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     `;
                 });
 
@@ -1810,25 +1817,14 @@ function renderExpensesPage() {
                         </div>
                     </div>
                     <div class="exp-cat-body" style="display: ${autoExpand ? 'block' : 'none'};">
-                        <div class="exp-cat-table-wrapper">
-                            <table class="exp-cat-table">
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Description</th>
-                                        <th>Account</th>
-                                        <th>Fund Source</th>
-                                        <th>Amount</th>
-                                        <th style="text-align:right;">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${rowsHTML}
-                                </tbody>
-                            </table>
+                        <div class="exp-entries-list">
+                            ${rowsHTML}
                         </div>
-                        <div style="display:flex; justify-content:flex-end; margin-top:10px; padding-top:8px; border-top:1px dashed var(--border-color);" onclick="event.stopPropagation()">
-                            <button class="btn btn-outline btn-sm" onclick="openAddExpenseForCategory('${cat}')" style="font-size:11px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px; color:var(--primary); border-color:var(--primary); font-weight:600;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:10px; border-top:1px dashed var(--border-color); flex-wrap:wrap; gap:8px;" onclick="event.stopPropagation()">
+                            <span style="font-size:12px; color:var(--text-secondary); font-weight:600;">
+                                Category Total: <strong style="color:var(--danger);">-₹${Math.round(catTotal).toLocaleString('en-IN')}</strong> (${txList.length} entries)
+                            </span>
+                            <button class="btn btn-outline btn-sm" onclick="openAddExpenseForCategory('${cat}')" style="font-size:11px; padding:5px 12px; display:inline-flex; align-items:center; gap:4px; color:var(--primary); border-color:var(--primary); font-weight:600;">
                                 <i data-lucide="plus" style="width:12px; height:12px;"></i> Add to ${cat}
                             </button>
                         </div>
@@ -3457,13 +3453,17 @@ window.deleteIncome = function(id) {
 };
 
 // Expense
-function openExpenseModal(editId = '') {
+function openExpenseModal(editId = '', presetCategory = '') {
     const modal = document.getElementById('modal-expense');
     const title = document.getElementById('modal-expense-title');
     const form = document.getElementById('form-expense');
     const clientSelect = document.getElementById('expense-client-source');
     const accSelect = document.getElementById('expense-account-select');
+    const catDropdown = document.getElementById('expense-category');
     form.reset();
+
+    // Populate category dropdown
+    populateCategoryDropdowns();
 
     const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
     let capitalOptions = `
@@ -3501,10 +3501,22 @@ function openExpenseModal(editId = '') {
     if (editId) {
         const tx = state.transactions.find(t => t.id === editId);
         if (tx) {
-            title.innerText = 'Edit Expense Entry';
+            title.innerHTML = `<i data-lucide="edit-3" style="width:18px; height:18px; color:var(--primary); display:inline-block; vertical-align:middle; margin-right:4px;"></i> Edit Expense Entry`;
             document.getElementById('edit-expense-id').value = tx.id;
             document.getElementById('expense-description').value = tx.description;
-            document.getElementById('expense-category').value = tx.category;
+            
+            // Ensure category exists in dropdown
+            if (catDropdown) {
+                let catExists = Array.from(catDropdown.options).some(o => o.value === tx.category);
+                if (!catExists && tx.category) {
+                    const opt = document.createElement('option');
+                    opt.value = tx.category;
+                    opt.innerText = tx.category;
+                    catDropdown.appendChild(opt);
+                }
+                catDropdown.value = tx.category;
+            }
+
             document.getElementById('expense-amount').value = tx.amount;
             document.getElementById('expense-date').value = tx.date;
             accSelect.value = tx.mode;
@@ -3521,8 +3533,19 @@ function openExpenseModal(editId = '') {
             });
         }
     } else {
-        title.innerText = 'Add Expense Entry';
+        title.innerHTML = `<i data-lucide="plus-circle" style="width:18px; height:18px; color:var(--primary); display:inline-block; vertical-align:middle; margin-right:4px;"></i> Add Expense Entry`;
         document.getElementById('edit-expense-id').value = '';
+
+        if (presetCategory && catDropdown) {
+            let catExists = Array.from(catDropdown.options).some(o => o.value === presetCategory);
+            if (!catExists) {
+                const opt = document.createElement('option');
+                opt.value = presetCategory;
+                opt.innerText = presetCategory;
+                catDropdown.appendChild(opt);
+            }
+            catDropdown.value = presetCategory;
+        }
 
         state.customTxFields.forEach(f => {
             customContainer.innerHTML += `
@@ -3534,6 +3557,7 @@ function openExpenseModal(editId = '') {
         });
     }
     modal.classList.add('active');
+    if (window.lucide) lucide.createIcons();
 }
 
 function closeExpenseModal() {

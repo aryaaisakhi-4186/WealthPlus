@@ -1232,6 +1232,133 @@ h1, h2, h3, h4, h5, h6 {
     margin-top: 6px;
 }
 
+.exp-entries-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.exp-entry-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    transition: all 0.15s ease;
+    gap: 12px;
+    cursor: pointer;
+}
+
+.exp-entry-row:hover {
+    border-color: var(--primary);
+    background: rgba(13, 148, 136, 0.03);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+}
+
+.exp-entry-main {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.exp-entry-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+.exp-entry-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.exp-entry-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.exp-entry-amount {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--danger);
+    white-space: nowrap;
+    text-align: right;
+}
+
+.exp-entry-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-exp-row-edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 9px;
+    border-radius: 4px;
+    color: var(--primary);
+    border: 1px solid rgba(13, 148, 136, 0.35);
+    background: rgba(13, 148, 136, 0.06);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-exp-row-edit:hover {
+    background: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+}
+
+.btn-exp-row-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    color: var(--danger);
+    border: 1px solid rgba(225, 29, 72, 0.25);
+    background: rgba(225, 29, 72, 0.05);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-exp-row-delete:hover {
+    background: var(--danger);
+    color: #ffffff;
+    border-color: var(--danger);
+}
+
+@media (max-width: 600px) {
+    .exp-entry-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    .exp-entry-right {
+        width: 100%;
+        justify-content: space-between;
+        border-top: 1px dashed var(--border-color);
+        padding-top: 6px;
+    }
+}
+
 .exp-cat-table {
     width: 100%;
     border-collapse: collapse;
