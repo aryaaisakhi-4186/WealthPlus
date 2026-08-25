@@ -23,7 +23,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=6.2.0">
+    <link rel="stylesheet" href="style.css?v=6.3.0">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -175,8 +175,11 @@
                         <div class="dashboard-left-panel">
                             <!-- Accounts Balances Overview -->
                             <div class="dashboard-box" style="margin-bottom: 20px;">
-                                <div class="box-header">
+                                <div class="box-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                                     <h4>Account Book Balances</h4>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="btn-dash-transfer" onclick="openTransferModal('cash-to-bank')" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:12px; padding:4px 10px;">
+                                        <i data-lucide="arrow-left-right" style="width:13px; height:13px;"></i> Cash ↔ Bank Transfer
+                                    </button>
                                 </div>
                                 <div class="account-balances-summary-grid" id="dash-account-balances-grid">
                                     <!-- Populated dynamically -->
@@ -443,11 +446,14 @@
                                 <select id="ledger-account-select" class="select-filter select-wide">
                                     <!-- Populated dynamically with accounts -->
                                 </select>
-                                <div class="ledger-summary-badge" style="margin-left: auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                                <div class="ledger-summary-badge" style="margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                                     <span>Opening: <strong id="selected-ledger-opening-balance" style="color: var(--primary);">₹0</strong></span>
                                     <span>Closing: <strong id="selected-ledger-closing-balance">₹0</strong></span>
                                     <button type="button" class="btn btn-outline btn-sm" id="btn-edit-ledger-opening" onclick="quickEditCurrentLedgerOpening()" style="padding: 4px 8px; font-size: 11px; height: auto;" title="Edit Account Opening Balance">
                                         <i data-lucide="edit-2" style="width: 12px; height: 12px;"></i> Edit
+                                    </button>
+                                    <button type="button" class="btn btn-primary btn-sm" id="btn-ledger-transfer" onclick="openTransferModal('cash-to-bank')" style="padding: 4px 10px; font-size: 11px; height: auto; display:inline-flex; align-items:center; gap:4px;" title="Transfer funds between Cash and Bank">
+                                        <i data-lucide="arrow-left-right" style="width: 12px; height: 12px;"></i> Transfer Funds
                                     </button>
                                 </div>
                             </div>
@@ -598,11 +604,19 @@
                     <div class="master-content-panel">
                         <!-- Panel A: Accounts Master -->
                         <div id="master-panel-accounts" class="master-sub-panel active">
-                            <div class="panel-action-header">
-                                <h4>Cash & Bank Accounts Setup</h4>
-                                <button class="btn btn-primary btn-sm" id="btn-master-add-account">
-                                    <i data-lucide="plus"></i> Add Account
-                                </button>
+                            <div class="panel-action-header" style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                                <div>
+                                    <h4>Cash & Bank Accounts Setup</h4>
+                                    <p style="font-size:12px; color:var(--text-secondary); margin:0;">Manage physical cash, bank books, opening balances, and internal fund transfers.</p>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="btn-master-transfer" onclick="openTransferModal('cash-to-bank')" style="display:inline-flex; align-items:center; gap:6px;">
+                                        <i data-lucide="arrow-left-right" style="width:14px; height:14px;"></i> Cash ↔ Bank Transfer
+                                    </button>
+                                    <button class="btn btn-primary btn-sm" id="btn-master-add-account">
+                                        <i data-lucide="plus"></i> Add Account
+                                    </button>
+                                </div>
                             </div>
                             <div class="table-container">
                                 <table class="data-table">
@@ -619,6 +633,39 @@
                                         <!-- Rendered dynamically -->
                                     </tbody>
                                 </table>
+                            </div>
+
+                            <!-- Contra Transfers History Table -->
+                            <div style="margin-top: 28px;">
+                                <div class="panel-action-header" style="display:flex; justify-content:space-between; align-items:center;">
+                                    <div>
+                                        <h5 style="margin:0; font-size:14px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+                                            <i data-lucide="arrow-left-right" style="width:15px; height:15px; color:var(--primary);"></i> Internal Transfers History (Cash ↔ Bank)
+                                        </h5>
+                                        <p style="font-size:11px; color:var(--text-secondary); margin:2px 0 0 0;">Complete record of transfers between cash in hand and bank accounts.</p>
+                                    </div>
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="openTransferModal('cash-to-bank')" style="font-size:11px; padding:4px 9px; display:inline-flex; align-items:center; gap:4px;">
+                                        <i data-lucide="plus" style="width:12px; height:12px;"></i> New Transfer
+                                    </button>
+                                </div>
+                                <div class="table-container" style="margin-top: 10px;">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Transfer Type</th>
+                                                <th>From Account (Outflow)</th>
+                                                <th>To Account (Inflow)</th>
+                                                <th>Amount (₹)</th>
+                                                <th>Remark / Notes</th>
+                                                <th class="actions-col">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="master-transfers-tbody">
+                                            <!-- Rendered dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
 
@@ -1221,6 +1268,77 @@
         </div>
     </div>
 
+    <!-- Modal 5: Cash to Bank / Bank to Cash Fund Transfer -->
+    <div id="modal-transfer" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h4 id="modal-transfer-title" style="display:flex; align-items:center; gap:8px;">
+                    <i data-lucide="arrow-left-right" style="width:20px; height:20px; color:var(--primary);"></i> Cash ↔ Bank Fund Transfer
+                </h4>
+                <button class="btn-close-modal" id="btn-close-transfer-modal" onclick="closeTransferModal()"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-transfer" class="modal-form">
+                <input type="hidden" id="edit-transfer-id">
+                
+                <!-- Quick Preset Transfer Type Selectors -->
+                <div class="form-group">
+                    <label>Transfer Direction / Mode *</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                        <button type="button" class="btn btn-outline btn-sm transfer-type-pill active" id="pill-cash-to-bank" onclick="setTransferPreset('cash-to-bank')" style="padding: 8px 4px; font-size: 11px; font-weight: 600; text-align: center;">
+                            💵 ➔ 🏦 Cash to Bank
+                        </button>
+                        <button type="button" class="btn btn-outline btn-sm transfer-type-pill" id="pill-bank-to-cash" onclick="setTransferPreset('bank-to-cash')" style="padding: 8px 4px; font-size: 11px; font-weight: 600; text-align: center;">
+                            🏦 ➔ 💵 Bank to Cash
+                        </button>
+                        <button type="button" class="btn btn-outline btn-sm transfer-type-pill" id="pill-custom-transfer" onclick="setTransferPreset('custom')" style="padding: 8px 4px; font-size: 11px; font-weight: 600; text-align: center;">
+                            🔁 Other Transfer
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="transfer-from-account">From Account (Source Outflow) *</label>
+                        <select id="transfer-from-account" required>
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="transfer-to-account">To Account (Destination Inflow) *</label>
+                        <select id="transfer-to-account" required>
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="transfer-amount">Transfer Amount (INR) *</label>
+                        <input type="number" id="transfer-amount" required min="1" step="any" placeholder="e.g. 25000">
+                    </div>
+                    <div class="form-group">
+                        <label for="transfer-date">Transfer Date *</label>
+                        <input type="date" id="transfer-date" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="transfer-remark">Remark / Description (Optional)</label>
+                    <input type="text" id="transfer-remark" placeholder="e.g. ATM cash withdrawal / Bank cash deposit / Counter transfer">
+                </div>
+
+                <div id="transfer-modal-feedback" style="display:none; font-size:12px; padding:8px 12px; border-radius:6px; margin-bottom:12px;"></div>
+
+                <div class="modal-footer-actions">
+                    <button type="button" class="btn btn-outline" id="btn-cancel-transfer" onclick="closeTransferModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-transfer" style="display:inline-flex; align-items:center; gap:6px;">
+                        <i data-lucide="check-circle" style="width:14px; height:14px;"></i> Save Transfer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Modal 5: Add Custom Column Field -->
     <div id="modal-field" class="modal-overlay">
         <div class="modal-box">
@@ -1292,9 +1410,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.2.0"></script>
-    <script src="app.js?v=6.2.0"></script>
-    <script src="sindhu_v1.js?v=6.2.0"></script>
+    <script src="firebase-config.js?v=6.3.0"></script>
+    <script src="app.js?v=6.3.0"></script>
+    <script src="sindhu_v1.js?v=6.3.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

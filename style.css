@@ -2794,3 +2794,46 @@ h1, h2, h3, h4, h5, h6 {
     color: #d97706;
     border: 1px solid rgba(245, 158, 11, 0.25);
 }
+
+/* Contra / Fund Transfer Styles */
+.transfer-type-pill {
+    transition: all 0.2s ease;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.transfer-type-pill.active {
+    background: var(--primary) !important;
+    color: #ffffff !important;
+    border-color: var(--primary) !important;
+    box-shadow: 0 2px 6px rgba(13, 148, 136, 0.25);
+}
+
+.badge-transfer-type {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.badge-transfer-type.cash-to-bank {
+    background: rgba(13, 148, 136, 0.1);
+    color: var(--primary);
+    border: 1px solid rgba(13, 148, 136, 0.25);
+}
+
+.badge-transfer-type.bank-to-cash {
+    background: rgba(245, 158, 11, 0.1);
+    color: #d97706;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.badge-transfer-type.custom {
+    background: rgba(99, 102, 241, 0.1);
+    color: #6366f1;
+    border: 1px solid rgba(99, 102, 241, 0.25);
+}
+

@@ -7,6 +7,7 @@ let state = {
     clients: [],
     incomeLogs: [],
     transactions: [],
+    transfers: [], // Contra internal fund transfers: { id, fromAccount, toAccount, amount, date, type, remark }
     accounts: [], // Dynamic Accounts: { id, name, type }
     budgets: {},  // Monthly Budgets: { Category: Amount }
     customClientFields: [], // Custom Columns: { id, name, type }
@@ -129,6 +130,7 @@ function seedState() {
     state.currentUser = null;
     state.incomeLogs = [...defaultIncomeLogs];
     state.transactions = [...defaultTransactions];
+    state.transfers = [];
     state.customClientFields = [];
     state.customTxFields = [];
     state.categoriesConfig = { ...defaultCategoriesConfig };
@@ -144,6 +146,7 @@ function seedState() {
 function runStateMigrations() {
     let updated = false;
 
+    if (!state.transfers) { state.transfers = []; updated = true; }
     if (!state.accounts || state.accounts.length === 0) { state.accounts = [...defaultAccounts]; updated = true; }
     if (!state.budgets || Object.keys(state.budgets).length === 0) { state.budgets = { ...defaultBudgets }; updated = true; }
     if (!state.members || state.members.length === 0) { state.members = [...defaultMembers]; updated = true; }
@@ -345,9 +348,39 @@ function initFirebaseSyncListeners() {
             renderPage(state.activePage);
         }
     }, err => console.error("Config sync error:", err));
+
+    // 7. Internal Transfers (Contra)
+    firebaseDb.collection('transfers').onSnapshot(snapshot => {
+        let items = [];
+        if (!snapshot.empty) {
+            snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+        }
+        if (!isSame(state.transfers, items)) {
+            state.transfers = items;
+            saveStateLocalOnly();
+            renderPage(state.activePage);
+        }
+    }, err => console.error("Transfers sync error:", err));
 }
 
 // --- CENTRAL DATA MUTATION FUNCTIONS ---
+function addTransferDirect(transferObj, syncToCloud = true) {
+    const idx = state.transfers.findIndex(t => t.id === transferObj.id);
+    if (idx !== -1) {
+        state.transfers[idx] = { ...state.transfers[idx], ...transferObj };
+    } else {
+        state.transfers.push(transferObj);
+    }
+    saveStateLocalOnly();
+    if (syncToCloud) firebaseWrite('transfers', transferObj.id, transferObj);
+}
+
+function deleteTransferDirect(id, syncToCloud = true) {
+    state.transfers = state.transfers.filter(t => t.id !== id);
+    saveStateLocalOnly();
+    if (syncToCloud) firebaseDelete('transfers', id);
+}
+
 function addClientDirect(clientObj, syncToCloud = true) {
     const idx = state.clients.findIndex(c => c.id === clientObj.id);
     if (idx !== -1) {
@@ -804,6 +837,41 @@ function getAccountLedger(accountId) {
                 debit: 0,
                 credit: Number(tx.amount),
                 timestamp: new Date(tx.date).getTime()
+            });
+        }
+    });
+
+    // Filter Contra / Internal Fund Transfers
+    (state.transfers || []).forEach(tr => {
+        const isOutflow = tr.fromAccount === account.name;
+        const isInflow = tr.toAccount === account.name;
+        const remarkSuffix = tr.remark ? ` (${tr.remark})` : '';
+
+        if (isOutflow) {
+            // Money transferred OUT of this account to another account
+            ledger.push({
+                id: tr.id,
+                transferId: tr.id,
+                date: tr.date,
+                particulars: `Contra Transfer ➔ ${tr.toAccount}${remarkSuffix}`,
+                category: 'Contra / Transfer',
+                debit: 0,
+                credit: Number(tr.amount),
+                timestamp: new Date(tr.date).getTime(),
+                isTransfer: true
+            });
+        } else if (isInflow) {
+            // Money transferred INTO this account from another account
+            ledger.push({
+                id: tr.id,
+                transferId: tr.id,
+                date: tr.date,
+                particulars: `Contra Transfer 🡸 ${tr.fromAccount}${remarkSuffix}`,
+                category: 'Contra / Transfer',
+                debit: Number(tr.amount),
+                credit: 0,
+                timestamp: new Date(tr.date).getTime(),
+                isTransfer: true
             });
         }
     });
@@ -2386,6 +2454,7 @@ function renderMasterAccounts() {
         `;
         tbody.appendChild(tr);
     });
+    renderMasterTransfers();
     lucide.createIcons();
 }
 
@@ -2912,6 +2981,8 @@ function initEventHandlers() {
     document.getElementById('form-income').addEventListener('submit', handleIncomeSubmit);
     document.getElementById('form-expense').addEventListener('submit', handleExpenseSubmit);
     document.getElementById('form-account').addEventListener('submit', handleAccountSubmit);
+    const formTransfer = document.getElementById('form-transfer');
+    if (formTransfer) formTransfer.addEventListener('submit', handleTransferSubmit);
     document.getElementById('form-field').addEventListener('submit', handleFieldSubmit);
     document.getElementById('form-member').addEventListener('submit', handleMemberSubmit);
     document.getElementById('form-category-budgets').addEventListener('submit', handleCategoryBudgetsSubmit);
@@ -3579,6 +3650,195 @@ window.deleteAccount = function(id) {
     }
 };
 
+// --- CONTRA & FUND TRANSFERS CONTROLLER (Cash to Bank / Bank to Cash) ---
+let currentTransferPreset = 'cash-to-bank';
+
+window.setTransferPreset = function(preset) {
+    currentTransferPreset = preset;
+    document.querySelectorAll('.transfer-type-pill').forEach(btn => btn.classList.remove('active'));
+    
+    const fromSel = document.getElementById('transfer-from-account');
+    const toSel = document.getElementById('transfer-to-account');
+    const remarkInput = document.getElementById('transfer-remark');
+
+    const cashAccounts = state.accounts.filter(a => a.type === 'Cash');
+    const bankAccounts = state.accounts.filter(a => a.type === 'Bank');
+
+    if (preset === 'cash-to-bank') {
+        const pill = document.getElementById('pill-cash-to-bank');
+        if (pill) pill.classList.add('active');
+        if (cashAccounts.length > 0) fromSel.value = cashAccounts[0].name;
+        if (bankAccounts.length > 0) toSel.value = bankAccounts[0].name;
+        if (!remarkInput.value || remarkInput.value.includes('withdrawal') || remarkInput.value.includes('deposit')) {
+            remarkInput.value = 'Cash deposit in Bank';
+        }
+    } else if (preset === 'bank-to-cash') {
+        const pill = document.getElementById('pill-bank-to-cash');
+        if (pill) pill.classList.add('active');
+        if (bankAccounts.length > 0) fromSel.value = bankAccounts[0].name;
+        if (cashAccounts.length > 0) toSel.value = cashAccounts[0].name;
+        if (!remarkInput.value || remarkInput.value.includes('withdrawal') || remarkInput.value.includes('deposit')) {
+            remarkInput.value = 'Cash withdrawal from Bank (ATM / Counter)';
+        }
+    } else {
+        const pill = document.getElementById('pill-custom-transfer');
+        if (pill) pill.classList.add('active');
+        if (state.accounts.length > 1) {
+            fromSel.value = state.accounts[0].name;
+            toSel.value = state.accounts[1].name;
+        }
+    }
+};
+
+window.openTransferModal = function(preset = 'cash-to-bank', editId = '') {
+    const modal = document.getElementById('modal-transfer');
+    if (!modal) return;
+    const form = document.getElementById('form-transfer');
+    const fromSel = document.getElementById('transfer-from-account');
+    const toSel = document.getElementById('transfer-to-account');
+    const title = document.getElementById('modal-transfer-title');
+    const feedback = document.getElementById('transfer-modal-feedback');
+    
+    form.reset();
+    if (feedback) feedback.style.display = 'none';
+
+    // Populate Accounts dropdowns
+    fromSel.innerHTML = '';
+    toSel.innerHTML = '';
+    state.accounts.forEach(a => {
+        fromSel.innerHTML += `<option value="${a.name}">${a.name} (${a.type})</option>`;
+        toSel.innerHTML += `<option value="${a.name}">${a.name} (${a.type})</option>`;
+    });
+
+    document.getElementById('transfer-date').value = new Date().toISOString().split('T')[0];
+
+    if (editId) {
+        const tr = state.transfers.find(t => t.id === editId);
+        if (tr) {
+            title.innerHTML = `<i data-lucide="edit-3" style="width:20px; height:20px; color:var(--primary);"></i> Edit Fund Transfer`;
+            document.getElementById('edit-transfer-id').value = tr.id;
+            fromSel.value = tr.fromAccount;
+            toSel.value = tr.toAccount;
+            document.getElementById('transfer-amount').value = tr.amount;
+            document.getElementById('transfer-date').value = tr.date;
+            document.getElementById('transfer-remark').value = tr.remark || '';
+            
+            const fromAcc = state.accounts.find(a => a.name === tr.fromAccount);
+            const toAcc = state.accounts.find(a => a.name === tr.toAccount);
+            if (fromAcc && toAcc && fromAcc.type === 'Cash' && toAcc.type === 'Bank') {
+                setTransferPreset('cash-to-bank');
+            } else if (fromAcc && toAcc && fromAcc.type === 'Bank' && toAcc.type === 'Cash') {
+                setTransferPreset('bank-to-cash');
+            } else {
+                setTransferPreset('custom');
+            }
+        }
+    } else {
+        title.innerHTML = `<i data-lucide="arrow-left-right" style="width:20px; height:20px; color:var(--primary);"></i> Cash ↔ Bank Fund Transfer`;
+        document.getElementById('edit-transfer-id').value = '';
+        setTransferPreset(preset);
+    }
+
+    modal.classList.add('active');
+    if (window.lucide) lucide.createIcons();
+};
+
+window.closeTransferModal = function() {
+    const modal = document.getElementById('modal-transfer');
+    if (modal) modal.classList.remove('active');
+};
+
+function handleTransferSubmit(e) {
+    e.preventDefault();
+    const id = document.getElementById('edit-transfer-id').value;
+    const fromAccount = document.getElementById('transfer-from-account').value;
+    const toAccount = document.getElementById('transfer-to-account').value;
+    const amount = Number(document.getElementById('transfer-amount').value);
+    const date = document.getElementById('transfer-date').value;
+    const remark = (document.getElementById('transfer-remark').value || '').trim();
+
+    if (fromAccount === toAccount) {
+        alert("Source Account and Destination Account cannot be the same. Please choose different accounts for transfer.");
+        return;
+    }
+
+    if (amount <= 0) {
+        alert("Please enter a valid transfer amount greater than ₹0.");
+        return;
+    }
+
+    const fromAcc = state.accounts.find(a => a.name === fromAccount);
+    const toAcc = state.accounts.find(a => a.name === toAccount);
+    let type = 'Transfer';
+    if (fromAcc && toAcc) {
+        if (fromAcc.type === 'Cash' && toAcc.type === 'Bank') type = 'Cash to Bank';
+        else if (fromAcc.type === 'Bank' && toAcc.type === 'Cash') type = 'Bank to Cash';
+    }
+
+    const transferObj = {
+        id: id || ('tr_' + Date.now()),
+        fromAccount,
+        toAccount,
+        amount,
+        date,
+        type,
+        remark
+    };
+
+    addTransferDirect(transferObj);
+    closeTransferModal();
+    renderPage(state.activePage);
+}
+
+window.deleteTransfer = function(id) {
+    if (confirm("Are you sure you want to delete this internal transfer entry? Both account balances will be restored.")) {
+        deleteTransferDirect(id);
+        renderPage(state.activePage);
+    }
+};
+
+window.openEditTransfer = function(id) {
+    openTransferModal('custom', id);
+};
+
+function renderMasterTransfers() {
+    const tbody = document.getElementById('master-transfers-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
+
+    const sorted = [...(state.transfers || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    if (sorted.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:20px;">No internal transfers logged yet. Use "+ New Transfer" to transfer funds between Cash and Bank accounts.</td></tr>`;
+        return;
+    }
+
+    sorted.forEach(tr => {
+        let typeBadgeClass = 'custom';
+        if (tr.type === 'Cash to Bank') typeBadgeClass = 'cash-to-bank';
+        else if (tr.type === 'Bank to Cash') typeBadgeClass = 'bank-to-cash';
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${formatDbDate(tr.date)}</td>
+            <td><span class="badge-transfer-type ${typeBadgeClass}">${tr.type || 'Transfer'}</span></td>
+            <td style="font-weight:600; color:var(--danger);">${tr.fromAccount}</td>
+            <td style="font-weight:600; color:var(--success);">${tr.toAccount}</td>
+            <td style="font-weight:700; color:var(--text-primary);">${fC(tr.amount)}</td>
+            <td style="font-size:12px; color:var(--text-secondary); max-width:200px; word-break:break-word;">${tr.remark || '-'}</td>
+            <td class="actions-col">
+                <div class="actions-wrapper">
+                    <button class="btn-icon-only edit-btn" onclick="openEditTransfer('${tr.id}')" title="Edit Transfer"><i data-lucide="edit-3"></i></button>
+                    <button class="btn-icon-only delete-btn" onclick="deleteTransfer('${tr.id}')" title="Delete Transfer"><i data-lucide="trash-2"></i></button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+    if (window.lucide) lucide.createIcons();
+}
+
 // Custom Fields
 function openFieldModal(scope) {
     const modal = document.getElementById('modal-field');
@@ -3757,6 +4017,15 @@ function exportToExcel() {
         };
     });
 
+    const transfersData = (state.transfers || []).map(tr => ({
+        "Date": formatDbDate(tr.date),
+        "Transfer Type": tr.type || 'Transfer',
+        "From Account (Outflow)": tr.fromAccount,
+        "To Account (Inflow)": tr.toAccount,
+        "Amount Transferred (INR)": tr.amount,
+        "Remark / Notes": tr.remark || ''
+    }));
+
     const wb = XLSX.utils.book_new();
 
     const addSheet = (data, sheetName) => {
@@ -3767,6 +4036,7 @@ function exportToExcel() {
     addSheet(clientsData, "Clients Overview");
     addSheet(incomeData, "Received Income Logs");
     addSheet(expensesData, "Expenses Ledger");
+    addSheet(transfersData, "Internal Transfers");
     addSheet(budgetData, "Budget Analysis");
 
     state.accounts.forEach(acc => {
