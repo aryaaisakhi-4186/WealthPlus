@@ -1691,7 +1691,7 @@ function renderClientsPage() {
             }
 
             const card = document.createElement('div');
-            card.className = 'client-card';
+            card.className = `client-card ${isCompleted ? 'fully-paid-card' : ''}`;
             card.id = `party-card-${client.id}`;
             card.onclick = () => togglePartyCard(client.id);
 
@@ -1704,6 +1704,11 @@ function renderClientsPage() {
                                 <i data-lucide="${isVendor ? 'truck' : 'user-check'}" style="width:12px; height:12px;"></i>
                                 ${isVendor ? 'Vendor' : 'Client'}
                             </span>
+                            ${isCompleted ? `
+                                <span class="settled-badge" title="Full payment received">
+                                    <i data-lucide="check-circle" style="width:11px; height:11px;"></i> Full Paid (चुकता)
+                                </span>
+                            ` : ''}
                             <span class="preview-loan-tag" style="background: rgba(99, 102, 241, 0.12); color: #4f46e5; border: 1px solid rgba(99, 102, 241, 0.25); font-weight: 600;">
                                 📅 FY: ${client.pendingYear || '2026-2027'}
                             </span>
@@ -2696,11 +2701,18 @@ function renderMasterClients() {
 
     state.clients.forEach(client => {
         const stats = getClientReportStats(client.id);
+        const isCompleted = stats.balanceReceivable <= 0;
         const isVendor = isVendorParty(client);
         const creditAmt = Number(client.creditAmount) || 0;
         const tr = document.createElement('tr');
+        if (isCompleted) {
+            tr.style.backgroundColor = 'rgba(16, 185, 129, 0.06)';
+        }
         tr.innerHTML = `
-            <td style="font-weight:600;">${client.name}</td>
+            <td style="font-weight:600;">
+                ${client.name}
+                ${isCompleted ? `<span class="settled-badge" style="font-size:9px; padding:1px 6px; margin-left:4px;">Full Paid</span>` : ''}
+            </td>
             <td>
                 <span class="party-group-badge ${isVendor ? 'vendor' : 'client'}">
                     ${isVendor ? 'Vendor' : 'Client'}

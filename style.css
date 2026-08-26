@@ -964,6 +964,66 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: 0 4px 16px rgba(13, 148, 136, 0.1);
 }
 
+/* Fully Paid / Settled Client Card Highlight (Soft Light Green) */
+.client-card.fully-paid-card {
+    background: #ecfdf5 !important;
+    border: 1.5px solid #10b981 !important;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.12);
+}
+
+.client-card.fully-paid-card:hover {
+    background: #d1fae5 !important;
+    border-color: #059669 !important;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.22);
+}
+
+.client-card.fully-paid-card.expanded {
+    background: #ecfdf5 !important;
+    border-color: #059669 !important;
+    box-shadow: 0 6px 18px rgba(16, 185, 129, 0.25);
+}
+
+.client-card.fully-paid-card .party-card-toggle-btn {
+    background: #d1fae5;
+    border-color: #a7f3d0;
+    color: #059669;
+}
+
+.client-card.fully-paid-card:hover .party-card-toggle-btn {
+    background: #10b981;
+    border-color: #10b981;
+    color: #ffffff;
+}
+
+.settled-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: #10b981;
+    color: #ffffff;
+    letter-spacing: 0.3px;
+    box-shadow: 0 1px 3px rgba(16, 185, 129, 0.3);
+}
+
+[data-theme="dark"] .client-card.fully-paid-card {
+    background: rgba(16, 185, 129, 0.12) !important;
+    border-color: rgba(16, 185, 129, 0.4) !important;
+}
+
+[data-theme="dark"] .client-card.fully-paid-card:hover {
+    background: rgba(16, 185, 129, 0.18) !important;
+    border-color: #10b981 !important;
+}
+
+[data-theme="dark"] .client-card.fully-paid-card.expanded {
+    background: rgba(16, 185, 129, 0.15) !important;
+    border-color: #10b981 !important;
+}
+
 .client-card-header {
     display: flex;
     justify-content: space-between;
