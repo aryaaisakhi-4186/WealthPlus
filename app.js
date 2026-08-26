@@ -3792,7 +3792,10 @@ function buildClientStatementElement(client, stats, fy) {
                 <div style="text-align:right;">
                     <span style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:600;">Financial Year / Period:</span>
                     <p style="margin:2px 0; font-size:14px; font-weight:700; color:#0f766e;">FY ${fy}</p>
-                    <span style="font-size:11px; color:#475569;">Opening Balance: <strong>${fC(stats.openingBalance)}</strong></span>
+                    <div style="font-size:11px; color:#475569; display:flex; flex-direction:column; gap:2px; align-items:flex-end; margin-top:2px;">
+                        <span>Opening Balance: <strong>${fC(stats.openingBalance)}</strong></span>
+                        <span style="font-weight:700; color:#0f766e;">Total Dues: <strong>${fC(stats.totalReceivable)}</strong></span>
+                    </div>
                 </div>
             </div>
 
@@ -3815,9 +3818,25 @@ function buildClientStatementElement(client, stats, fy) {
                     ${contractRowsHTML}
                 </tbody>
                 <tfoot>
-                    <tr style="font-weight:700; background:#f0fdfa; font-size:12px;">
-                        <td colspan="5" style="border:1px solid #cbd5e1; text-align:right; padding:8px;">Total Yearly Retainer / Services:</td>
-                        <td style="border:1px solid #cbd5e1; text-align:right; color:#0f766e; padding:8px;">${fC(stats.yearlyContract)}</td>
+                    <tr style="font-weight:600; background:#f8fafc; font-size:11px;">
+                        <td colspan="5" style="border:1px solid #cbd5e1; text-align:right; padding:5px 8px;">Subtotal (Services & Retainer):</td>
+                        <td style="border:1px solid #cbd5e1; text-align:right; color:#0f766e; padding:5px 8px; font-weight:700;">${fC(stats.yearlyContract)}</td>
+                    </tr>
+                    ${stats.openingBalance !== 0 ? `
+                    <tr style="font-weight:600; background:#f8fafc; font-size:11px;">
+                        <td colspan="5" style="border:1px solid #cbd5e1; text-align:right; padding:5px 8px;">Add: Opening Balance / Past Due:</td>
+                        <td style="border:1px solid #cbd5e1; text-align:right; color:#0f766e; padding:5px 8px; font-weight:700;">${fC(stats.openingBalance)}</td>
+                    </tr>
+                    ` : ''}
+                    ${stats.loansGiven > 0 ? `
+                    <tr style="font-weight:600; background:#f8fafc; font-size:11px;">
+                        <td colspan="5" style="border:1px solid #cbd5e1; text-align:right; padding:5px 8px;">Add: Loans / Credit Given:</td>
+                        <td style="border:1px solid #cbd5e1; text-align:right; color:#0f766e; padding:5px 8px; font-weight:700;">${fC(stats.loansGiven)}</td>
+                    </tr>
+                    ` : ''}
+                    <tr style="font-weight:800; background:#f0fdfa; font-size:12px;">
+                        <td colspan="5" style="border:1px solid #cbd5e1; text-align:right; padding:8px; color:#0f766e; font-weight:800;">TOTAL DUES (Opening Balance + Services):</td>
+                        <td style="border:1px solid #cbd5e1; text-align:right; color:#0f766e; padding:8px; font-weight:800; font-size:13px;">${fC(stats.totalReceivable)}</td>
                     </tr>
                 </tfoot>
             </table>
@@ -3854,14 +3873,19 @@ function buildClientStatementElement(client, stats, fy) {
             <!-- Section 3: Final Account Settlement Summary Box -->
             <div style="background:#f0fdfa; border:2px solid #0d9488; border-radius:8px; padding:16px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                 <div style="display:flex; flex-direction:column; gap:4px; font-size:12px;">
+                    <span>Opening Balance / Past Due: <strong>${fC(stats.openingBalance)}</strong></span>
                     <span>Total Services & Contracts: <strong>${fC(stats.yearlyContract)}</strong></span>
                     ${stats.loansGiven > 0 ? `<span>Total Loans Given: <strong>${fC(stats.loansGiven)}</strong></span>` : ''}
-                    <span>Opening Balance: <strong>${fC(stats.openingBalance)}</strong></span>
-                    <span style="font-weight:700; color:#0f766e;">Total Billed / Receivable: ${fC(stats.totalReceivable)}</span>
-                    <span style="color:#16a34a;">Less: Total Received: -${fC(stats.totalReceived)}</span>
-                    ${stats.totalDiscount > 0 ? `<span style="color:#d97706;">Less: Total Discount: -${fC(stats.totalDiscount)}</span>` : ''}
+                    <span style="font-weight:800; color:#0f766e; font-size:13px; border-top:1px solid #99f6e4; padding-top:4px; margin-top:2px;">
+                        TOTAL DUES (Total Receivable): <strong>${fC(stats.totalReceivable)}</strong>
+                    </span>
+                    <span style="color:#16a34a; font-weight:600;">Less: Total Payments Received: -${fC(stats.totalReceived)}</span>
+                    ${stats.totalDiscount > 0 ? `<span style="color:#d97706; font-weight:600;">Less: Total Discount Allowed: -${fC(stats.totalDiscount)}</span>` : ''}
                 </div>
                 <div style="text-align:right; background:#ffffff; padding:12px 20px; border-radius:6px; border:1px solid #99f6e4;">
+                    <div style="font-size:11px; color:#64748b; margin-bottom:2px;">
+                        Total Dues: <strong style="color:#0f766e;">${fC(stats.totalReceivable)}</strong> | Received: <strong style="color:#16a34a;">${fC(stats.totalReceived)}</strong>
+                    </div>
                     <span style="font-size:11px; text-transform:uppercase; font-weight:700; color:#64748b; letter-spacing:0.5px;">Net Outstanding Balance Due</span>
                     <h2 style="margin:4px 0 0 0; font-size:24px; font-weight:800; color:${stats.balanceReceivable > 0 ? '#0d9488' : '#16a34a'};">
                         ${stats.balanceReceivable <= 0 ? 'Fully Settled (₹0)' : fC(stats.balanceReceivable)}
@@ -3947,6 +3971,7 @@ Please find attached your *Final Settled Statement of Account* for *FY ${fy}*.
 
 ✅ *Account Status: Fully Settled & Closed*
 • Total Contract / Services: ${fAmt(stats.yearlyContract)}
+${stats.openingBalance !== 0 ? `• Opening Balance / Past Due: ${fAmt(stats.openingBalance)}\n` : ''}• Total Dues Billed: ${fAmt(stats.totalReceivable)}
 • Total Amount Received: ${fAmt(stats.totalReceived)}
 ${stats.totalDiscount > 0 ? `• Total Discount Allowed: ${fAmt(stats.totalDiscount)}\n` : ''}• *Balance Due: Nil (Rs. 0)*
 
@@ -3963,9 +3988,10 @@ Greetings!
 Please find attached your detailed Statement of Account for *FY ${fy}*.
 
 📋 *Account Summary:*
-• Total Services / Contract: ${fAmt(stats.yearlyContract)}
-${stats.loansGiven > 0 ? `• Total Loans / Credit Given: ${fAmt(stats.loansGiven)}\n` : ''}${stats.openingBalance > 0 ? `• Opening Balance: ${fAmt(stats.openingBalance)}\n` : ''}• Total Amount Received: ${fAmt(stats.totalReceived)}
-${stats.totalDiscount > 0 ? `• Total Discount Given: ${fAmt(stats.totalDiscount)}\n` : ''}• *Net Pending Balance: ${fAmt(stats.balanceReceivable)}*
+• Services / Contract Amount: ${fAmt(stats.yearlyContract)}
+${stats.openingBalance !== 0 ? `• Opening Balance / Past Due: ${fAmt(stats.openingBalance)}\n` : ''}${stats.loansGiven > 0 ? `• Loans / Credit Given: ${fAmt(stats.loansGiven)}\n` : ''}• *TOTAL DUES BILLED: ${fAmt(stats.totalReceivable)}*
+• Total Amount Received: ${fAmt(stats.totalReceived)}
+${stats.totalDiscount > 0 ? `• Discount Given: ${fAmt(stats.totalDiscount)}\n` : ''}• *NET PENDING BALANCE DUE: ${fAmt(stats.balanceReceivable)}*
 
 Kindly review the attached PDF statement and arrange the pending balance payment at your convenience.
 
