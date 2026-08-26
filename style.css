@@ -1611,8 +1611,8 @@ h1, h2, h3, h4, h5, h6 {
 
 .ledger-table th { background: var(--bg-tertiary); }
 .text-right { text-align: right; }
-.debit-amt { color: var(--success); font-weight: 600; }
-.credit-amt { color: var(--danger); font-weight: 600; }
+.credit-amt { color: var(--success); font-weight: 600; }
+.debit-amt { color: var(--danger); font-weight: 600; }
 .bal-amt { font-weight: 600; font-family: 'Outfit', sans-serif; }
 
 /* MASTER SETTINGS STYLINGS (Category Dropdown & Accordion Selector) */

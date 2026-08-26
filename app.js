@@ -850,34 +850,34 @@ function getAccountLedger(accountId) {
     let ledger = [];
     const openingBal = Number(account.openingBalance) || 0;
 
-    // Prepend Opening Balance if non-zero
+    // Prepend Opening Balance if non-zero (Positive is Credit deposit, Negative is Debit overdraft)
     if (openingBal !== 0) {
         ledger.push({
             date: 'Opening Balance',
             particulars: 'Opening Balance',
             category: 'Opening Balance',
-            debit: openingBal > 0 ? openingBal : 0,
-            credit: openingBal < 0 ? Math.abs(openingBal) : 0,
+            credit: openingBal > 0 ? openingBal : 0,
+            debit: openingBal < 0 ? Math.abs(openingBal) : 0,
             timestamp: 0
         });
     }
 
-    // Filter inflows
+    // Filter inflows (Income/Received - CREDIT in Bank Account)
     state.incomeLogs.forEach(log => {
         if (log.mode === account.name) {
             const client = state.clients.find(c => c.id === log.clientId);
             ledger.push({
                 date: log.date,
                 particulars: `Received from ${client ? client.name : 'Unknown Party'}`,
-                category: 'Inflow (Revenue)',
-                debit: Number(log.amount),
-                credit: 0,
+                category: 'Inflow (Credit / जमा)',
+                credit: Number(log.amount),
+                debit: 0,
                 timestamp: new Date(log.date).getTime()
             });
         }
     });
 
-    // Filter outflows (Expenses - excluding legacy loan transactions now tracked in loans array)
+    // Filter outflows (Expenses - DEBIT in Bank Account)
     state.transactions.forEach(tx => {
         if (tx.isLoanDisbursement || tx.id.startsWith('t_loan_') || tx.category === 'Loan Given') {
             return; // Managed strictly through loans system
@@ -894,8 +894,8 @@ function getAccountLedger(accountId) {
                 date: tx.date,
                 particulars: `${tx.description}${fundSuffix}`,
                 category: tx.category,
-                debit: 0,
-                credit: Number(tx.amount),
+                credit: 0,
+                debit: Number(tx.amount),
                 timestamp: new Date(tx.date).getTime()
             });
         }
@@ -909,28 +909,28 @@ function getAccountLedger(accountId) {
             const remarkSuffix = loan.remark ? ` (${loan.remark})` : '';
 
             if (loan.type === 'given') {
-                // Cash/Bank Outflow (Credit) when giving loan to party
+                // Outflow / Withdrawn to give loan -> DEBIT (निकासी)
                 ledger.push({
                     id: loan.id,
                     loanId: loan.id,
                     date: loan.date,
                     particulars: `Loan given to ${partyName}${remarkSuffix}`,
-                    category: 'Loan Disbursement',
-                    debit: 0,
-                    credit: Number(loan.amount),
+                    category: 'Loan Disbursement (Debit / निकासी)',
+                    credit: 0,
+                    debit: Number(loan.amount),
                     timestamp: new Date(loan.date).getTime(),
                     isLoan: true
                 });
             } else if (loan.type === 'taken') {
-                // Cash/Bank Inflow (Debit) when taking loan from party
+                // Inflow / Deposited from borrowed loan -> CREDIT (जमा)
                 ledger.push({
                     id: loan.id,
                     loanId: loan.id,
                     date: loan.date,
                     particulars: `Loan taken from ${partyName}${remarkSuffix}`,
-                    category: 'Loan Borrowed',
-                    debit: Number(loan.amount),
-                    credit: 0,
+                    category: 'Loan Borrowed (Credit / जमा)',
+                    credit: Number(loan.amount),
+                    debit: 0,
                     timestamp: new Date(loan.date).getTime(),
                     isLoan: true
                 });
@@ -945,28 +945,28 @@ function getAccountLedger(accountId) {
         const remarkSuffix = tr.remark ? ` (${tr.remark})` : '';
 
         if (isOutflow) {
-            // Money transferred OUT of this account to another account
+            // Money transferred OUT (Withdrawn) -> DEBIT (निकासी)
             ledger.push({
                 id: tr.id,
                 transferId: tr.id,
                 date: tr.date,
                 particulars: `Contra Transfer ➔ ${tr.toAccount}${remarkSuffix}`,
-                category: 'Contra / Transfer',
-                debit: 0,
-                credit: Number(tr.amount),
+                category: 'Contra / Transfer (Debit)',
+                credit: 0,
+                debit: Number(tr.amount),
                 timestamp: new Date(tr.date).getTime(),
                 isTransfer: true
             });
         } else if (isInflow) {
-            // Money transferred INTO this account from another account
+            // Money transferred IN (Deposited) -> CREDIT (जमा)
             ledger.push({
                 id: tr.id,
                 transferId: tr.id,
                 date: tr.date,
                 particulars: `Contra Transfer 🡸 ${tr.fromAccount}${remarkSuffix}`,
-                category: 'Contra / Transfer',
-                debit: Number(tr.amount),
-                credit: 0,
+                category: 'Contra / Transfer (Credit)',
+                credit: Number(tr.amount),
+                debit: 0,
                 timestamp: new Date(tr.date).getTime(),
                 isTransfer: true
             });
@@ -979,10 +979,10 @@ function getAccountLedger(accountId) {
         return a.particulars.localeCompare(b.particulars);
     });
 
-    // Calculate running balance
+    // Calculate running balance (Balance = Credit Deposits - Debit Withdrawals)
     let runningBalance = 0;
     ledger.forEach(row => {
-        runningBalance += (row.debit - row.credit);
+        runningBalance += (row.credit - row.debit);
         row.balance = runningBalance;
     });
 
@@ -2241,8 +2241,8 @@ function renderAccountLedgerDetails() {
     }
 
     ledger.forEach(row => {
-        const deb = row.debit > 0 ? `+${fC(row.debit)}` : '-';
-        const cre = row.credit > 0 ? `-${fC(row.credit)}` : '-';
+        const cre = row.credit > 0 ? `+${fC(row.credit)}` : '-';
+        const deb = row.debit > 0 ? `-${fC(row.debit)}` : '-';
         const balanceColor = row.balance < 0 ? 'color: var(--danger);' : '';
 
         const tr = document.createElement('tr');
@@ -2250,8 +2250,8 @@ function renderAccountLedgerDetails() {
             <td>${formatDbDate(row.date)}</td>
             <td style="font-weight:600;">${row.particulars}</td>
             <td><span style="font-size:11px; color:var(--text-secondary);">${row.category}</span></td>
-            <td class="text-right debit-amt">${deb}</td>
             <td class="text-right credit-amt">${cre}</td>
+            <td class="text-right debit-amt">${deb}</td>
             <td class="text-right bal-amt" style="${balanceColor}">${fC(row.balance)}</td>
         `;
         tbody.appendChild(tr);
@@ -4743,8 +4743,8 @@ function exportToExcel() {
                 "Date": formatDbDate(row.date),
                 "Particulars Description": row.particulars,
                 "Category / Type": row.category,
-                "Debit Inflow (INR)": row.debit > 0 ? row.debit : null,
-                "Credit Outflow (INR)": row.credit > 0 ? row.credit : null,
+                "Credit Deposit / Inflow (INR)": row.credit > 0 ? row.credit : null,
+                "Debit Withdrawal / Outflow (INR)": row.debit > 0 ? row.debit : null,
                 "Running Balance (INR)": row.balance
             };
         });
