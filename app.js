@@ -3806,8 +3806,9 @@ function buildClientStatementElement(client, stats, fy) {
             <!-- Header -->
             <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #0d9488; padding-bottom:15px; margin-bottom:20px;">
                 <div>
-                    <h2 style="margin:0; font-size:24px; color:#0f766e; font-weight:800; letter-spacing:-0.5px;">WEALTH PLUS</h2>
-                    <p style="margin:3px 0 0 0; font-size:12px; color:#64748b; font-weight:500;">Financial Accounting & Client Ledger Statement</p>
+                    <h2 style="margin:0; font-size:24px; color:#0f766e; font-weight:800; letter-spacing:-0.5px;">ARYA ASSOCIATES</h2>
+                    <p style="margin:3px 0 0 0; font-size:12px; color:#475569; font-weight:600;">RAVI KATARA &nbsp;|&nbsp; Mobile: 8815052555, 8982147763</p>
+                    <p style="margin:2px 0 0 0; font-size:11px; color:#64748b;">Financial Accounting & Client Ledger Statement</p>
                 </div>
                 <div style="text-align:right;">
                     <span style="display:inline-block; background:#f0fdfa; color:#0f766e; border:1px solid #99f6e4; font-weight:700; font-size:12px; padding:4px 10px; border-radius:4px;">
@@ -3929,9 +3930,9 @@ function buildClientStatementElement(client, stats, fy) {
             </div>
 
             <!-- Footer / Terms -->
-            <div style="margin-top:25px; padding-top:10px; border-top:1px dashed #cbd5e1; display:flex; justify-content:space-between; font-size:10px; color:#94a3b8;">
-                <span>Generated via Wealth Plus Accounting & Bookkeeping</span>
-                <span>Authorized Signatory</span>
+            <div style="margin-top:25px; padding-top:10px; border-top:1px dashed #cbd5e1; display:flex; justify-content:space-between; font-size:10px; color:#64748b;">
+                <span>ARYA ASSOCIATES — Financial Accounting (Mob: 8815052555, 8982147763)</span>
+                <span style="font-weight:700; color:#0f766e;">RAVI KATARA (Authorized Signatory)</span>
             </div>
         </div>
     `;
@@ -4013,7 +4014,9 @@ ${stats.totalDiscount > 0 ? `• Total Discount Allowed: ${fAmt(stats.totalDisco
 We sincerely thank you for completing your account settlement and for your wonderful trust in our services. It is always a pleasure working with you, and we look forward to our continued partnership!
 
 Warm regards and best wishes,
-*Wealth Plus Accounts Team*`;
+*ARYA ASSOCIATES*
+RAVI KATARA
+Mobile: 8815052555, 8982147763`;
     } else {
         msg = 
 `Dear *${client.name}*,
@@ -4033,7 +4036,9 @@ Kindly review the attached PDF statement and arrange the pending balance payment
 Thank you for your valuable association and continued support.
 
 Warm regards,
-*Wealth Plus Accounts Team*`;
+*ARYA ASSOCIATES*
+RAVI KATARA
+Mobile: 8815052555, 8982147763`;
     }
 
     const printContainer = buildClientStatementElement(client, stats, fy);
