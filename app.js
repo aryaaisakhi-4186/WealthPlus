@@ -1648,6 +1648,24 @@ function renderClientsPage() {
                     ${loanItemizedHTML}
                 `;
             }
+            let contractItemsBreakdownHTML = '';
+            if (client.contractItems && client.contractItems.length > 0) {
+                contractItemsBreakdownHTML = `
+                    <div style="background:var(--bg-primary); border:1px solid var(--border-color); border-radius:4px; padding:6px 8px; margin:4px 0;">
+                        <div style="font-size:11px; font-weight:700; color:var(--text-secondary); margin-bottom:4px; display:flex; align-items:center; gap:4px;">
+                            <i data-lucide="layers" style="width:12px; height:12px; color:var(--primary);"></i>
+                            Services & Retainer Breakdown:
+                        </div>
+                        ${client.contractItems.map(ci => `
+                            <div class="c-stat-row" style="font-size:11px; padding:2px 0;">
+                                <span>• ${ci.particulars || 'Service'} (${ci.months} mo @ ₹${Number(ci.rate || 0).toLocaleString('en-IN')}):</span>
+                                <span style="font-weight:600;">₹${Number(ci.amount || 0).toLocaleString('en-IN')}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
             if (Number(client.monthlyPay) > 0 || stats.yearlyContract > 0) {
                 contractInfoHTML += `
                     <div class="c-stat-row">
@@ -1658,6 +1676,7 @@ function renderClientsPage() {
                         <span class="c-stat-label">Yearly Retainer:</span>
                         <span class="c-stat-val">${fC(stats.yearlyContract)}</span>
                     </div>
+                    ${contractItemsBreakdownHTML}
                 `;
             }
 
@@ -1733,6 +1752,12 @@ function renderClientsPage() {
                         </button>
                         <button class="btn btn-outline btn-sm" onclick="quickReceiveForParty('${client.id}')" title="Log Received Amount" style="font-size:11px; padding:4px 9px; display:inline-flex; align-items:center; gap:4px; color:var(--success); border-color:rgba(16, 185, 129, 0.4); background:rgba(16, 185, 129, 0.06); font-weight:600;">
                             <i data-lucide="plus-circle" style="width:12px; height:12px;"></i> Receive
+                        </button>
+                        <button class="btn btn-outline btn-sm" onclick="generateClientStatementPDF('${client.id}')" title="Download PDF Ledger" style="font-size:11px; padding:4px 8px; display:inline-flex; align-items:center; gap:3px; color:#4f46e5; border-color:rgba(99, 102, 241, 0.4); background:rgba(99, 102, 241, 0.06); font-weight:600;">
+                            <i data-lucide="file-text" style="width:12px; height:12px;"></i> PDF
+                        </button>
+                        <button class="btn btn-sm btn-whatsapp" onclick="shareClientLedgerWhatsApp('${client.id}')" title="Share Ledger Statement on WhatsApp" style="font-size:11px; padding:4px 8px; display:inline-flex; align-items:center; gap:3px;">
+                            <i data-lucide="send" style="width:12px; height:12px;"></i> WhatsApp
                         </button>
                         <button class="btn-icon-only edit-btn" onclick="openEditClient('${client.id}')" title="Edit Party"><i data-lucide="edit-3"></i></button>
                         <button class="btn-icon-only delete-btn" onclick="deleteClient('${client.id}')" title="Delete Party"><i data-lucide="trash-2"></i></button>
@@ -2225,6 +2250,32 @@ function renderClientReportDetails(clientId) {
             `;
             tableBody.appendChild(tr);
         });
+    }
+
+    // Render Contract Items Breakdown in Client Report
+    const contractBox = document.getElementById('client-contract-breakdown-report-box');
+    const contractTbody = document.getElementById('client-report-contracts-tbody');
+    const contractTotalDisplay = document.getElementById('client-report-contracts-total');
+
+    if (contractBox && contractTbody) {
+        if (client && client.contractItems && client.contractItems.length > 0) {
+            contractBox.style.display = 'block';
+            contractTbody.innerHTML = '';
+            client.contractItems.forEach(ci => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-weight:600;">${ci.particulars || 'Service'}</td>
+                    <td>${ci.period || ('FY ' + (client.pendingYear || '2026-2027'))}</td>
+                    <td class="text-right">${ci.months || 12}</td>
+                    <td class="text-right">${ci.rate ? fC(ci.rate) : '-'}</td>
+                    <td class="text-right" style="font-weight:700; color:var(--primary);">${fC(ci.amount || 0)}</td>
+                `;
+                contractTbody.appendChild(tr);
+            });
+            if (contractTotalDisplay) contractTotalDisplay.innerText = fC(stats.yearlyContract);
+        } else {
+            contractBox.style.display = 'none';
+        }
     }
 }
 
@@ -3309,98 +3360,129 @@ window.deleteMember = function(id) {
     }
 };
 
-// Party CRUD
-window.openClientModal = function(editId = '') {
-    const modal = document.getElementById('modal-client');
-    const title = document.getElementById('modal-client-title');
-    const form = document.getElementById('form-client');
-    if (!modal) return;
-    if (form) form.reset();
+// --- CONTRACT & SERVICES BREAKDOWN ROW MANAGER ---
+let activeContractItems = [];
 
-    const customContainer = document.getElementById('client-modal-custom-fields-container');
-    if (customContainer) customContainer.innerHTML = '';
+window.renderContractItemsTable = function() {
+    const tbody = document.getElementById('contract-items-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
 
-    const creditInp = document.getElementById('client-credit-amount');
-    const loanSourceSelect = document.getElementById('client-loan-source-account');
-    const loanDateInp = document.getElementById('client-loan-date');
-    const loanDateGroup = document.getElementById('client-loan-date-group');
-    const monthlyInp = document.getElementById('client-monthly-pay');
-    const yearlyInp = document.getElementById('client-yearly-pay');
-    const pendingYearInp = document.getElementById('client-pending-year');
-    const openingInp = document.getElementById('client-opening-balance');
-    const groupInp = document.getElementById('client-group');
-    const nameInp = document.getElementById('client-name');
-    const editIdInp = document.getElementById('edit-client-id');
-
-    if (loanSourceSelect) {
-        loanSourceSelect.innerHTML = '<option value="">None / Past Old Due (No Cash/Bank deduction)</option>';
-        state.accounts.forEach(a => {
-            loanSourceSelect.innerHTML += `<option value="${a.name}">${a.type === 'Cash' ? '💵' : '🏦'} ${a.name} (${a.type} Book)</option>`;
-        });
-        loanSourceSelect.onchange = function() {
-            if (loanDateGroup) loanDateGroup.style.display = this.value ? 'block' : 'none';
-        };
+    if (!activeContractItems || activeContractItems.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:10px;">No service breakdown added. Click "+ Add Row" or enter retainer below.</td></tr>`;
+        recalculateContractTotals();
+        return;
     }
 
-    if (editId) {
-        const client = state.clients.find(c => c.id === editId);
-        if (client) {
-            if (title) title.innerText = 'Edit Party Details';
-            if (editIdInp) editIdInp.value = client.id;
-            if (nameInp) nameInp.value = client.name;
-            if (groupInp) groupInp.value = isVendorParty(client) ? 'Vendor' : 'Client';
-            if (creditInp) creditInp.value = client.creditAmount !== undefined ? client.creditAmount : 0;
-            if (loanSourceSelect) loanSourceSelect.value = client.loanSourceAccount || '';
-            if (loanDateInp) loanDateInp.value = client.loanDate || new Date().toISOString().split('T')[0];
-            if (loanDateGroup) loanDateGroup.style.display = client.loanSourceAccount ? 'block' : 'none';
+    activeContractItems.forEach((item, idx) => {
+        const tr = document.createElement('tr');
+        tr.dataset.index = idx;
+        tr.innerHTML = `
+            <td>
+                <input type="text" class="contract-item-input ci-particulars" placeholder="e.g. Monthly Retainer, GST" value="${item.particulars || ''}">
+            </td>
+            <td>
+                <input type="text" class="contract-item-input ci-period" placeholder="e.g. Apr 26 - Mar 27" value="${item.period || ''}">
+            </td>
+            <td>
+                <input type="number" min="1" step="1" class="contract-item-input ci-months" placeholder="12" value="${item.months !== undefined ? item.months : 12}" style="text-align:center;">
+            </td>
+            <td>
+                <input type="number" min="0" step="any" class="contract-item-input ci-rate" placeholder="2500" value="${item.rate !== undefined ? item.rate : ''}" style="text-align:right;">
+            </td>
+            <td>
+                <input type="number" min="0" step="any" class="contract-item-input ci-amount" placeholder="30000" value="${item.amount !== undefined ? item.amount : ''}" style="text-align:right; font-weight:700;">
+            </td>
+            <td style="text-align:center;">
+                <button type="button" class="btn-del-contract-row" onclick="removeContractItemRow(${idx})" title="Delete Row">
+                    <i data-lucide="trash-2" style="width:13px; height:13px;"></i>
+                </button>
+            </td>
+        `;
 
-            const m = Number(client.monthlyPay) || 0;
-            const y = Number(client.yearlyPay) || (m * 12);
-            if (monthlyInp) monthlyInp.value = m || '';
-            if (yearlyInp) yearlyInp.value = y || '';
-            if (pendingYearInp) pendingYearInp.value = client.pendingYear || '2026-2027';
-            if (openingInp) openingInp.value = client.openingBalance !== undefined ? client.openingBalance : 0;
-            
-            if (customContainer && state.customClientFields) {
-                state.customClientFields.forEach(f => {
-                    const val = client[f.name] || '';
-                    customContainer.innerHTML += `
-                        <div class="form-group">
-                            <label for="custom-field-${f.name}">${f.name}</label>
-                            <input type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" id="custom-field-${f.name}" name="${f.name}" value="${val}" placeholder="Enter ${f.name}...">
-                        </div>
-                    `;
-                });
+        // Live calculation on input
+        const inpPart = tr.querySelector('.ci-particulars');
+        const inpPeriod = tr.querySelector('.ci-period');
+        const inpMonths = tr.querySelector('.ci-months');
+        const inpRate = tr.querySelector('.ci-rate');
+        const inpAmount = tr.querySelector('.ci-amount');
+
+        const updateRowMath = (isManualAmount = false) => {
+            const months = Number(inpMonths.value) || 0;
+            const rate = Number(inpRate.value) || 0;
+            let amount = Number(inpAmount.value) || 0;
+
+            if (!isManualAmount && months > 0 && rate > 0) {
+                amount = months * rate;
+                inpAmount.value = amount;
+            } else if (isManualAmount && months > 0 && amount > 0 && rate === 0) {
+                inpRate.value = Math.round(amount / months);
             }
-        }
-    } else {
-        if (title) title.innerText = 'Add New Party';
-        if (editIdInp) editIdInp.value = '';
-        if (nameInp) nameInp.value = '';
-        if (groupInp) groupInp.value = (state.partyFilter === 'vendor' || state.partyFilter === 'creditor') ? 'Vendor' : 'Client';
-        if (creditInp) creditInp.value = '0';
-        if (loanSourceSelect) loanSourceSelect.value = '';
-        if (loanDateInp) loanDateInp.value = new Date().toISOString().split('T')[0];
-        if (loanDateGroup) loanDateGroup.style.display = 'none';
-        if (monthlyInp) monthlyInp.value = '';
-        if (yearlyInp) yearlyInp.value = '';
-        if (pendingYearInp) pendingYearInp.value = '2026-2027';
-        if (openingInp) openingInp.value = '0';
-        
-        if (customContainer && state.customClientFields) {
-            state.customClientFields.forEach(f => {
-                customContainer.innerHTML += `
-                    <div class="form-group">
-                        <label for="custom-field-${f.name}">${f.name}</label>
-                        <input type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" id="custom-field-${f.name}" name="${f.name}" placeholder="Enter ${f.name}...">
-                    </div>
-                `;
-            });
-        }
-    }
-    modal.classList.add('active');
+
+            activeContractItems[idx] = {
+                id: item.id || ('ci_' + Date.now() + '_' + idx),
+                particulars: inpPart.value.trim(),
+                period: inpPeriod.value.trim(),
+                months: months,
+                rate: rate,
+                amount: amount
+            };
+            recalculateContractTotals();
+        };
+
+        inpPart.addEventListener('input', () => updateRowMath(false));
+        inpPeriod.addEventListener('input', () => updateRowMath(false));
+        inpMonths.addEventListener('input', () => updateRowMath(false));
+        inpRate.addEventListener('input', () => updateRowMath(false));
+        inpAmount.addEventListener('input', () => updateRowMath(true));
+
+        tbody.appendChild(tr);
+    });
+
     if (window.lucide) lucide.createIcons();
+    recalculateContractTotals();
 };
+
+window.addContractItemRow = function(item = null) {
+    const currentFY = document.getElementById('client-pending-year')?.value || '2026-2027';
+    const newItem = item || {
+        id: 'ci_' + Date.now(),
+        particulars: '',
+        period: 'FY ' + currentFY,
+        months: 12,
+        rate: '',
+        amount: ''
+    };
+    activeContractItems.push(newItem);
+    renderContractItemsTable();
+};
+
+window.removeContractItemRow = function(index) {
+    activeContractItems.splice(index, 1);
+    renderContractItemsTable();
+};
+
+window.recalculateContractTotals = function() {
+    let totalYearly = 0;
+    activeContractItems.forEach(item => {
+        totalYearly += Number(item.amount) || 0;
+    });
+
+    const elTotalDisplay = document.getElementById('contract-items-total-display');
+    if (elTotalDisplay) {
+        elTotalDisplay.innerText = '₹' + Math.round(totalYearly).toLocaleString('en-IN');
+    }
+
+    const yearlyInp = document.getElementById('client-yearly-pay');
+    const monthlyInp = document.getElementById('client-monthly-pay');
+
+    if (activeContractItems.length > 0 && totalYearly > 0) {
+        if (yearlyInp) yearlyInp.value = totalYearly || '';
+        if (monthlyInp) monthlyInp.value = Math.round(totalYearly / 12) || '';
+    }
+};
+
+
 
 window.closeClientModal = function() {
     const modal = document.getElementById('modal-client');
@@ -3428,7 +3510,10 @@ function handleClientSubmit(e) {
     const pendingYear = document.getElementById('client-pending-year')?.value || '2026-2027';
     const openingBalance = Number(document.getElementById('client-opening-balance').value) || 0;
 
-    let clientObj = { name, group, creditAmount, loanSourceAccount, loanDate, monthlyPay, yearlyPay, pendingYear, openingBalance };
+    // Filter valid contract items
+    const validContractItems = (activeContractItems || []).filter(ci => ci.particulars || ci.amount > 0 || ci.rate > 0);
+
+    let clientObj = { name, group, creditAmount, loanSourceAccount, loanDate, monthlyPay, yearlyPay, pendingYear, openingBalance, contractItems: validContractItems };
 
     state.customClientFields.forEach(f => {
         const val = document.getElementById(`custom-field-${f.name}`).value;
@@ -3476,6 +3561,285 @@ window.deleteClient = function(id) {
         deleteClientDirect(id);
         renderPage(state.activePage);
     }
+};
+
+// --- CLIENT DETAILED LEDGER PDF & WHATSAPP GENERATION ---
+
+window.generateClientStatementPDF = function(clientId) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client) {
+        alert("Client not found.");
+        return;
+    }
+
+    const stats = getClientReportStats(clientId);
+    const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
+    const fy = client.pendingYear || '2026-2027';
+    const isVendor = isVendorParty(client);
+    const dateStr = formatDateString(new Date());
+
+    // 1. Contract items rows
+    let contractRowsHTML = '';
+    const contractList = client.contractItems && client.contractItems.length > 0 ? client.contractItems : [
+        { particulars: 'Annual Retainer Contract', period: 'FY ' + fy, months: 12, rate: client.monthlyPay || 0, amount: stats.yearlyContract }
+    ];
+
+    contractList.forEach((ci, idx) => {
+        contractRowsHTML += `
+            <tr>
+                <td style="text-align:center;">${idx + 1}</td>
+                <td><strong>${ci.particulars || 'Service / Retainer'}</strong></td>
+                <td>${ci.period || ('FY ' + fy)}</td>
+                <td style="text-align:center;">${ci.months || 12}</td>
+                <td style="text-align:right;">${ci.rate ? fC(ci.rate) : '-'}</td>
+                <td style="text-align:right; font-weight:700;">${fC(ci.amount || 0)}</td>
+            </tr>
+        `;
+    });
+
+    // 2. Loans / Udhaar rows (if any)
+    let loansRowsHTML = '';
+    if (stats.loansList && stats.loansList.length > 0) {
+        loansRowsHTML = `
+            <h4 style="margin: 18px 0 8px 0; color:#0f766e; border-bottom: 2px solid #0f766e; padding-bottom: 4px; font-size:14px;">Loans & Udhaar Record (उधार खाता विवरण)</h4>
+            <table style="width:100%; border-collapse:collapse; margin-bottom:15px;">
+                <thead>
+                    <tr style="background:#f0fdfa; color:#0f766e;">
+                        <th style="border:1px solid #cbd5e1; padding:6px 8px; text-align:left;">Date</th>
+                        <th style="border:1px solid #cbd5e1; padding:6px 8px; text-align:left;">Transaction / Particulars</th>
+                        <th style="border:1px solid #cbd5e1; padding:6px 8px; text-align:left;">Payment Account</th>
+                        <th style="border:1px solid #cbd5e1; padding:6px 8px; text-align:right;">Disbursed Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${stats.loansList.map(l => `
+                        <tr>
+                            <td style="border:1px solid #cbd5e1; padding:6px 8px;">${formatDbDate(l.date)}</td>
+                            <td style="border:1px solid #cbd5e1; padding:6px 8px;"><strong>${l.type === 'given' ? 'Loan Given (उधार दिया)' : 'Loan Taken (उधार लिया)'}</strong>${l.remark ? ' — ' + l.remark : ''}</td>
+                            <td style="border:1px solid #cbd5e1; padding:6px 8px;">${l.account || 'Direct'}</td>
+                            <td style="border:1px solid #cbd5e1; padding:6px 8px; text-align:right; font-weight:700; color:#0f766e;">${fC(l.amount)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    // 3. Payments Received & Discount Logs
+    const incomeList = state.incomeLogs.filter(l => l.clientId === clientId).sort((a, b) => new Date(a.date) - new Date(b.date));
+    let incomeRowsHTML = '';
+    if (incomeList.length > 0) {
+        incomeRowsHTML = incomeList.map((log, idx) => `
+            <tr>
+                <td style="text-align:center;">${idx + 1}</td>
+                <td>${formatDbDate(log.date)}</td>
+                <td><strong>Payment Received</strong>${log.remark ? ' — ' + log.remark : ''}</td>
+                <td>${log.mode}</td>
+                <td style="text-align:right; font-weight:700; color:#16a34a;">${fC(log.amount)}</td>
+                <td style="text-align:right; color:#d97706;">${log.discount ? fC(log.discount) : '-'}</td>
+            </tr>
+        `).join('');
+    } else {
+        incomeRowsHTML = `<tr><td colspan="6" style="text-align:center; color:#64748b; padding:10px;">No payments received yet for this client.</td></tr>`;
+    }
+
+    // Build printable HTML box
+    const printContainer = document.createElement('div');
+    printContainer.id = 'pdf-render-temp';
+    printContainer.style.position = 'fixed';
+    printContainer.style.left = '-9999px';
+    printContainer.style.top = '0';
+    printContainer.style.width = '800px';
+    printContainer.style.background = '#ffffff';
+
+    printContainer.innerHTML = `
+        <div class="pdf-statement-container" style="padding: 30px 35px; color:#1e293b; font-family:'Plus Jakarta Sans', Arial, sans-serif;">
+            <!-- Header -->
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #0d9488; padding-bottom:15px; margin-bottom:20px;">
+                <div>
+                    <h2 style="margin:0; font-size:24px; color:#0f766e; font-weight:800; letter-spacing:-0.5px;">WEALTH PLUS</h2>
+                    <p style="margin:3px 0 0 0; font-size:12px; color:#64748b; font-weight:500;">Financial Accounting & Client Ledger Statement</p>
+                </div>
+                <div style="text-align:right;">
+                    <span style="display:inline-block; background:#f0fdfa; color:#0f766e; border:1px solid #99f6e4; font-weight:700; font-size:12px; padding:4px 10px; border-radius:4px;">
+                        FY: ${fy}
+                    </span>
+                    <p style="margin:4px 0 0 0; font-size:11px; color:#64748b;">Date: ${dateStr}</p>
+                </div>
+            </div>
+
+            <!-- Party Details Box -->
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px 16px; margin-bottom:20px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <div>
+                    <span style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:600;">Party / Client Name:</span>
+                    <h3 style="margin:2px 0; font-size:17px; color:#0f172a; font-weight:700;">${client.name}</h3>
+                    <span style="font-size:11px; color:#475569;">Category: <strong>${isVendor ? 'Vendor (Creditor)' : 'Client (Debtor)'}</strong></span>
+                </div>
+                <div style="text-align:right;">
+                    <span style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:600;">Financial Year / Period:</span>
+                    <p style="margin:2px 0; font-size:14px; font-weight:700; color:#0f766e;">FY ${fy}</p>
+                    <span style="font-size:11px; color:#475569;">Opening Balance: <strong>${fC(stats.openingBalance)}</strong></span>
+                </div>
+            </div>
+
+            <!-- Section 1: Services / Contract Retainer Breakdown Table -->
+            <h4 style="margin:15px 0 8px 0; color:#0f766e; border-bottom:2px solid #0f766e; padding-bottom:4px; font-size:14px;">
+                1. Services & Contract Retainer Breakdown (सेवा विवरण एवं दर)
+            </h4>
+            <table style="width:100%; border-collapse:collapse; margin-bottom:15px;">
+                <thead>
+                    <tr style="background:#f1f5f9; color:#0f172a; font-size:11px;">
+                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:35px; text-align:center;">#</th>
+                        <th style="border:1px solid #cbd5e1; padding:7px 8px; text-align:left;">Particulars (विवरण)</th>
+                        <th style="border:1px solid #cbd5e1; padding:7px 8px; text-align:left; width:120px;">Period (अवधि)</th>
+                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:60px; text-align:center;">Months</th>
+                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:90px; text-align:right;">Rate (₹)</th>
+                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:100px; text-align:right;">Amount (₹)</th>
+                    </tr>
+                </thead>
+                <tbody style="font-size:11px;">
+                    ${contractRowsHTML}
+                </tbody>
+                <tfoot>
+                    <tr style="font-weight:700; background:#f0fdfa; font-size:12px;">
+                        <td colspan="5" style="border:1px solid #cbd5e1; text-align:right; padding:8px;">Total Yearly Retainer / Services:</td>
+                        <td style="border:1px solid #cbd5e1; text-align:right; color:#0f766e; padding:8px;">${fC(stats.yearlyContract)}</td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            ${loansRowsHTML}
+
+            <!-- Section 2: Payments Received & Discount Logs Table -->
+            <h4 style="margin:18px 0 8px 0; color:#0f766e; border-bottom:2px solid #0f766e; padding-bottom:4px; font-size:14px;">
+                2. Payments Received & Settlement Log (प्राप्त भुगतान का विवरण)
+            </h4>
+            <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+                <thead>
+                    <tr style="background:#f1f5f9; color:#0f172a; font-size:11px;">
+                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:35px; text-align:center;">#</th>
+                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:85px; text-align:left;">Date</th>
+                        <th style="border:1px solid #cbd5e1; padding:7px 8px; text-align:left;">Particulars / Remarks</th>
+                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:110px; text-align:left;">Mode / Account</th>
+                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:100px; text-align:right;">Received (₹)</th>
+                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:80px; text-align:right;">Discount (₹)</th>
+                    </tr>
+                </thead>
+                <tbody style="font-size:11px;">
+                    ${incomeRowsHTML}
+                </tbody>
+                <tfoot>
+                    <tr style="font-weight:700; background:#f8fafc; font-size:11px;">
+                        <td colspan="4" style="border:1px solid #cbd5e1; text-align:right; padding:6px 8px;">Total Received & Discount:</td>
+                        <td style="border:1px solid #cbd5e1; text-align:right; color:#16a34a; padding:6px 8px;">${fC(stats.totalReceived)}</td>
+                        <td style="border:1px solid #cbd5e1; text-align:right; color:#d97706; padding:6px 8px;">${fC(stats.totalDiscount)}</td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <!-- Section 3: Final Account Settlement Summary Box -->
+            <div style="background:#f0fdfa; border:2px solid #0d9488; border-radius:8px; padding:16px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                <div style="display:flex; flex-direction:column; gap:4px; font-size:12px;">
+                    <span>Total Services & Contracts: <strong>${fC(stats.yearlyContract)}</strong></span>
+                    ${stats.loansGiven > 0 ? `<span>Total Loans Given: <strong>${fC(stats.loansGiven)}</strong></span>` : ''}
+                    <span>Opening Balance: <strong>${fC(stats.openingBalance)}</strong></span>
+                    <span style="font-weight:700; color:#0f766e;">Total Billed / Receivable: ${fC(stats.totalReceivable)}</span>
+                    <span style="color:#16a34a;">Less: Total Received: -${fC(stats.totalReceived)}</span>
+                    ${stats.totalDiscount > 0 ? `<span style="color:#d97706;">Less: Total Discount: -${fC(stats.totalDiscount)}</span>` : ''}
+                </div>
+                <div style="text-align:right; background:#ffffff; padding:12px 20px; border-radius:6px; border:1px solid #99f6e4;">
+                    <span style="font-size:11px; text-transform:uppercase; font-weight:700; color:#64748b; letter-spacing:0.5px;">Net Outstanding Balance Due</span>
+                    <h2 style="margin:4px 0 0 0; font-size:24px; font-weight:800; color:${stats.balanceReceivable > 0 ? '#0d9488' : '#16a34a'};">
+                        ${stats.balanceReceivable <= 0 ? 'Fully Settled (₹0)' : fC(stats.balanceReceivable)}
+                    </h2>
+                </div>
+            </div>
+
+            <!-- Footer / Terms -->
+            <div style="margin-top:25px; padding-top:10px; border-top:1px dashed #cbd5e1; display:flex; justify-content:space-between; font-size:10px; color:#94a3b8;">
+                <span>Generated via Wealth Plus Accounting & Bookkeeping</span>
+                <span>Authorized Signatory</span>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(printContainer);
+
+    const safeClientName = client.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const opt = {
+        margin: [10, 10, 10, 10],
+        filename: `${safeClientName}_Ledger_Statement_FY_${fy}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    if (window.html2pdf) {
+        html2pdf().set(opt).from(printContainer.querySelector('.pdf-statement-container')).save().then(() => {
+            document.body.removeChild(printContainer);
+        });
+    } else {
+        alert("PDF generator loading. Please try again in 2 seconds.");
+        document.body.removeChild(printContainer);
+    }
+};
+
+window.generateSelectedClientPDF = function() {
+    const sel = document.getElementById('report-client-select');
+    if (!sel || !sel.value) {
+        alert("Please select a client first.");
+        return;
+    }
+    generateClientStatementPDF(sel.value);
+};
+
+window.shareClientLedgerWhatsApp = function(clientId) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client) {
+        alert("Client not found.");
+        return;
+    }
+
+    const stats = getClientReportStats(clientId);
+    const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
+    const fy = client.pendingYear || '2026-2027';
+    const dateStr = formatDateString(new Date());
+
+    let itemsBulletText = '';
+    if (client.contractItems && client.contractItems.length > 0) {
+        itemsBulletText = '\n📋 *Contract / Services Breakdown:*\n' + client.contractItems.map(ci => `• ${ci.particulars || 'Service'} (${ci.months} mo @ ₹${ci.rate}): ₹${Number(ci.amount).toLocaleString('en-IN')}`).join('\n') + '\n';
+    }
+
+    const msg = 
+`*STATEMENT OF ACCOUNT - WEALTH PLUS*
+*Party:* ${client.name}
+*Financial Year:* FY ${fy}
+*Statement Date:* ${dateStr}
+---------------------------------------------${itemsBulletText}
+*Total Contract / Retainer:* ${fC(stats.yearlyContract)}
+${stats.loansGiven > 0 ? `*Total Loans Given:* ${fC(stats.loansGiven)}\n` : ''}*Opening Balance:* ${fC(stats.openingBalance)}
+*Total Receivable:* ${fC(stats.totalReceivable)}
+*Total Received:* ${fC(stats.totalReceived)}
+${stats.totalDiscount > 0 ? `*Discount Given:* ${fC(stats.totalDiscount)}\n` : ''}---------------------------------------------
+💰 *NET OUTSTANDING BALANCE DUE:* *${stats.balanceReceivable <= 0 ? '₹0 (Fully Received)' : fC(stats.balanceReceivable)}*
+---------------------------------------------
+_Detailed PDF Ledger Statement is attached._`;
+
+    // Download PDF first
+    generateClientStatementPDF(clientId);
+
+    // Open WhatsApp
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, '_blank');
+};
+
+window.shareSelectedClientWhatsApp = function() {
+    const sel = document.getElementById('report-client-select');
+    if (!sel || !sel.value) {
+        alert("Please select a client first.");
+        return;
+    }
+    shareClientLedgerWhatsApp(sel.value);
 };
 
 // Income logs
@@ -4746,6 +5110,24 @@ function exportToExcel() {
         };
     });
 
+    const contractsData = [];
+    state.clients.forEach(client => {
+        const fy = client.pendingYear || '2026-2027';
+        if (client.contractItems && client.contractItems.length > 0) {
+            client.contractItems.forEach(ci => {
+                contractsData.push({
+                    "Party Name": client.name,
+                    "Financial Year": fy,
+                    "Service Particulars": ci.particulars || 'Service',
+                    "Period": ci.period || ('FY ' + fy),
+                    "Months": ci.months || 12,
+                    "Rate (INR)": ci.rate || 0,
+                    "Amount (INR)": ci.amount || 0
+                });
+            });
+        }
+    });
+
     const wb = XLSX.utils.book_new();
 
     const addSheet = (data, sheetName) => {
@@ -4754,6 +5136,7 @@ function exportToExcel() {
     };
 
     addSheet(clientsData, "Clients Overview");
+    if (contractsData.length > 0) addSheet(contractsData, "Contract Breakdown");
     addSheet(loansData, "Loans & Udhaar");
     addSheet(incomeData, "Received Income Logs");
     addSheet(expensesData, "Expenses Ledger");

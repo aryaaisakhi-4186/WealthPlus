@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wealth-plus-cache-v29';
+const CACHE_NAME = 'wealth-plus-cache-v30';
 const ASSETS = [
   './',
   './index.html',
@@ -13,7 +13,8 @@ const ASSETS = [
   'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js',
   'https://unpkg.com/lucide@latest',
   'https://cdn.jsdelivr.net/npm/chart.js',
-  'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
+  'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
 ];
 
 self.addEventListener('install', (e) => {

@@ -18,12 +18,14 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- SheetJS CDN for Excel Export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- HTML2PDF CDN for Client Ledger PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <!-- PWA Manifest & Mobile Web App support -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=6.4.2">
+    <link rel="stylesheet" href="style.css?v=6.5.0">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -545,10 +547,48 @@
                                 <select id="report-client-select" class="select-filter select-wide">
                                     <!-- Populated dynamically -->
                                 </select>
+                                <div style="margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="btn-client-report-pdf" onclick="generateSelectedClientPDF()" style="display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:5px 10px;" title="Download Client Statement PDF">
+                                        <i data-lucide="file-text" style="width:13px; height:13px;"></i> Download PDF
+                                    </button>
+                                    <button type="button" class="btn btn-sm" id="btn-client-report-whatsapp" onclick="shareSelectedClientWhatsApp()" style="display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:5px 10px; background:#25D366; border-color:#25D366; color:#ffffff; font-weight:600;" title="Share Statement on WhatsApp">
+                                        <i data-lucide="send" style="width:13px; height:13px;"></i> WhatsApp Statement
+                                    </button>
+                                </div>
                             </div>
 
                             <div class="report-summary-cards" id="client-report-stats-grid">
                                 <!-- Rendered dynamically -->
+                            </div>
+
+                            <!-- Client Contract & Services Breakdown Box -->
+                            <div class="report-table-box" id="client-contract-breakdown-report-box" style="margin-bottom: 20px; display: none;">
+                                <h5 style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
+                                    <i data-lucide="layers" style="width:15px; height:15px; color:var(--primary);"></i>
+                                    Contract & Service Retainer Breakdown (सेवा विवरण)
+                                </h5>
+                                <div class="table-container-mini">
+                                    <table class="data-table-mini" id="table-client-report-contracts">
+                                        <thead>
+                                            <tr>
+                                                <th>Particulars (विवरण)</th>
+                                                <th>Period (अवधि)</th>
+                                                <th class="text-right">Months</th>
+                                                <th class="text-right">Rate (₹)</th>
+                                                <th class="text-right">Amount (₹)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="client-report-contracts-tbody">
+                                            <!-- Rendered dynamically -->
+                                        </tbody>
+                                        <tfoot>
+                                            <tr style="font-weight:700; background:rgba(13,148,136,0.08);">
+                                                <td colspan="4" style="text-align:right; font-weight:700;">Total Yearly Retainer:</td>
+                                                <td id="client-report-contracts-total" class="text-right" style="color:var(--primary); font-weight:700;">₹0</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
                             </div>
 
                             <div class="report-details-grid">
@@ -1225,13 +1265,53 @@
                     <label for="client-loan-date">Loan Disbursement Date</label>
                     <input type="date" id="client-loan-date">
                 </div>
+                <!-- Service & Contract Retainer Items Breakdown -->
+                <div class="contract-breakdown-box" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 15px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                        <div>
+                            <h5 style="margin:0; font-size:13px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+                                <i data-lucide="layers" style="width:14px; height:14px; color:var(--primary);"></i>
+                                Service & Contract Breakdown (सेवा विवरण एवं दर)
+                            </h5>
+                            <span style="font-size:11px; color:var(--text-secondary);">Itemize services. Total will auto-fill Yearly & Monthly Retainer.</span>
+                        </div>
+                        <button type="button" class="btn btn-outline btn-sm" id="btn-add-contract-row" onclick="addContractItemRow()" style="font-size:11px; padding:4px 9px; display:inline-flex; align-items:center; gap:4px; font-weight:600;">
+                            <i data-lucide="plus" style="width:12px; height:12px;"></i> Add Row
+                        </button>
+                    </div>
+                    <div class="table-responsive-wrapper" style="overflow-x:auto;">
+                        <table class="data-table-mini" id="table-contract-items" style="width:100%; font-size:11px;">
+                            <thead>
+                                <tr>
+                                    <th style="min-width:130px;">Particulars (विवरण)</th>
+                                    <th style="min-width:90px;">Period (अवधि)</th>
+                                    <th style="width:55px;">Months</th>
+                                    <th style="width:75px;">Rate (₹)</th>
+                                    <th style="width:85px; text-align:right;">Amount (₹)</th>
+                                    <th style="width:32px; text-align:center;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="contract-items-tbody">
+                                <!-- Dynamic Rows -->
+                            </tbody>
+                            <tfoot>
+                                <tr style="font-weight:700; background:rgba(13,148,136,0.08);">
+                                    <td colspan="4" style="text-align:right; padding:6px 8px; font-weight:700;">Total Yearly Retainer:</td>
+                                    <td id="contract-items-total-display" style="text-align:right; color:var(--primary); padding:6px 8px; font-weight:700;">₹0</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
                 <div class="form-group-row">
                     <div class="form-group">
-                        <label for="client-monthly-pay">Monthly Retainer (₹ / Mo) (Optional)</label>
+                        <label for="client-monthly-pay">Monthly Retainer (₹ / Mo) (Auto-Calculated / Edit)</label>
                         <input type="number" id="client-monthly-pay" min="0" placeholder="0 (e.g. 25000)" inputmode="numeric">
                     </div>
                     <div class="form-group">
-                        <label for="client-yearly-pay">Yearly Retainer (₹ / Yr) (Optional)</label>
+                        <label for="client-yearly-pay">Yearly Retainer (₹ / Yr) (Auto-Calculated / Edit)</label>
                         <input type="number" id="client-yearly-pay" min="0" placeholder="0 (e.g. 300000)" inputmode="numeric">
                     </div>
                 </div>
@@ -1642,9 +1722,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.4.2"></script>
-    <script src="app.js?v=6.4.2"></script>
-    <script src="sindhu_v1.js?v=6.4.2"></script>
+    <script src="firebase-config.js?v=6.5.0"></script>
+    <script src="app.js?v=6.5.0"></script>
+    <script src="sindhu_v1.js?v=6.5.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

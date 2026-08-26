@@ -3011,3 +3011,86 @@ h1, h2, h3, h4, h5, h6 {
     border: 1px solid rgba(99, 102, 241, 0.25);
 }
 
+/* Contract & Services Retainer Items Table Inputs */
+.contract-item-input {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.contract-item-input:focus {
+    border-color: var(--primary);
+    outline: none;
+    box-shadow: 0 0 0 2px var(--primary-glow);
+}
+
+.btn-del-contract-row {
+    background: transparent;
+    border: none;
+    color: var(--danger);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+}
+
+.btn-del-contract-row:hover {
+    background: rgba(225, 29, 72, 0.12);
+}
+
+/* WhatsApp & Statement Action Buttons */
+.btn-whatsapp {
+    background: #25D366 !important;
+    border-color: #25D366 !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-whatsapp:hover {
+    background: #1eb956 !important;
+    border-color: #1eb956 !important;
+    box-shadow: 0 4px 10px rgba(37, 211, 102, 0.35);
+}
+
+/* PDF Statement Printable Styling */
+.pdf-statement-container {
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+    background: #ffffff;
+    color: #1e293b;
+    padding: 30px;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    box-sizing: border-box;
+}
+
+.pdf-statement-container table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+}
+
+.pdf-statement-container th,
+.pdf-statement-container td {
+    border: 1px solid #cbd5e1;
+    padding: 8px 10px;
+    font-size: 12px;
+}
+
+.pdf-statement-container th {
+    background: #f1f5f9;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+
