@@ -25,7 +25,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=6.5.6">
+    <link rel="stylesheet" href="style.css?v=6.5.7">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -550,6 +550,9 @@
                                 <div style="margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                                     <button type="button" class="btn btn-outline-primary btn-sm" id="btn-client-report-pdf" onclick="generateSelectedClientPDF()" style="display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:5px 10px;" title="Download Client Statement PDF">
                                         <i data-lucide="file-text" style="width:13px; height:13px;"></i> Download PDF
+                                    </button>
+                                    <button type="button" class="btn btn-outline btn-sm" id="btn-client-report-excel" onclick="exportSelectedClientExcel()" style="display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:5px 10px; color:#107c41; border-color:rgba(16, 124, 65, 0.4); background:rgba(16, 124, 65, 0.06); font-weight:600;" title="Export Client Excel Statement">
+                                        <i data-lucide="file-spreadsheet" style="width:13px; height:13px;"></i> Export Excel
                                     </button>
                                     <button type="button" class="btn btn-sm" id="btn-client-report-whatsapp" onclick="shareSelectedClientWhatsApp()" style="display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:5px 10px; background:#25D366; border-color:#25D366; color:#ffffff; font-weight:600;" title="Share Statement on WhatsApp">
                                         <i data-lucide="send" style="width:13px; height:13px;"></i> WhatsApp Statement
@@ -1722,9 +1725,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.5.6"></script>
-    <script src="app.js?v=6.5.6"></script>
-    <script src="sindhu_v1.js?v=6.5.6"></script>
+    <script src="firebase-config.js?v=6.5.7"></script>
+    <script src="app.js?v=6.5.7"></script>
+    <script src="sindhu_v1.js?v=6.5.7"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

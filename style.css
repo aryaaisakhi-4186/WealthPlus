@@ -3248,6 +3248,20 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: 0 4px 10px rgba(37, 211, 102, 0.35);
 }
 
+.btn-excel {
+    background: #107c41 !important;
+    border-color: #107c41 !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-excel:hover {
+    background: #0b5c30 !important;
+    border-color: #0b5c30 !important;
+    box-shadow: 0 4px 10px rgba(16, 124, 65, 0.35);
+}
+
 /* PDF Statement Printable Styling */
 .pdf-statement-container {
     width: 100%;

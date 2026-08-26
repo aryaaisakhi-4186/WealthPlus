@@ -1761,6 +1761,9 @@ function renderClientsPage() {
                         <button class="btn btn-outline btn-sm" onclick="generateClientStatementPDF('${client.id}')" title="Download PDF Ledger" style="font-size:11px; padding:4px 8px; display:inline-flex; align-items:center; gap:3px; color:#4f46e5; border-color:rgba(99, 102, 241, 0.4); background:rgba(99, 102, 241, 0.06); font-weight:600;">
                             <i data-lucide="file-text" style="width:12px; height:12px;"></i> PDF
                         </button>
+                        <button class="btn btn-outline btn-sm btn-excel" onclick="exportClientStatementExcel('${client.id}')" title="Export Client Excel Statement" style="font-size:11px; padding:4px 8px; display:inline-flex; align-items:center; gap:3px;">
+                            <i data-lucide="file-spreadsheet" style="width:12px; height:12px;"></i> Excel
+                        </button>
                         <button class="btn btn-sm btn-whatsapp" onclick="shareClientLedgerWhatsApp('${client.id}')" title="Share Ledger Statement on WhatsApp" style="font-size:11px; padding:4px 8px; display:inline-flex; align-items:center; gap:3px;">
                             <i data-lucide="send" style="width:12px; height:12px;"></i> WhatsApp
                         </button>
@@ -3684,16 +3687,8 @@ window.deleteClient = function(id) {
 
 // --- CLIENT DETAILED LEDGER PDF & WHATSAPP GENERATION ---
 
-window.generateClientStatementPDF = function(clientId) {
-    const client = state.clients.find(c => c.id === clientId);
-    if (!client) {
-        alert("Client not found.");
-        return;
-    }
-
-    const stats = getClientReportStats(clientId);
+function buildClientStatementElement(client, stats, fy) {
     const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
-    const fy = client.pendingYear || '2026-2027';
     const isVendor = isVendorParty(client);
     const dateStr = formatDateString(new Date());
 
@@ -3745,7 +3740,7 @@ window.generateClientStatementPDF = function(clientId) {
     }
 
     // 3. Payments Received & Discount Logs
-    const incomeList = state.incomeLogs.filter(l => l.clientId === clientId).sort((a, b) => new Date(a.date) - new Date(b.date));
+    const incomeList = state.incomeLogs.filter(l => l.clientId === client.id).sort((a, b) => new Date(a.date) - new Date(b.date));
     let incomeRowsHTML = '';
     if (incomeList.length > 0) {
         incomeRowsHTML = incomeList.map((log, idx) => `
@@ -3882,6 +3877,19 @@ window.generateClientStatementPDF = function(clientId) {
         </div>
     `;
 
+    return printContainer;
+}
+
+window.generateClientStatementPDF = function(clientId) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client) {
+        alert("Client not found.");
+        return;
+    }
+
+    const stats = getClientReportStats(clientId);
+    const fy = client.pendingYear || '2026-2027';
+    const printContainer = buildClientStatementElement(client, stats, fy);
     document.body.appendChild(printContainer);
 
     const safeClientName = client.name.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -3895,6 +3903,9 @@ window.generateClientStatementPDF = function(clientId) {
 
     if (window.html2pdf) {
         html2pdf().set(opt).from(printContainer.querySelector('.pdf-statement-container')).save().then(() => {
+            document.body.removeChild(printContainer);
+        }).catch(err => {
+            console.error("PDF generation error:", err);
             document.body.removeChild(printContainer);
         });
     } else {
@@ -3912,7 +3923,7 @@ window.generateSelectedClientPDF = function() {
     generateClientStatementPDF(sel.value);
 };
 
-window.shareClientLedgerWhatsApp = function(clientId) {
+window.shareClientLedgerWhatsApp = async function(clientId) {
     const client = state.clients.find(c => c.id === clientId);
     if (!client) {
         alert("Client not found.");
@@ -3920,35 +3931,111 @@ window.shareClientLedgerWhatsApp = function(clientId) {
     }
 
     const stats = getClientReportStats(clientId);
-    const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
+    const fAmt = v => 'Rs. ' + Math.round(v).toLocaleString('en-IN') + '/-';
     const fy = client.pendingYear || '2026-2027';
-    const dateStr = formatDateString(new Date());
+    const isSettled = stats.balanceReceivable <= 0;
 
-    let itemsBulletText = '';
-    if (client.contractItems && client.contractItems.length > 0) {
-        itemsBulletText = '\n📋 *Contract / Services Breakdown:*\n' + client.contractItems.map(ci => `• ${ci.particulars || 'Service'} (${ci.months} mo @ ₹${ci.rate}): ₹${Number(ci.amount).toLocaleString('en-IN')}`).join('\n') + '\n';
+    // Humble WhatsApp message (formatted without raw rupee symbols to prevent WhatsApp Pay auto-link)
+    let msg = '';
+    if (isSettled) {
+        msg = 
+`Dear *${client.name}*,
+
+Greetings!
+
+Please find attached your *Final Settled Statement of Account* for *FY ${fy}*.
+
+✅ *Account Status: Fully Settled & Closed*
+• Total Contract / Services: ${fAmt(stats.yearlyContract)}
+• Total Amount Received: ${fAmt(stats.totalReceived)}
+${stats.totalDiscount > 0 ? `• Total Discount Allowed: ${fAmt(stats.totalDiscount)}\n` : ''}• *Balance Due: Nil (Rs. 0)*
+
+We sincerely thank you for completing your account settlement and for your wonderful trust in our services. It is always a pleasure working with you, and we look forward to our continued partnership!
+
+Warm regards and best wishes,
+*Wealth Plus Accounts Team*`;
+    } else {
+        msg = 
+`Dear *${client.name}*,
+
+Greetings!
+
+Please find attached your detailed Statement of Account for *FY ${fy}*.
+
+📋 *Account Summary:*
+• Total Services / Contract: ${fAmt(stats.yearlyContract)}
+${stats.loansGiven > 0 ? `• Total Loans / Credit Given: ${fAmt(stats.loansGiven)}\n` : ''}${stats.openingBalance > 0 ? `• Opening Balance: ${fAmt(stats.openingBalance)}\n` : ''}• Total Amount Received: ${fAmt(stats.totalReceived)}
+${stats.totalDiscount > 0 ? `• Total Discount Given: ${fAmt(stats.totalDiscount)}\n` : ''}• *Net Pending Balance: ${fAmt(stats.balanceReceivable)}*
+
+Kindly review the attached PDF statement and arrange the pending balance payment at your convenience.
+
+Thank you for your valuable association and continued support.
+
+Warm regards,
+*Wealth Plus Accounts Team*`;
     }
 
-    const msg = 
-`*STATEMENT OF ACCOUNT - WEALTH PLUS*
-*Party:* ${client.name}
-*Financial Year:* FY ${fy}
-*Statement Date:* ${dateStr}
----------------------------------------------${itemsBulletText}
-*Total Contract / Retainer:* ${fC(stats.yearlyContract)}
-${stats.loansGiven > 0 ? `*Total Loans Given:* ${fC(stats.loansGiven)}\n` : ''}*Opening Balance:* ${fC(stats.openingBalance)}
-*Total Receivable:* ${fC(stats.totalReceivable)}
-*Total Received:* ${fC(stats.totalReceived)}
-${stats.totalDiscount > 0 ? `*Discount Given:* ${fC(stats.totalDiscount)}\n` : ''}---------------------------------------------
-💰 *NET OUTSTANDING BALANCE DUE:* *${stats.balanceReceivable <= 0 ? '₹0 (Fully Received)' : fC(stats.balanceReceivable)}*
----------------------------------------------
-_Detailed PDF Ledger Statement is attached._`;
+    const printContainer = buildClientStatementElement(client, stats, fy);
+    document.body.appendChild(printContainer);
 
-    // Download PDF first
-    generateClientStatementPDF(clientId);
+    const safeClientName = client.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `${safeClientName}_Statement_FY_${fy}.pdf`;
 
-    // Open Regular / Normal WhatsApp directly (ignoring WhatsApp Business)
-    openRegularWhatsApp(msg);
+    const opt = {
+        margin: [10, 10, 10, 10],
+        filename: fileName,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    if (!window.html2pdf) {
+        alert("PDF generator is loading. Please try again in 2 seconds.");
+        document.body.removeChild(printContainer);
+        return;
+    }
+
+    try {
+        const pdfWorker = html2pdf().set(opt).from(printContainer.querySelector('.pdf-statement-container'));
+        const pdfBlob = await pdfWorker.output('blob');
+        document.body.removeChild(printContainer);
+
+        const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+        // If Web Share API supports file sharing (Mobile Chrome / Safari / PWA):
+        if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+            try {
+                await navigator.share({
+                    files: [pdfFile],
+                    title: `${client.name} - Statement of Account`,
+                    text: msg
+                });
+                return;
+            } catch (shareErr) {
+                if (shareErr.name === 'AbortError') return; // User cancelled share modal
+                console.warn("Native share error, falling back to direct launch:", shareErr);
+            }
+        }
+
+        // Fallback for Desktop / non-file share: download PDF & open regular WhatsApp
+        const fileUrl = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = fileUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            if (document.body.contains(a)) document.body.removeChild(a);
+            URL.revokeObjectURL(fileUrl);
+        }, 1000);
+
+        openRegularWhatsApp(msg);
+
+    } catch (err) {
+        console.error("PDF generation or share error:", err);
+        if (document.body.contains(printContainer)) document.body.removeChild(printContainer);
+        openRegularWhatsApp(msg);
+    }
 };
 
 window.openRegularWhatsApp = function(message) {
@@ -3978,6 +4065,97 @@ window.shareSelectedClientWhatsApp = function() {
         return;
     }
     shareClientLedgerWhatsApp(sel.value);
+};
+
+// --- CLIENT DETAILED STATEMENT EXCEL EXPORT ---
+window.exportClientStatementExcel = function(clientId) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client) {
+        alert("Client not found.");
+        return;
+    }
+
+    const stats = getClientReportStats(clientId);
+    const fy = client.pendingYear || '2026-2027';
+    const isVendor = isVendorParty(client);
+    const isSettled = stats.balanceReceivable <= 0;
+    const safeClientName = client.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    // 1. Account Summary Sheet
+    const summaryData = [{
+        "Party / Client Name": client.name,
+        "Category": isVendor ? "Vendor (Creditor)" : "Client (Debtor)",
+        "Financial Year": "FY " + fy,
+        "Statement Date": formatDateString(new Date()),
+        "Opening Balance (INR)": stats.openingBalance,
+        "Total Services Retainer (INR)": stats.yearlyContract,
+        "Total Loans Given (INR)": stats.loansGiven,
+        "Total Billed / Receivable (INR)": stats.totalReceivable,
+        "Total Received (INR)": stats.totalReceived,
+        "Total Discount Given (INR)": stats.totalDiscount,
+        "Net Outstanding Balance Due (INR)": Math.max(0, stats.balanceReceivable),
+        "Account Status": isSettled ? "Fully Settled & Closed" : "Active / Outstanding Due"
+    }];
+
+    // 2. Services / Contract Breakdown Sheet
+    const contractData = [];
+    const contractList = (client.contractItems && client.contractItems.length > 0) ? client.contractItems : [
+        { particulars: 'Annual Retainer Contract', period: 'FY ' + fy, months: 12, rate: client.monthlyPay || 0, amount: stats.yearlyContract }
+    ];
+    contractList.forEach((ci, idx) => {
+        contractData.push({
+            "S.No": idx + 1,
+            "Service Particulars": ci.particulars || 'Service',
+            "Period": ci.period || ('FY ' + fy),
+            "Months": ci.months || 12,
+            "Monthly Rate (INR)": ci.rate || 0,
+            "Total Amount (INR)": ci.amount || 0
+        });
+    });
+
+    // 3. Received Payments Log Sheet
+    const incomeList = state.incomeLogs.filter(l => l.clientId === clientId).sort((a, b) => new Date(a.date) - new Date(b.date));
+    const receiptsData = incomeList.map((log, idx) => ({
+        "S.No": idx + 1,
+        "Receipt Date": formatDbDate(log.date),
+        "Received From Party": client.name,
+        "Destination Account (Cash/Bank)": log.mode,
+        "Amount Received (INR)": Number(log.amount) || 0,
+        "Discount Allowed (INR)": Number(log.discount) || 0,
+        "Remark / Description": log.remark || ''
+    }));
+
+    // 4. Loans & Credit Record Sheet (if any)
+    const loansData = (stats.loansList || []).map((l, idx) => ({
+        "S.No": idx + 1,
+        "Date": formatDbDate(l.date),
+        "Loan Direction": l.type === 'given' ? 'Loan Given' : 'Loan Taken',
+        "Payment Account": l.account || 'Direct',
+        "Amount (INR)": Number(l.amount) || 0,
+        "Remark / Purpose": l.remark || ''
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const addSheet = (data, sheetName) => {
+        const ws = XLSX.utils.json_to_sheet(data.length > 0 ? data : [{ "Status": "No records found" }]);
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    };
+
+    addSheet(summaryData, "Account Summary");
+    addSheet(contractData, "Services Breakdown");
+    addSheet(receiptsData, "Payments Received");
+    if (loansData.length > 0) addSheet(loansData, "Loans & Credit");
+
+    XLSX.writeFile(wb, `${safeClientName}_Statement_FY_${fy}.xlsx`);
+};
+
+window.exportSelectedClientExcel = function() {
+    const sel = document.getElementById('report-client-select');
+    if (!sel || !sel.value) {
+        alert("Please select a client first.");
+        return;
+    }
+    exportClientStatementExcel(sel.value);
 };
 
 // Income logs
