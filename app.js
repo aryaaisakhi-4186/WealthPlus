@@ -3840,9 +3840,28 @@ _Detailed PDF Ledger Statement is attached._`;
     // Download PDF first
     generateClientStatementPDF(clientId);
 
-    // Open WhatsApp
-    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
-    window.open(waUrl, '_blank');
+    // Open Regular / Normal WhatsApp directly (ignoring WhatsApp Business)
+    openRegularWhatsApp(msg);
+};
+
+window.openRegularWhatsApp = function(message) {
+    const encoded = encodeURIComponent(message);
+    const isAndroid = /android/i.test(navigator.userAgent || '');
+    
+    if (isAndroid) {
+        // Explicitly targets Regular WhatsApp package (com.whatsapp) on Android
+        // Bypasses WhatsApp Business (com.whatsapp.w4b)
+        const intentUrl = `intent://send?text=${encoded}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
+        try {
+            window.location.href = intentUrl;
+        } catch (e) {
+            window.location.href = `whatsapp://send?text=${encoded}`;
+        }
+    } else {
+        // iOS or Desktop
+        const waUrl = `whatsapp://send?text=${encoded}`;
+        window.open(waUrl, '_blank');
+    }
 };
 
 window.shareSelectedClientWhatsApp = function() {
