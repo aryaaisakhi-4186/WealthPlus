@@ -3501,6 +3501,113 @@ window.closeClientModal = function() {
     if (modal) modal.classList.remove('active');
 };
 
+window.openClientModal = function(editId = '') {
+    const modal = document.getElementById('modal-client');
+    if (!modal) return;
+
+    const form = document.getElementById('form-client');
+    if (form) form.reset();
+
+    const title = document.getElementById('modal-client-title');
+    const editIdInput = document.getElementById('edit-client-id');
+    const nameInput = document.getElementById('client-name');
+    const groupInput = document.getElementById('client-group');
+    const creditInput = document.getElementById('client-credit-amount');
+    const loanSourceSelect = document.getElementById('client-loan-source-account');
+    const loanDateInput = document.getElementById('client-loan-date');
+    const loanDateGroup = document.getElementById('client-loan-date-group');
+    const monthlyInput = document.getElementById('client-monthly-pay');
+    const yearlyInput = document.getElementById('client-yearly-pay');
+    const pendingYearSelect = document.getElementById('client-pending-year');
+    const openingBalanceInput = document.getElementById('client-opening-balance');
+    const customFieldsContainer = document.getElementById('client-modal-custom-fields-container');
+
+    // Populate loan source accounts dropdown
+    if (loanSourceSelect) {
+        loanSourceSelect.innerHTML = `<option value="">None / Past Old Due (No Cash/Bank deduction)</option>`;
+        (state.accounts || []).forEach(acc => {
+            loanSourceSelect.innerHTML += `<option value="${acc.name}">${acc.name} (${acc.type})</option>`;
+        });
+    }
+
+    // Render custom client fields
+    if (customFieldsContainer) {
+        customFieldsContainer.innerHTML = '';
+        (state.customClientFields || []).forEach(f => {
+            const div = document.createElement('div');
+            div.className = 'form-group';
+            div.innerHTML = `
+                <label for="custom-field-${f.name}">${f.name}</label>
+                <input type="${f.type === 'number' ? 'number' : 'text'}" id="custom-field-${f.name}" placeholder="Enter ${f.name}">
+            `;
+            customFieldsContainer.appendChild(div);
+        });
+    }
+
+    if (editId) {
+        const client = state.clients.find(c => c.id === editId);
+        if (client) {
+            if (title) title.innerText = 'Edit Party';
+            if (editIdInput) editIdInput.value = client.id;
+            if (nameInput) nameInput.value = client.name || '';
+            if (groupInput) groupInput.value = client.group || (isVendorParty(client) ? 'Vendor' : 'Client');
+            if (creditInput) creditInput.value = client.creditAmount || 0;
+            if (loanSourceSelect) loanSourceSelect.value = client.loanSourceAccount || '';
+            if (loanDateInput) loanDateInput.value = client.loanDate || '';
+            if (monthlyInput) monthlyInput.value = client.monthlyPay || '';
+            if (yearlyInput) yearlyInput.value = client.yearlyPay || (client.monthlyPay ? client.monthlyPay * 12 : '') || '';
+            if (pendingYearSelect) pendingYearSelect.value = client.pendingYear || '2026-2027';
+            if (openingBalanceInput) openingBalanceInput.value = client.openingBalance || 0;
+
+            // Custom fields
+            (state.customClientFields || []).forEach(f => {
+                const el = document.getElementById(`custom-field-${f.name}`);
+                if (el && client[f.name] !== undefined) {
+                    el.value = client[f.name];
+                }
+            });
+
+            // Contract breakdown items
+            if (client.contractItems && client.contractItems.length > 0) {
+                activeContractItems = JSON.parse(JSON.stringify(client.contractItems));
+            } else {
+                activeContractItems = [];
+                // If yearly/monthly exists without contract items, add default single row
+                if (client.yearlyPay > 0 || client.monthlyPay > 0) {
+                    activeContractItems.push({
+                        id: 'ci_' + Date.now(),
+                        particulars: 'Professional Services Retainer',
+                        period: 'FY ' + (client.pendingYear || '2026-2027'),
+                        months: 12,
+                        rate: client.monthlyPay || Math.round((client.yearlyPay || 0) / 12),
+                        amount: client.yearlyPay || (client.monthlyPay * 12)
+                    });
+                }
+            }
+        }
+    } else {
+        if (title) title.innerText = 'Add New Party';
+        if (editIdInput) editIdInput.value = '';
+        if (pendingYearSelect) pendingYearSelect.value = '2026-2027';
+        activeContractItems = [];
+    }
+
+    // Toggle loan date group visibility
+    const toggleLoanDate = () => {
+        if (loanDateGroup) {
+            const hasLoan = Number(creditInput?.value) > 0 && loanSourceSelect?.value !== '';
+            loanDateGroup.style.display = hasLoan ? 'block' : 'none';
+        }
+    };
+    if (creditInput) creditInput.oninput = toggleLoanDate;
+    if (loanSourceSelect) loanSourceSelect.onchange = toggleLoanDate;
+    toggleLoanDate();
+
+    renderContractItemsTable();
+    modal.classList.add('active');
+    if (window.lucide) lucide.createIcons();
+};
+
 function openClientModal(editId = '') {
     window.openClientModal(editId);
 }
