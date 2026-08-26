@@ -1685,6 +1685,9 @@ function renderClientsPage() {
                                 <i data-lucide="${isVendor ? 'truck' : 'user-check'}" style="width:12px; height:12px;"></i>
                                 ${isVendor ? 'Vendor' : 'Client'}
                             </span>
+                            <span class="preview-loan-tag" style="background: rgba(99, 102, 241, 0.12); color: #4f46e5; border: 1px solid rgba(99, 102, 241, 0.25); font-weight: 600;">
+                                📅 FY: ${client.pendingYear || '2026-2027'}
+                            </span>
                         </div>
                         <div class="party-card-summary-preview">
                             <span class="preview-receivable">
@@ -1700,6 +1703,10 @@ function renderClientsPage() {
                 </div>
                 <div class="client-card-body" style="display: none;">
                     <div class="client-stats">
+                        <div class="c-stat-row" style="background: rgba(99, 102, 241, 0.06); padding: 4px 8px; border-radius: 4px; margin: 3px 0; border: 1px solid rgba(99, 102, 241, 0.2); align-items: center;">
+                            <span class="c-stat-label" style="font-weight: 600; color: #4f46e5;">Pending Payment Year:</span>
+                            <span class="c-stat-val" style="font-weight: 700; color: #4f46e5;">📅 ${client.pendingYear || '2026-2027'}</span>
+                        </div>
                         ${contractInfoHTML}
                         <div class="c-stat-row">
                             <span class="c-stat-label">Opening Balance:</span>
@@ -2138,7 +2145,14 @@ function renderClientReportDetails(clientId) {
         `;
     }
 
+    const client = state.clients.find(c => c.id === clientId);
+    const pendingYear = client ? (client.pendingYear || '2026-2027') : '2026-2027';
+
     statsContainer.innerHTML = `
+        <div class="report-stat-card val-primary" style="border-left: 4px solid #6366f1;">
+            <h5>Financial Year</h5>
+            <span class="val" style="color: #4f46e5; font-size: 15px;">📅 ${pendingYear}</span>
+        </div>
         ${creditCardHTML}
         <div class="report-stat-card val-primary">
             <h5>Yearly Retainer</h5>
@@ -2639,6 +2653,11 @@ function renderMasterClients() {
             <td>
                 <span class="party-group-badge ${isVendor ? 'vendor' : 'client'}">
                     ${isVendor ? 'Vendor' : 'Client'}
+                </span>
+            </td>
+            <td>
+                <span class="badge" style="background: rgba(99, 102, 241, 0.12); color: #4f46e5; font-weight: 600; font-size: 11px; padding: 3px 7px; border-radius: 4px;">
+                    📅 ${client.pendingYear || '2026-2027'}
                 </span>
             </td>
             <td style="font-weight:600; color: ${creditAmt > 0 ? 'var(--primary)' : 'var(--text-muted)'};">${fC(creditAmt)}</td>
@@ -3307,6 +3326,7 @@ window.openClientModal = function(editId = '') {
     const loanDateGroup = document.getElementById('client-loan-date-group');
     const monthlyInp = document.getElementById('client-monthly-pay');
     const yearlyInp = document.getElementById('client-yearly-pay');
+    const pendingYearInp = document.getElementById('client-pending-year');
     const openingInp = document.getElementById('client-opening-balance');
     const groupInp = document.getElementById('client-group');
     const nameInp = document.getElementById('client-name');
@@ -3338,6 +3358,7 @@ window.openClientModal = function(editId = '') {
             const y = Number(client.yearlyPay) || (m * 12);
             if (monthlyInp) monthlyInp.value = m || '';
             if (yearlyInp) yearlyInp.value = y || '';
+            if (pendingYearInp) pendingYearInp.value = client.pendingYear || '2026-2027';
             if (openingInp) openingInp.value = client.openingBalance !== undefined ? client.openingBalance : 0;
             
             if (customContainer && state.customClientFields) {
@@ -3363,6 +3384,7 @@ window.openClientModal = function(editId = '') {
         if (loanDateGroup) loanDateGroup.style.display = 'none';
         if (monthlyInp) monthlyInp.value = '';
         if (yearlyInp) yearlyInp.value = '';
+        if (pendingYearInp) pendingYearInp.value = '2026-2027';
         if (openingInp) openingInp.value = '0';
         
         if (customContainer && state.customClientFields) {
@@ -3403,9 +3425,10 @@ function handleClientSubmit(e) {
     const loanDate = document.getElementById('client-loan-date')?.value || new Date().toISOString().split('T')[0];
     const monthlyPay = Number(document.getElementById('client-monthly-pay').value) || 0;
     const yearlyPay = Number(document.getElementById('client-yearly-pay').value) || (monthlyPay * 12);
+    const pendingYear = document.getElementById('client-pending-year')?.value || '2026-2027';
     const openingBalance = Number(document.getElementById('client-opening-balance').value) || 0;
 
-    let clientObj = { name, group, creditAmount, loanSourceAccount, loanDate, monthlyPay, yearlyPay, openingBalance };
+    let clientObj = { name, group, creditAmount, loanSourceAccount, loanDate, monthlyPay, yearlyPay, pendingYear, openingBalance };
 
     state.customClientFields.forEach(f => {
         const val = document.getElementById(`custom-field-${f.name}`).value;
@@ -4624,6 +4647,7 @@ function exportToExcel() {
         let rowObj = {
             "Party Name": client.name,
             "Party Group": isVendorParty(client) ? 'Vendor' : 'Client',
+            "Payment / Financial Year": client.pendingYear || '2026-2027',
             "Credit / Loan Amount (INR)": client.creditAmount || 0,
             "Monthly Retainer (INR)": client.monthlyPay || 0,
             "Yearly Retainer (INR)": stats.yearlyContract,
