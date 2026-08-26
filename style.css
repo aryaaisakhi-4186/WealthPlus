@@ -2239,28 +2239,153 @@ h1, h2, h3, h4, h5, h6 {
     /* Clients & Tables */
     .clients-grid {
         grid-template-columns: 1fr;
-        gap: 12px;
+        gap: 10px;
+        width: 100%;
+        box-sizing: border-box;
     }
-    .client-card { padding: 14px; }
+    .client-card {
+        padding: 12px 12px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow-x: hidden;
+    }
+    .client-card-header {
+        gap: 8px;
+        align-items: flex-start;
+    }
+    .party-card-name-row {
+        gap: 5px;
+    }
+    .party-card-name {
+        font-size: 14px;
+        word-break: break-word;
+    }
+    .party-card-summary-preview {
+        gap: 4px;
+        font-size: 11px;
+    }
+    .client-card-footer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        justify-content: flex-start;
+        align-items: center;
+        width: 100%;
+    }
+    .client-card-footer .btn {
+        flex: 1 1 calc(50% - 6px);
+        min-width: 95px;
+        font-size: 11px;
+        padding: 6px 6px;
+        justify-content: center;
+        box-sizing: border-box;
+    }
+    .client-card-footer .btn-icon-only {
+        flex: 0 0 auto;
+    }
+    
     .section-actions-header {
         flex-direction: column;
         align-items: stretch;
         gap: 10px;
     }
     .section-actions-header .btn { width: 100%; }
+
+    .party-filter-dropdown-wrapper > div:last-child {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+    .party-filter-dropdown-wrapper .searchable-input-wrapper {
+        min-width: 100% !important;
+        width: 100% !important;
+    }
+    .party-filter-dropdown-wrapper select,
+    .party-filter-dropdown-wrapper .party-category-select {
+        min-width: 100% !important;
+        width: 100% !important;
+    }
     
     /* Modals & Forms */
-    .modal-box {
-        width: calc(100% - 24px);
-        max-width: 480px;
-        padding: 16px;
-        margin: 12px auto;
-        max-height: 90vh;
+    .modal-overlay {
+        padding: 8px;
+        align-items: flex-start;
         overflow-y: auto;
+    }
+    .modal-box {
+        width: 100%;
+        max-width: 100%;
+        padding: 12px 14px;
+        margin: 8px auto;
+        max-height: 94vh;
+        overflow-y: auto;
+        box-sizing: border-box;
+        overflow-x: hidden;
+    }
+    .modal-header {
+        padding: 10px 0 12px 0;
+    }
+    .modal-form {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .form-group-row {
+        flex-direction: column;
+        gap: 0;
+    }
+    .form-group {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .contract-breakdown-box {
+        padding: 8px 10px;
+        margin-bottom: 12px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .contract-breakdown-box .table-responsive-wrapper {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        display: block;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+    }
+    .contract-item-input {
+        font-size: 11px !important;
+        padding: 5px 6px !important;
+        min-width: 0 !important;
+        height: auto !important;
+    }
+    .ci-particulars { min-width: 110px !important; }
+    .ci-period { min-width: 80px !important; }
+    .ci-months { width: 45px !important; }
+    .ci-rate { width: 65px !important; }
+    .ci-amount { width: 75px !important; }
+
+    /* Client Reports on Mobile */
+    #report-screen-client .report-filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    #report-screen-client .report-filter-bar select {
+        width: 100%;
+    }
+    #report-screen-client .report-filter-bar > div:last-child {
+        width: 100%;
+        display: flex;
+        gap: 8px;
+    }
+    #report-screen-client .report-filter-bar > div:last-child button {
+        flex: 1 1 50%;
+        justify-content: center;
     }
     
     /* Prevent Mobile Browser Auto-Zoom on form focus */
-    input, select, textarea {
+    input:not(.contract-item-input), select, textarea {
         font-size: 16px !important;
     }
     
