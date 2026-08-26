@@ -34,6 +34,7 @@ let state = {
     activeMasterTab: 'accounts',
     activeLoansTab: 'given',
     partyFilter: 'all',
+    partyFyFilter: 'all',
     selectedPeriod: 'financial-year',
     customStartDate: '',
     customEndDate: '',
@@ -1573,6 +1574,12 @@ function renderClientsPage() {
         dropdown.value = (filter === 'debtor') ? 'client' : (filter === 'creditor') ? 'vendor' : filter;
     }
 
+    const fyDropdown = document.getElementById('party-fy-dropdown');
+    const fyFilter = fyDropdown ? fyDropdown.value : (state.partyFyFilter || 'all');
+    if (fyDropdown) {
+        fyDropdown.value = fyFilter;
+    }
+
     const countBadge = document.getElementById('party-category-count-badge');
     if (countBadge) {
         if (filter === 'client' || filter === 'debtor') {
@@ -1584,11 +1591,16 @@ function renderClientsPage() {
         }
     }
 
-    let filteredClients = state.clients;
+    let filteredClients = [...state.clients];
     if (filter === 'client' || filter === 'debtor') {
-        filteredClients = state.clients.filter(isClientParty);
+        filteredClients = filteredClients.filter(isClientParty);
     } else if (filter === 'vendor' || filter === 'creditor') {
-        filteredClients = state.clients.filter(isVendorParty);
+        filteredClients = filteredClients.filter(isVendorParty);
+    }
+
+    // Filter by Financial Year (if not 'all')
+    if (fyFilter && fyFilter !== 'all') {
+        filteredClients = filteredClients.filter(c => (c.pendingYear || '2026-2027') === fyFilter);
     }
 
     // Apply Live Search Filter
@@ -1600,10 +1612,23 @@ function renderClientsPage() {
         });
     }
 
+    // Sort: Pending/Active clients (due balance > 0) come FIRST;
+    // Fully settled/paid clients (green cards / balance <= 0) move to the very LAST.
+    filteredClients.sort((a, b) => {
+        const statsA = getClientReportStats(a.id);
+        const statsB = getClientReportStats(b.id);
+        const settledA = statsA.balanceReceivable <= 0 ? 1 : 0;
+        const settledB = statsB.balanceReceivable <= 0 ? 1 : 0;
+        if (settledA !== settledB) {
+            return settledA - settledB; // 0 (pending) before 1 (fully settled)
+        }
+        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+
     if (filteredClients.length === 0) {
         const msg = searchQuery 
             ? `No parties found matching "${searchQuery}".` 
-            : (filter === 'client' || filter === 'debtor') ? 'No clients added yet.' : (filter === 'vendor' || filter === 'creditor') ? 'No vendors added yet.' : 'No parties added yet.';
+            : (filter === 'client' || filter === 'debtor') ? 'No clients added yet for this filter.' : (filter === 'vendor' || filter === 'creditor') ? 'No vendors added yet for this filter.' : 'No parties found for this filter.';
         container.innerHTML = `<div class="empty-state" style="grid-column:1/-1; padding:32px 16px; text-align:center;">${msg}</div>`;
     } else {
         filteredClients.forEach(client => {
@@ -3141,6 +3166,16 @@ function initEventHandlers() {
     if (partyCatDropdown) {
         partyCatDropdown.addEventListener('change', function() {
             state.partyFilter = this.value;
+            saveState();
+            renderClientsPage();
+        });
+    }
+
+    // Party Financial Year Filter Dropdown
+    const partyFyDropdown = document.getElementById('party-fy-dropdown');
+    if (partyFyDropdown) {
+        partyFyDropdown.addEventListener('change', function() {
+            state.partyFyFilter = this.value;
             saveState();
             renderClientsPage();
         });
@@ -5537,6 +5572,11 @@ document.addEventListener('DOMContentLoaded', () => {
         githubDeployBtn.addEventListener('click', deployAppToGitHub);
     }
 
+    const resetTxBtn = document.getElementById('btn-reset-transactions-now');
+    if (resetTxBtn) {
+        resetTxBtn.addEventListener('click', handleResetTransactionsClick);
+    }
+
     const resetAppBtn = document.getElementById('btn-reset-app-now');
     if (resetAppBtn) {
         resetAppBtn.addEventListener('click', handleResetAppClick);
@@ -5740,18 +5780,35 @@ async function uploadLocalDataToFirebase() {
     });
 }
 
-async function handleResetAppClick() {
-    if (!confirm("⚠️ WARNING: Are you sure you want to perform a full reset of the ledger and transactions? This will permanently delete all local and cloud expense entries and income logs. Member Directory, Settings, and GitHub configuration will remain untouched. This cannot be undone!")) {
+async function handleResetTransactionsClick() {
+    // Verify Admin rights
+    const currentUser = state.currentUser;
+    if (currentUser && currentUser.role === 'Staff') {
+        alert("🔒 Access Denied: Only Admin can reset transactions.");
         return;
     }
 
-    const resetBtn = document.getElementById('btn-reset-app-now');
+    const adminMember = (state.members || []).find(m => m.role === 'Admin') || { pin: ADMIN_PIN };
+    const enteredPin = prompt("⚠️ ADMIN CONFIRMATION REQUIRED\n\nEnter your Admin PIN to confirm deleting all amount transactions (Expenses, Client Payments & Loans):");
+    
+    if (enteredPin === null) return;
+    if (enteredPin !== adminMember.pin && enteredPin !== ADMIN_PIN) {
+        alert("❌ Incorrect Admin PIN! Transaction reset cancelled.");
+        return;
+    }
 
-    if (state.cloudSyncEnabled && firebaseDb) {
-        try {
-            resetBtn.disabled = true;
-            resetBtn.innerText = "Clearing Cloud Ledger...";
+    if (!confirm("⚠️ FINAL WARNING:\n\nAre you sure you want to delete ALL amount transactions?\n\n• All Expenses, Client Payment Receipts, and Loans will be deleted.\n• All Client Profiles, Contracts, Expense Categories, Budgets, Bank Accounts, and Member Logins will stay 100% safe.\n\nProceed?")) {
+        return;
+    }
 
+    const resetBtn = document.getElementById('btn-reset-transactions-now');
+    if (resetBtn) {
+        resetBtn.disabled = true;
+        resetBtn.innerText = "Clearing Transactions...";
+    }
+
+    try {
+        if (state.cloudSyncEnabled && firebaseDb) {
             // Wipe transactions from Firestore
             const txSnapshot = await firebaseDb.collection('transactions').get();
             for (const doc of txSnapshot.docs) {
@@ -5764,23 +5821,95 @@ async function handleResetAppClick() {
                 await doc.ref.delete();
             }
 
-            alert("Cloud database transactions and income logs cleared successfully!");
+            // Wipe loans from Firestore
+            const loansSnapshot = await firebaseDb.collection('loans').get();
+            for (const doc of loansSnapshot.docs) {
+                await doc.ref.delete();
+            }
+        }
+
+        // Reset local amount-based records
+        state.transactions = [];
+        state.incomeLogs = [];
+        state.loans = [];
+        
+        // Save state locally
+        saveState();
+        
+        alert("✅ All amount transactions have been successfully reset!\n\nAll Client Profiles, Contracts, Categories, Budgets, and Settings remain safely preserved.");
+        window.location.reload();
+    } catch (e) {
+        console.error("Transaction reset error:", e);
+        alert("Error resetting transactions: " + e.message);
+    } finally {
+        if (resetBtn) {
+            resetBtn.disabled = false;
+            resetBtn.innerHTML = '<i data-lucide="refresh-cw"></i> Reset All Transactions (Admin Only)';
+            if (window.lucide) lucide.createIcons();
+        }
+    }
+}
+
+async function handleResetAppClick() {
+    // Verify Admin rights
+    const currentUser = state.currentUser;
+    if (currentUser && currentUser.role === 'Staff') {
+        alert("🔒 Access Denied: Only Admin can perform a factory reset.");
+        return;
+    }
+
+    const adminMember = (state.members || []).find(m => m.role === 'Admin') || { pin: ADMIN_PIN };
+    const enteredPin = prompt("⚠️ FACTORY RESET - ADMIN CONFIRMATION REQUIRED\n\nEnter your Admin PIN to confirm complete application factory reset:");
+    
+    if (enteredPin === null) return;
+    if (enteredPin !== adminMember.pin && enteredPin !== ADMIN_PIN) {
+        alert("❌ Incorrect Admin PIN! Factory reset cancelled.");
+        return;
+    }
+
+    if (!confirm("⚠️ FINAL WARNING: Are you sure you want to perform a complete factory reset? This will wipe EVERYTHING (all clients, accounts, transactions, and categories). This cannot be undone!")) {
+        return;
+    }
+
+    const resetBtn = document.getElementById('btn-reset-app-now');
+    if (resetBtn) {
+        resetBtn.disabled = true;
+        resetBtn.innerText = "Clearing All Data...";
+    }
+
+    if (state.cloudSyncEnabled && firebaseDb) {
+        try {
+            // Wipe transactions from Firestore
+            const txSnapshot = await firebaseDb.collection('transactions').get();
+            for (const doc of txSnapshot.docs) await doc.ref.delete();
+
+            // Wipe income logs from Firestore
+            const incomeSnapshot = await firebaseDb.collection('incomeLogs').get();
+            for (const doc of incomeSnapshot.docs) await doc.ref.delete();
+
+            // Wipe loans from Firestore
+            const loansSnapshot = await firebaseDb.collection('loans').get();
+            for (const doc of loansSnapshot.docs) await doc.ref.delete();
+
+            // Wipe clients from Firestore
+            const clientSnapshot = await firebaseDb.collection('clients').get();
+            for (const doc of clientSnapshot.docs) await doc.ref.delete();
+
+            alert("Cloud database records cleared successfully!");
         } catch (e) {
             console.error("Cloud reset error:", e);
             alert("Error clearing cloud database: " + e.message);
-        } finally {
-            resetBtn.disabled = false;
-            resetBtn.innerText = "Reset Application Now";
         }
     }
 
-    // Reset local data arrays for ledger
+    // Reset local state
     state.transactions = [];
     state.incomeLogs = [];
+    state.loans = [];
+    state.clients = defaultClients;
+    state.accounts = defaultAccounts;
     
-    // Save state
     saveState();
-    
-    alert("Local ledger data reset successfully! Reloading page...");
+    alert("Application data reset successfully! Reloading page...");
     window.location.reload();
 }

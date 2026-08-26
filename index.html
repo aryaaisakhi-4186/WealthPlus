@@ -25,7 +25,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=6.5.8">
+    <link rel="stylesheet" href="style.css?v=6.5.9">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -280,11 +280,24 @@
                                     <i data-lucide="x" style="width: 14px; height: 14px;"></i>
                                 </button>
                             </div>
-                            <div style="min-width: 180px; flex-shrink: 0;">
+                            <div style="min-width: 160px; flex-shrink: 0;">
                                 <select id="party-category-dropdown" class="party-category-select" style="width: 100%; padding: 9px 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-weight: 600; font-size: 13px;">
-                                    <option value="all">📁 All Parties (Complete List)</option>
-                                    <option value="client">🏢 Clients (Debtors — Receivables)</option>
-                                    <option value="vendor">🏭 Vendors (Creditors — Payables)</option>
+                                    <option value="all">📁 All Groups</option>
+                                    <option value="client">🏢 Clients (Receivables)</option>
+                                    <option value="vendor">🏭 Vendors (Payables)</option>
+                                </select>
+                            </div>
+                            <div style="min-width: 160px; flex-shrink: 0;">
+                                <select id="party-fy-dropdown" class="party-category-select" style="width: 100%; padding: 9px 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-weight: 600; font-size: 13px;">
+                                    <option value="all">📅 All Financial Years</option>
+                                    <option value="2026-2027">FY 2026-2027 (Current)</option>
+                                    <option value="2027-2028">FY 2027-2028 (Next Year)</option>
+                                    <option value="2028-2029">FY 2028-2029</option>
+                                    <option value="2029-2030">FY 2029-2030</option>
+                                    <option value="2025-2026">FY 2025-2026</option>
+                                    <option value="2024-2025">FY 2024-2025</option>
+                                    <option value="2023-2024">FY 2023-2024</option>
+                                    <option value="Old Past Dues">Old Past Dues</option>
                                 </select>
                             </div>
                         </div>
@@ -1117,30 +1130,57 @@
                             </div>
                         </div>
 
-                        <!-- Panel H: Reset App -->
+                        <!-- Panel H: Reset Options -->
                         <div id="master-panel-reset-app" class="master-sub-panel">
                             <div class="panel-action-header">
-                                <h4>Reset Application Data</h4>
-                                <p style="font-size:12px; color:var(--text-secondary);">Perform a full reset of the application. This action cannot be undone.</p>
+                                <h4>Reset Application & Transactions</h4>
+                                <p style="font-size:12px; color:var(--text-secondary);">Manage data clearing and transaction reset with Admin authorization.</p>
                             </div>
                             
-                            <div class="card" style="padding: 24px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color); max-width: 600px; margin-top: 15px;">
-                                <div style="display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px;">
-                                    <div style="background: rgba(225, 29, 72, 0.1); color: var(--danger); padding: 12px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <!-- Option 1: Reset Transactions Only (Preserve Profiles & Setup) -->
+                            <div class="card" style="padding: 24px; background: var(--bg-secondary); border-radius: 8px; border: 1.5px solid rgba(245, 158, 11, 0.4); max-width: 650px; margin-top: 15px; margin-bottom: 20px;">
+                                <div style="display: flex; align-items: flex-start; gap: 16px; margin-bottom: 16px;">
+                                    <div style="background: rgba(245, 158, 11, 0.12); color: #d97706; padding: 12px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink:0;">
+                                        <i data-lucide="refresh-cw" style="width: 28px; height: 28px;"></i>
+                                    </div>
+                                    <div>
+                                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                                            <h5 style="margin: 0; color: var(--text-primary); font-size: 16px; font-weight: 700;">Reset Transactions & Vouchers Only</h5>
+                                            <span class="badge" style="font-size:10px; font-weight:700; background:rgba(245, 158, 11, 0.15); color:#d97706; border:1px solid rgba(245, 158, 11, 0.3);">Admin Protected</span>
+                                        </div>
+                                        <p style="font-size: 13px; margin: 0; line-height: 1.5; color: var(--text-secondary);">
+                                            Permanently deletes all financial transaction entries, expenses, payment receipts (income logs), and loan entries.
+                                        </p>
+                                        <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 12px; margin-top: 10px; font-size: 12px; color: var(--text-primary);">
+                                            <strong style="color: #10b981;">✔ Safely Preserved:</strong> Client/Party Profiles, Contract Itemization, Expense Categories & Monthly Budgets, Cash/Bank Account Names, and Member Credentials.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button type="button" class="btn btn-warning" id="btn-reset-transactions-now" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; font-weight: 700; font-size: 13px; background: #d97706; color: #ffffff; border: none; border-radius: var(--radius-sm); cursor: pointer;">
+                                    <i data-lucide="refresh-cw" style="width:16px; height:16px;"></i> Reset All Transactions (Admin Only)
+                                </button>
+                            </div>
+
+                            <!-- Option 2: Full Application Reset -->
+                            <div class="card" style="padding: 24px; background: var(--bg-secondary); border-radius: 8px; border: 1.5px solid rgba(225, 29, 72, 0.3); max-width: 650px;">
+                                <div style="display: flex; align-items: flex-start; gap: 16px; margin-bottom: 16px;">
+                                    <div style="background: rgba(225, 29, 72, 0.1); color: var(--danger); padding: 12px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink:0;">
                                         <i data-lucide="alert-triangle" style="width: 28px; height: 28px;"></i>
                                     </div>
                                     <div>
-                                        <h5 style="margin-top: 0; margin-bottom: 8px; color: var(--danger); font-size: 15px; font-weight: 700;">Reset Ledger Data Only</h5>
+                                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                                            <h5 style="margin: 0; color: var(--danger); font-size: 16px; font-weight: 700;">Full Factory Reset (Complete App Wipe)</h5>
+                                            <span class="badge" style="font-size:10px; font-weight:700; background:rgba(225, 29, 72, 0.15); color:var(--danger); border:1px solid rgba(225, 29, 72, 0.3);">High Risk</span>
+                                        </div>
                                         <p style="font-size: 13px; margin: 0; line-height: 1.5; color: var(--text-secondary);">
-                                            This will permanently delete all transaction entries (expenses) and income logs from both your browser and the cloud (if sync is enabled). Your Member Directory, budgets, clients, Firebase credentials, and GitHub tokens will remain untouched.
+                                            Completely resets the entire application back to initial state. Deletes all clients, accounts, categories, and logs from both browser storage and cloud database.
                                         </p>
                                     </div>
                                 </div>
 
-
-
-                                <button type="button" class="btn btn-danger" id="btn-reset-app-now" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: 600;">
-                                    <i data-lucide="trash-2"></i> Reset Application Now
+                                <button type="button" class="btn btn-danger" id="btn-reset-app-now" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; font-weight: 700; font-size: 13px;">
+                                    <i data-lucide="trash-2" style="width:16px; height:16px;"></i> Factory Reset Everything
                                 </button>
                             </div>
                         </div>
@@ -1319,17 +1359,20 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="client-pending-year">Payment / Financial Year</label>
+                    <label for="client-pending-year">Payment / Financial Year *</label>
                     <select id="client-pending-year" style="font-weight: 600; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); width: 100%;">
                         <option value="2026-2027">FY 2026-2027 (Current Year)</option>
+                        <option value="2027-2028">FY 2027-2028 (Next Year)</option>
+                        <option value="2028-2029">FY 2028-2029</option>
+                        <option value="2029-2030">FY 2029-2030</option>
+                        <option value="2030-2031">FY 2030-2031</option>
                         <option value="2025-2026">FY 2025-2026</option>
                         <option value="2024-2025">FY 2024-2025</option>
                         <option value="2023-2024">FY 2023-2024</option>
                         <option value="2022-2023">FY 2022-2023</option>
-                        <option value="2027-2028">FY 2027-2028</option>
                         <option value="Old Past Dues">Old Past Dues</option>
                     </select>
-                    <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Select which financial year this party's pending contract / due belongs to.</span>
+                    <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Select which financial year this party contract / due belongs to. New clients for upcoming years can be set up easily.</span>
                 </div>
                 <div class="form-group">
                     <label for="client-opening-balance">Opening Balance (₹) (Initial Due / Advance)</label>
@@ -1725,9 +1768,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.5.8"></script>
-    <script src="app.js?v=6.5.8"></script>
-    <script src="sindhu_v1.js?v=6.5.8"></script>
+    <script src="firebase-config.js?v=6.5.9"></script>
+    <script src="app.js?v=6.5.9"></script>
+    <script src="sindhu_v1.js?v=6.5.9"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">
