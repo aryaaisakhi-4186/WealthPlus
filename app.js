@@ -869,7 +869,7 @@ function getAccountLedger(accountId) {
             ledger.push({
                 date: log.date,
                 particulars: `Received from ${client ? client.name : 'Unknown Party'}`,
-                category: 'Inflow (Credit / जमा)',
+                category: 'Inflow (Credit)',
                 credit: Number(log.amount),
                 debit: 0,
                 timestamp: new Date(log.date).getTime()
@@ -901,7 +901,7 @@ function getAccountLedger(accountId) {
         }
     });
 
-    // Filter Multi-Entry Loans & Udhaar (Given / Taken)
+    // Filter Multi-Entry Loans (Given / Taken)
     (state.loans || []).forEach(loan => {
         if (loan.account === account.name) {
             const client = state.clients.find(c => c.id === loan.clientId);
@@ -909,26 +909,26 @@ function getAccountLedger(accountId) {
             const remarkSuffix = loan.remark ? ` (${loan.remark})` : '';
 
             if (loan.type === 'given') {
-                // Outflow / Withdrawn to give loan -> DEBIT (निकासी)
+                // Outflow / Withdrawn to give loan -> DEBIT
                 ledger.push({
                     id: loan.id,
                     loanId: loan.id,
                     date: loan.date,
                     particulars: `Loan given to ${partyName}${remarkSuffix}`,
-                    category: 'Loan Disbursement (Debit / निकासी)',
+                    category: 'Loan Disbursement (Debit)',
                     credit: 0,
                     debit: Number(loan.amount),
                     timestamp: new Date(loan.date).getTime(),
                     isLoan: true
                 });
             } else if (loan.type === 'taken') {
-                // Inflow / Deposited from borrowed loan -> CREDIT (जमा)
+                // Inflow / Deposited from borrowed loan -> CREDIT
                 ledger.push({
                     id: loan.id,
                     loanId: loan.id,
                     date: loan.date,
                     particulars: `Loan taken from ${partyName}${remarkSuffix}`,
-                    category: 'Loan Borrowed (Credit / जमा)',
+                    category: 'Loan Borrowed (Credit)',
                     credit: Number(loan.amount),
                     debit: 0,
                     timestamp: new Date(loan.date).getTime(),
@@ -945,7 +945,7 @@ function getAccountLedger(accountId) {
         const remarkSuffix = tr.remark ? ` (${tr.remark})` : '';
 
         if (isOutflow) {
-            // Money transferred OUT (Withdrawn) -> DEBIT (निकासी)
+            // Money transferred OUT (Withdrawn) -> DEBIT
             ledger.push({
                 id: tr.id,
                 transferId: tr.id,
@@ -958,7 +958,7 @@ function getAccountLedger(accountId) {
                 isTransfer: true
             });
         } else if (isInflow) {
-            // Money transferred IN (Deposited) -> CREDIT (जमा)
+            // Money transferred IN (Deposited) -> CREDIT
             ledger.push({
                 id: tr.id,
                 transferId: tr.id,
@@ -1384,7 +1384,7 @@ function renderDashboard() {
                 <div class="progress-bar-fill" style="width: ${Math.min(pct, 100)}%; background-color: ${isOverspent ? 'var(--danger)' : 'var(--primary)'};"></div>
             </div>
             <div class="progress-item-footer">
-                <span class="variance-lbl">${isOverspent ? 'Extra Kharch:' : 'Bacha Hai:'}</span>
+                <span class="variance-lbl">${isOverspent ? 'Overspent:' : 'Remaining:'}</span>
                 <span class="variance-val" style="color: ${isOverspent ? 'var(--danger)' : 'var(--success)'};">${fC(Math.abs(variance))} (${Math.round(pct)}%)</span>
             </div>
         `;
@@ -1642,7 +1642,7 @@ function renderClientsPage() {
             if (stats.loansGiven > 0) {
                 contractInfoHTML += `
                     <div class="c-stat-row" style="background: rgba(13, 148, 136, 0.08); padding: 5px 8px; border-radius: 4px; margin: 3px 0; border: 1px solid rgba(13, 148, 136, 0.2); align-items: center;">
-                        <span class="c-stat-label" style="font-weight: 700; color: var(--primary);">Total Loans / Udhaar Given:</span>
+                        <span class="c-stat-label" style="font-weight: 700; color: var(--primary);">Total Loans Given:</span>
                         <span class="c-stat-val" style="font-weight: 700; color: var(--primary);">${fC(stats.loansGiven)}</span>
                     </div>
                     ${loanItemizedHTML}
@@ -1706,7 +1706,7 @@ function renderClientsPage() {
                             </span>
                             ${isCompleted ? `
                                 <span class="settled-badge" title="Full payment received">
-                                    <i data-lucide="check-circle" style="width:11px; height:11px;"></i> Full Paid (चुकता)
+                                    <i data-lucide="check-circle" style="width:11px; height:11px;"></i> Fully Settled
                                 </span>
                             ` : ''}
                             <span class="preview-loan-tag" style="background: rgba(99, 102, 241, 0.12); color: #4f46e5; border: 1px solid rgba(99, 102, 241, 0.25); font-weight: 600;">
@@ -2362,7 +2362,7 @@ function renderBudgetAnalysisReport() {
             <td class="text-right" style="color:var(--danger); font-weight:600;">${isOverspent ? fC(Math.abs(variance)) : '-'}</td>
             <td>
                 <span class="badge" style="background: ${isOverspent ? 'var(--danger-glow); color:var(--danger)' : 'var(--success-glow); color:var(--success)'}; font-size:11px; font-weight:600; padding:4px 10px; border-radius:10px;">
-                    ${isOverspent ? 'Extra Kharch' : 'Bacha Hai'}
+                    ${isOverspent ? 'Overspent' : 'Remaining'}
                 </span>
             </td>
         `;
@@ -3609,11 +3609,11 @@ window.generateClientStatementPDF = function(clientId) {
         `;
     });
 
-    // 2. Loans / Udhaar rows (if any)
+    // 2. Loans / Credit rows (if any)
     let loansRowsHTML = '';
     if (stats.loansList && stats.loansList.length > 0) {
         loansRowsHTML = `
-            <h4 style="margin: 18px 0 8px 0; color:#0f766e; border-bottom: 2px solid #0f766e; padding-bottom: 4px; font-size:14px;">Loans & Udhaar Record (उधार खाता विवरण)</h4>
+            <h4 style="margin: 18px 0 8px 0; color:#0f766e; border-bottom: 2px solid #0f766e; padding-bottom: 4px; font-size:14px;">Loans & Credit Record</h4>
             <table style="width:100%; border-collapse:collapse; margin-bottom:15px;">
                 <thead>
                     <tr style="background:#f0fdfa; color:#0f766e;">
@@ -3627,7 +3627,7 @@ window.generateClientStatementPDF = function(clientId) {
                     ${stats.loansList.map(l => `
                         <tr>
                             <td style="border:1px solid #cbd5e1; padding:6px 8px;">${formatDbDate(l.date)}</td>
-                            <td style="border:1px solid #cbd5e1; padding:6px 8px;"><strong>${l.type === 'given' ? 'Loan Given (उधार दिया)' : 'Loan Taken (उधार लिया)'}</strong>${l.remark ? ' — ' + l.remark : ''}</td>
+                            <td style="border:1px solid #cbd5e1; padding:6px 8px;"><strong>${l.type === 'given' ? 'Loan Given' : 'Loan Taken'}</strong>${l.remark ? ' — ' + l.remark : ''}</td>
                             <td style="border:1px solid #cbd5e1; padding:6px 8px;">${l.account || 'Direct'}</td>
                             <td style="border:1px solid #cbd5e1; padding:6px 8px; text-align:right; font-weight:700; color:#0f766e;">${fC(l.amount)}</td>
                         </tr>
@@ -3696,14 +3696,14 @@ window.generateClientStatementPDF = function(clientId) {
 
             <!-- Section 1: Services / Contract Retainer Breakdown Table -->
             <h4 style="margin:15px 0 8px 0; color:#0f766e; border-bottom:2px solid #0f766e; padding-bottom:4px; font-size:14px;">
-                1. Services & Contract Retainer Breakdown (सेवा विवरण एवं दर)
+                1. Services & Contract Retainer Breakdown
             </h4>
             <table style="width:100%; border-collapse:collapse; margin-bottom:15px;">
                 <thead>
                     <tr style="background:#f1f5f9; color:#0f172a; font-size:11px;">
                         <th style="border:1px solid #cbd5e1; padding:7px 8px; width:35px; text-align:center;">#</th>
-                        <th style="border:1px solid #cbd5e1; padding:7px 8px; text-align:left;">Particulars (विवरण)</th>
-                        <th style="border:1px solid #cbd5e1; padding:7px 8px; text-align:left; width:120px;">Period (अवधि)</th>
+                        <th style="border:1px solid #cbd5e1; padding:7px 8px; text-align:left;">Particulars</th>
+                        <th style="border:1px solid #cbd5e1; padding:7px 8px; text-align:left; width:120px;">Period</th>
                         <th style="border:1px solid #cbd5e1; padding:7px 8px; width:60px; text-align:center;">Months</th>
                         <th style="border:1px solid #cbd5e1; padding:7px 8px; width:90px; text-align:right;">Rate (₹)</th>
                         <th style="border:1px solid #cbd5e1; padding:7px 8px; width:100px; text-align:right;">Amount (₹)</th>
@@ -3724,7 +3724,7 @@ window.generateClientStatementPDF = function(clientId) {
 
             <!-- Section 2: Payments Received & Discount Logs Table -->
             <h4 style="margin:18px 0 8px 0; color:#0f766e; border-bottom:2px solid #0f766e; padding-bottom:4px; font-size:14px;">
-                2. Payments Received & Settlement Log (प्राप्त भुगतान का विवरण)
+                2. Payments Received & Settlement Log
             </h4>
             <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
                 <thead>
@@ -4563,7 +4563,7 @@ window.openLoanModal = function(presetType = 'given', presetPartyId = '', editId
             }
         }
     } else {
-        title.innerHTML = `<i data-lucide="hand-coins" style="width:20px; height:20px; color:var(--primary);"></i> Add Loan / Udhaar Entry`;
+        title.innerHTML = `<i data-lucide="hand-coins" style="width:20px; height:20px; color:var(--primary);"></i> Add Loan / Credit Entry`;
         setLoanTypePreset(presetType);
         if (presetPartyId) {
             const matchedClient = state.clients.find(c => c.id === presetPartyId);
@@ -4920,7 +4920,7 @@ function renderLoansPage() {
                     <td style="font-weight:600;">${partyName}</td>
                     <td>
                         <span class="badge-transfer-type ${isGiven ? 'cash-to-bank' : 'bank-to-cash'}" style="font-size:11px; padding:2px 8px;">
-                            ${isGiven ? '💵 Loan Given (उधार दिया)' : '🏦 Loan Taken (उधार लिया)'}
+                            ${isGiven ? '💵 Loan Given' : '🏦 Loan Taken'}
                         </span>
                     </td>
                     <td><span class="badge-acctype">${loan.account || '-'}</span></td>
@@ -5116,7 +5116,7 @@ function exportToExcel() {
             "Actual Spent (INR)": actualSpent,
             "Savings Remaining (INR)": variance >= 0 ? variance : 0,
             "Overspent Variance (INR)": variance < 0 ? Math.abs(variance) : 0,
-            "Status": variance >= 0 ? "Bacha Hai" : "Extra Kharch"
+            "Status": variance >= 0 ? "Surplus / Saved" : "Overspent"
         };
     });
 
@@ -5134,7 +5134,7 @@ function exportToExcel() {
         return {
             "Date": formatDbDate(loan.date),
             "Party Name": client ? client.name : 'Unknown Party',
-            "Loan Direction": loan.type === 'given' ? 'Loan Given (उधार दिया)' : 'Loan Taken (उधार लिया)',
+            "Loan Direction": loan.type === 'given' ? 'Loan Given' : 'Loan Taken',
             "Account": loan.account || '',
             "Loan Amount (INR)": loan.amount,
             "Remark / Purpose": loan.remark || ''
@@ -5168,7 +5168,7 @@ function exportToExcel() {
 
     addSheet(clientsData, "Clients Overview");
     if (contractsData.length > 0) addSheet(contractsData, "Contract Breakdown");
-    addSheet(loansData, "Loans & Udhaar");
+    addSheet(loansData, "Loans & Credit");
     addSheet(incomeData, "Received Income Logs");
     addSheet(expensesData, "Expenses Ledger");
     addSheet(transfersData, "Internal Transfers");
