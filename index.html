@@ -25,7 +25,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=6.6.1">
+    <link rel="stylesheet" href="style.css?v=6.6.2">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -421,12 +421,12 @@
                     </div>
 
                     <!-- Loans Search Filter Bar -->
-                    <div class="party-filter-dropdown-wrapper" style="margin-bottom: 16px;">
-                        <div class="searchable-input-wrapper" style="position: relative;">
-                            <i data-lucide="search" class="search-input-icon" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted);"></i>
-                            <input type="text" id="loan-search-input" class="searchable-input" placeholder="🔍 Search loan by party name, remark, amount..." autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 9px 36px 9px 36px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 13px;">
-                            <button type="button" class="btn-clear-search" id="btn-clear-loan-search" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;" title="Clear search">
-                                <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                    <div class="party-filter-dropdown-wrapper" style="margin-bottom: 14px; padding: 10px 12px;">
+                        <div class="searchable-input-wrapper" style="position: relative; width: 100%;">
+                            <i data-lucide="search" class="search-input-icon" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-muted); pointer-events: none;"></i>
+                            <input type="text" id="loan-search-input" class="searchable-input" placeholder="🔍 Search loan by party name, remark, amount..." autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 0 28px 0 30px !important; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 12px; height: 34px; outline: none; margin: 0;">
+                            <button type="button" class="btn-clear-search" id="btn-clear-loan-search" style="display: none; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;" title="Clear search">
+                                <i data-lucide="x" style="width: 12px; height: 12px;"></i>
                             </button>
                         </div>
                     </div>
@@ -481,24 +481,24 @@
                     </div>
 
                     <!-- Expense Search & Category Filter Bar -->
-                    <div class="party-filter-dropdown-wrapper" style="margin-bottom: 16px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-                            <label style="font-size: 13px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
-                                <i data-lucide="tags" style="width: 16px; height: 16px; color: var(--primary);"></i>
+                    <div class="party-filter-dropdown-wrapper" style="margin-bottom: 14px; padding: 10px 12px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+                            <label style="font-size: 12px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 5px;">
+                                <i data-lucide="tags" style="width: 14px; height: 14px; color: var(--primary);"></i>
                                 Expense Categories:
                             </label>
-                            <span id="expense-total-badge" class="badge" style="font-size: 12px; padding: 4px 10px;">Total: ₹0 (0 Entries)</span>
+                            <span id="expense-total-badge" class="badge" style="font-size: 11px; padding: 2px 8px;">Total: ₹0 (0 Entries)</span>
                         </div>
-                        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; width: 100%;">
-                            <div class="searchable-input-wrapper" style="flex: 1 1 200px; min-width: 150px; position: relative;">
-                                <i data-lucide="search" class="search-input-icon" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted);"></i>
-                                <input type="text" id="expense-search-input" class="searchable-input" placeholder="🔍 Search expenses..." autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 9px 36px 9px 36px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 13px;">
-                                <button type="button" class="btn-clear-search" id="btn-clear-expense-search" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;" title="Clear search">
-                                    <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                        <div class="filter-controls-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
+                            <div class="searchable-input-wrapper" style="position: relative; width: 100%;">
+                                <i data-lucide="search" class="search-input-icon" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-muted); pointer-events: none;"></i>
+                                <input type="text" id="expense-search-input" class="searchable-input" placeholder="🔍 Search expenses..." autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 0 28px 0 30px !important; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 12px; height: 34px; outline: none; margin: 0;">
+                                <button type="button" class="btn-clear-search" id="btn-clear-expense-search" style="display: none; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;" title="Clear search">
+                                    <i data-lucide="x" style="width: 12px; height: 12px;"></i>
                                 </button>
                             </div>
-                            <div style="flex: 1 1 150px; min-width: 140px;">
-                                <select id="expense-category-filter-select" class="party-category-select" style="width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-weight: 600; font-size: 13px;">
+                            <div style="width: 100%;">
+                                <select id="expense-category-filter-select" class="party-category-select" style="width: 100%; box-sizing: border-box; padding: 0 8px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-weight: 600; font-size: 12px; height: 34px; outline: none; margin: 0;">
                                     <option value="all">📁 All Categories</option>
                                     <!-- Populated dynamically -->
                                 </select>
@@ -1770,9 +1770,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.6.1"></script>
-    <script src="app.js?v=6.6.1"></script>
-    <script src="sindhu_v1.js?v=6.6.1"></script>
+    <script src="firebase-config.js?v=6.6.2"></script>
+    <script src="app.js?v=6.6.2"></script>
+    <script src="sindhu_v1.js?v=6.6.2"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

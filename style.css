@@ -2293,19 +2293,14 @@ h1, h2, h3, h4, h5, h6 {
     }
     .section-actions-header .btn { width: 100%; }
 
-    .party-filter-dropdown-wrapper > div:last-child {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 8px;
+    .party-filter-dropdown-wrapper {
+        padding: 8px 10px;
+        margin-bottom: 12px;
     }
-    .party-filter-dropdown-wrapper .searchable-input-wrapper {
-        min-width: 100% !important;
-        width: 100% !important;
-    }
-    .party-filter-dropdown-wrapper select,
-    .party-filter-dropdown-wrapper .party-category-select {
-        min-width: 100% !important;
-        width: 100% !important;
+    .filter-controls-grid-2,
+    .party-filter-dropdowns-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 6px !important;
     }
     
     /* Modals & Forms */
@@ -3000,33 +2995,35 @@ h1, h2, h3, h4, h5, h6 {
 
 .searchable-input-wrapper .search-input-icon {
     position: absolute;
-    left: 12px;
-    width: 16px;
-    height: 16px;
+    left: 10px;
+    width: 14px;
+    height: 14px;
     color: var(--text-muted);
     pointer-events: none;
 }
 
 .searchable-input-wrapper input.searchable-input {
     width: 100%;
-    padding: 10px 36px 10px 36px !important;
+    height: 34px;
+    padding: 0 28px 0 30px !important;
     background: var(--bg-primary);
-    border: 1px solid var(--border-color);
+    border: 1.5px solid var(--border-color);
     border-radius: var(--radius-sm);
     color: var(--text-primary);
-    font-size: 14px;
+    font-size: 12px;
+    box-sizing: border-box;
     transition: var(--transition);
 }
 
 .searchable-input-wrapper input.searchable-input:focus {
     border-color: var(--primary);
     outline: none;
-    box-shadow: 0 0 0 3px var(--primary-glow);
+    box-shadow: 0 0 0 2px var(--primary-glow);
 }
 
 .searchable-input-wrapper .btn-clear-search {
     position: absolute;
-    right: 8px;
+    right: 6px;
     background: none;
     border: none;
     color: var(--text-muted);
@@ -3041,6 +3038,16 @@ h1, h2, h3, h4, h5, h6 {
 .searchable-input-wrapper .btn-clear-search:hover {
     color: var(--danger);
     background: rgba(239, 68, 68, 0.1);
+}
+
+.filter-controls-grid-2,
+.party-filter-dropdowns-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+    align-items: center;
+    box-sizing: border-box;
 }
 
 .searchable-dropdown-menu {
