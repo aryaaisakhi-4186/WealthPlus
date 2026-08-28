@@ -1968,20 +1968,7 @@ function renderInvestmentsPage() {
     const searchQuery = (searchInput ? searchInput.value : '').trim().toLowerCase();
     const catSelect = document.getElementById('investment-category-filter-select');
     const selectedCategory = catSelect ? catSelect.value : 'all';
-    const accFilterSelect = document.getElementById('investment-account-filter-select');
     const statusFilter = state.activeInvestmentStatus || 'all';
-
-    // Populate Account Filter Select
-    if (accFilterSelect) {
-        const currentAccVal = accFilterSelect.value || 'all';
-        let accOpts = `<option value="all">🏦 All Source Accounts</option>`;
-        (state.accounts || []).forEach(a => {
-            accOpts += `<option value="${a.name}">${a.name} (${a.type})</option>`;
-        });
-        accFilterSelect.innerHTML = accOpts;
-        accFilterSelect.value = currentAccVal;
-    }
-    const selectedAccount = accFilterSelect ? accFilterSelect.value : 'all';
 
     // 1. Calculate Portfolio KPIs
     let grossInvested = 0;
@@ -2009,79 +1996,11 @@ function renderInvestmentsPage() {
     if (elNetActive) elNetActive.innerText = fC(netActive);
     if (elCount) elCount.innerText = activeHoldingsCount;
 
-    // 2. Render Account Allocation Breakdown Matrix
-    const allocationGrid = document.getElementById('investments-account-allocation-grid');
-    if (allocationGrid) {
-        allocationGrid.innerHTML = '';
-        (state.accounts || []).forEach(acc => {
-            let accInvested = 0;
-            let accWithdrawn = 0;
-            let count = 0;
-
-            investments.forEach(inv => {
-                if (inv.account === acc.name) {
-                    accInvested += (Number(inv.amount) || 0);
-                    count++;
-                }
-                (inv.withdrawals || []).forEach(w => {
-                    if (w.account === acc.name) {
-                        accWithdrawn += (Number(w.amount) || 0);
-                    }
-                });
-            });
-
-            const accActive = Math.max(0, accInvested - accWithdrawn);
-            const sharePct = grossInvested > 0 ? Math.round((accInvested / grossInvested) * 100) : 0;
-            const isCash = acc.type === 'Cash';
-            const isSelected = selectedAccount === acc.name;
-
-            const card = document.createElement('div');
-            card.className = 'dash-acc-bal-card';
-            card.style.cursor = 'pointer';
-            card.style.transition = 'all 0.2s ease';
-            if (isSelected) {
-                card.style.borderColor = 'var(--primary)';
-                card.style.boxShadow = '0 0 0 2px rgba(13, 148, 136, 0.25)';
-            }
-            card.title = `Click to filter investments funded from ${acc.name}`;
-            card.innerHTML = `
-                <div style="display:flex; flex-direction:column; gap:2px;">
-                    <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
-                        <span class="acc-name" style="font-weight:700; font-size:12px; color:var(--text-primary); display:flex; align-items:center; gap:4px;">
-                            ${isCash ? '💵' : '🏦'} ${acc.name}
-                        </span>
-                        <span class="badge" style="font-size:9px; font-weight:700; background:rgba(13,148,136,0.12); color:var(--primary); padding:1px 6px; border-radius:4px;">
-                            ${sharePct}% Share
-                        </span>
-                    </div>
-                    <span style="font-size:11px; color:var(--text-secondary); margin-top:3px;">
-                        Invested: <strong style="color:var(--text-primary);">${fC(accInvested)}</strong> • Ret: <span style="color:#10b981; font-weight:600;">+${fC(accWithdrawn)}</span>
-                    </span>
-                </div>
-                <div style="text-align:right;">
-                    <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:600; display:block;">Active Allocated</span>
-                    <span class="acc-bal ${accActive > 0 ? 'pos-bal' : ''}" style="font-size:13px; font-weight:800; color:${accActive > 0 ? 'var(--primary)' : 'var(--text-muted)'};">${fC(accActive)}</span>
-                </div>
-            `;
-            card.addEventListener('click', () => {
-                if (accFilterSelect) {
-                    accFilterSelect.value = (accFilterSelect.value === acc.name) ? 'all' : acc.name;
-                    renderInvestmentsPage();
-                }
-            });
-            allocationGrid.appendChild(card);
-        });
-    }
-
-    // 3. Filter Investments
+    // 2. Filter Investments
     let filtered = [...investments];
 
     if (selectedCategory && selectedCategory !== 'all') {
         filtered = filtered.filter(inv => inv.category === selectedCategory);
-    }
-
-    if (selectedAccount && selectedAccount !== 'all') {
-        filtered = filtered.filter(inv => inv.account === selectedAccount);
     }
 
     if (statusFilter === 'active') {
@@ -2103,8 +2022,7 @@ function renderInvestmentsPage() {
             const accMatch = inv.account && inv.account.toLowerCase().includes(searchQuery);
             const remMatch = inv.remark && inv.remark.toLowerCase().includes(searchQuery);
             const amtMatch = inv.amount && String(inv.amount).includes(searchQuery);
-            const fundMatch = inv.fundSource && resolveFundSourceText(inv.fundSource).toLowerCase().includes(searchQuery);
-            return nameMatch || catMatch || accMatch || remMatch || amtMatch || fundMatch;
+            return nameMatch || catMatch || accMatch || remMatch || amtMatch;
         });
     }
 
@@ -2118,21 +2036,19 @@ function renderInvestmentsPage() {
         return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
 
-    // 4. Render Cards
+    // 3. Render Cards
     container.innerHTML = '';
 
     if (filtered.length === 0) {
         const msg = searchQuery 
             ? `No investments found matching "${searchQuery}".` 
-            : (selectedAccount !== 'all')
-                ? `No investments found allocated from "${selectedAccount}".`
-                : (selectedCategory !== 'all') 
-                    ? `No investments found under "${selectedCategory}".` 
-                    : (statusFilter === 'active')
-                        ? 'No active investments currently running.'
-                        : (statusFilter === 'closed')
-                            ? 'No closed / redeemed investments.'
-                            : 'No investments added yet. Click "+ Add Investment" to create your first portfolio entry!';
+            : (selectedCategory !== 'all') 
+                ? `No investments found under "${selectedCategory}".` 
+                : (statusFilter === 'active')
+                    ? 'No active investments currently running.'
+                    : (statusFilter === 'closed')
+                        ? 'No closed / redeemed investments.'
+                        : 'No investments added yet. Click "+ Add Investment" to create your first portfolio entry!';
         container.innerHTML = `<div class="empty-state" style="grid-column:1/-1; padding:36px 16px; text-align:center;">${msg}</div>`;
         return;
     }
@@ -3948,12 +3864,6 @@ function initEventHandlers() {
     const invCatSelect = document.getElementById('investment-category-filter-select');
     if (invCatSelect) {
         invCatSelect.addEventListener('change', function() {
-            renderInvestmentsPage();
-        });
-    }
-    const invAccSelect = document.getElementById('investment-account-filter-select');
-    if (invAccSelect) {
-        invAccSelect.addEventListener('change', function() {
             renderInvestmentsPage();
         });
     }
