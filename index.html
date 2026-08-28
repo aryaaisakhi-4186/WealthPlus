@@ -25,7 +25,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=6.6.2">
+    <link rel="stylesheet" href="style.css?v=6.7.0">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -86,6 +86,10 @@
                 <a href="#" class="menu-item" data-page="loans" id="nav-loans">
                     <i data-lucide="hand-coins"></i>
                     <span>Loans & Credit</span>
+                </a>
+                <a href="#" class="menu-item" data-page="investments" id="nav-investments">
+                    <i data-lucide="trending-up"></i>
+                    <span>Investments</span>
                 </a>
                 <a href="#" class="menu-item" data-page="expenses" id="nav-expenses">
                     <i data-lucide="arrow-up-right"></i>
@@ -468,7 +472,106 @@
                     </div>
                 </section>
 
-                <!-- 3. EXPENSES PAGE -->
+                <!-- 3. INVESTMENTS PAGE -->
+                <section id="page-investments" class="app-page">
+                    <div class="section-actions-header">
+                        <div>
+                            <h3 style="margin-bottom: 4px;">Investment Portfolio</h3>
+                            <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">Manage Mutual Funds, FDs, Stocks, Gold & Asset Withdrawals</p>
+                        </div>
+                        <button class="btn btn-primary" id="btn-add-investment">
+                            <i data-lucide="plus"></i> Add Investment
+                        </button>
+                    </div>
+
+                    <!-- Summary KPI Cards -->
+                    <div class="stats-grid" style="margin-bottom: 16px;">
+                        <div class="stat-card" style="border-left: 4px solid var(--primary);">
+                            <div class="stat-icon" style="background: rgba(13, 148, 136, 0.1); color: var(--primary);">
+                                <i data-lucide="wallet"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Total Invested</h3>
+                                <span class="amount" id="stat-inv-total-invested" style="color:var(--primary);">₹0</span>
+                                <span class="helper-text">Gross Principal Invested</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid #10b981;">
+                            <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                                <i data-lucide="arrow-down-left"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Total Withdrawn</h3>
+                                <span class="amount" id="stat-inv-total-withdrawn" style="color:#10b981;">₹0</span>
+                                <span class="helper-text">Returns & Capital Pulled</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid #3b82f6;">
+                            <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">
+                                <i data-lucide="trending-up"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Active Portfolio</h3>
+                                <span class="amount" id="stat-inv-net-active" style="color:#3b82f6;">₹0</span>
+                                <span class="helper-text">Net Invested Balance</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid #8b5cf6;">
+                            <div class="stat-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">
+                                <i data-lucide="pie-chart"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Holdings Count</h3>
+                                <span class="amount" id="stat-inv-count" style="color:#8b5cf6;">0</span>
+                                <span class="helper-text">Active Investment Plans</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Investment Filter Bar -->
+                    <div class="party-filter-dropdown-wrapper" style="margin-bottom: 14px; padding: 10px 12px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+                            <label style="font-size: 12px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 5px;">
+                                <i data-lucide="filter" style="width: 14px; height: 14px; color: var(--primary);"></i>
+                                Portfolio Filter & Search:
+                            </label>
+                            <!-- Status filter pills -->
+                            <div style="display: flex; gap: 4px;">
+                                <button type="button" class="btn btn-outline btn-sm inv-status-pill active" id="pill-inv-status-all" onclick="setInvestmentStatusFilter('all')" style="padding: 2px 8px; font-size: 11px; font-weight: 600;">All</button>
+                                <button type="button" class="btn btn-outline btn-sm inv-status-pill" id="pill-inv-status-active" onclick="setInvestmentStatusFilter('active')" style="padding: 2px 8px; font-size: 11px; font-weight: 600;">Active</button>
+                                <button type="button" class="btn btn-outline btn-sm inv-status-pill" id="pill-inv-status-closed" onclick="setInvestmentStatusFilter('closed')" style="padding: 2px 8px; font-size: 11px; font-weight: 600;">Closed</button>
+                            </div>
+                        </div>
+                        <div class="filter-controls-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
+                            <div class="searchable-input-wrapper" style="position: relative; width: 100%;">
+                                <i data-lucide="search" class="search-input-icon" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-muted); pointer-events: none;"></i>
+                                <input type="text" id="investment-search-input" class="searchable-input" placeholder="🔍 Search investment by name, folio, remark..." autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 0 28px 0 30px !important; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 12px; height: 34px; outline: none; margin: 0;">
+                                <button type="button" class="btn-clear-search" id="btn-clear-investment-search" style="display: none; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;" title="Clear search">
+                                    <i data-lucide="x" style="width: 12px; height: 12px;"></i>
+                                </button>
+                            </div>
+                            <div style="width: 100%;">
+                                <select id="investment-category-filter-select" class="party-category-select" style="width: 100%; box-sizing: border-box; padding: 0 8px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-weight: 600; font-size: 12px; height: 34px; outline: none; margin: 0;">
+                                    <option value="all">📁 All Asset Types</option>
+                                    <option value="Mutual Funds / SIP">📈 Mutual Funds / SIP</option>
+                                    <option value="Fixed Deposit (FD)">🏦 Fixed Deposit (FD / RD)</option>
+                                    <option value="Shares / Stocks">📊 Shares / Stocks</option>
+                                    <option value="Gold / Silver">🪙 Gold / Silver</option>
+                                    <option value="Real Estate">🏡 Real Estate / Property</option>
+                                    <option value="PPF / EPF / Bonds">📜 PPF / EPF / Bonds</option>
+                                    <option value="Other Investments">💼 Other Investments</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Investments Cards Grid -->
+                    <div class="clients-grid" id="investments-list-container">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </section>
+
+                <!-- 4. EXPENSES PAGE -->
                 <section id="page-expenses" class="app-page">
                     <div class="section-actions-header">
                         <div>
@@ -1253,6 +1356,10 @@
                 <i data-lucide="hand-coins"></i>
                 <span>Loans</span>
             </a>
+            <a href="#" class="bottom-nav-item" data-page="investments">
+                <i data-lucide="trending-up"></i>
+                <span>Invest</span>
+            </a>
             <a href="#" class="bottom-nav-item" data-page="expenses">
                 <i data-lucide="arrow-up-right"></i>
                 <span>Expenses</span>
@@ -1765,14 +1872,130 @@
             </form>
         </div>
     </div>
+
+    <!-- Modal 7: Add / Edit Investment -->
+    <div id="modal-investment" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h4 id="modal-investment-title">Add New Investment</h4>
+                <button class="btn-close-modal" id="btn-close-investment-modal" onclick="closeInvestmentModal()"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-investment" class="modal-form">
+                <input type="hidden" id="edit-investment-id">
+                
+                <div class="form-group">
+                    <label for="investment-name">Investment / Asset Name *</label>
+                    <input type="text" id="investment-name" required placeholder="e.g. SBI Bluechip Fund / HDFC FD / Gold Sovereign">
+                </div>
+
+                <div class="form-group">
+                    <label for="investment-category">Asset / Investment Category *</label>
+                    <select id="investment-category" required>
+                        <option value="Mutual Funds / SIP">📈 Mutual Funds / SIP</option>
+                        <option value="Fixed Deposit (FD)">🏦 Fixed Deposit (FD / RD)</option>
+                        <option value="Shares / Stocks">📊 Shares / Stocks</option>
+                        <option value="Gold / Silver">🪙 Gold / Silver</option>
+                        <option value="Real Estate">🏡 Real Estate / Property</option>
+                        <option value="PPF / EPF / Bonds">📜 PPF / EPF / Bonds</option>
+                        <option value="Other Investments">💼 Other Investments</option>
+                    </select>
+                </div>
+
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="investment-amount">Invested Amount (₹) *</label>
+                        <input type="number" id="investment-amount" required min="1" step="any" placeholder="e.g. 50000">
+                    </div>
+                    <div class="form-group">
+                        <label for="investment-date">Investment Date *</label>
+                        <input type="date" id="investment-date" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="investment-account-select">Payment Mode / Source Account *</label>
+                    <select id="investment-account-select" required>
+                        <!-- Populated dynamically with Cash & Bank accounts -->
+                    </select>
+                    <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Amount will be deducted (debited) from this account book.</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="investment-remark">Remark / Folio / Description (Optional)</label>
+                    <input type="text" id="investment-remark" placeholder="e.g. Folio: 123456 / FD Rate 7.25% / 5 Yrs lock-in">
+                </div>
+
+                <div class="modal-footer-actions">
+                    <button type="button" class="btn btn-outline" id="btn-cancel-investment" onclick="closeInvestmentModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-investment" style="display:inline-flex; align-items:center; gap:6px;">
+                        <i data-lucide="check-circle" style="width:14px; height:14px;"></i> Save Investment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 8: Record Investment Withdrawal / Return -->
+    <div id="modal-investment-withdraw" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h4>Withdraw / Redeem Investment</h4>
+                <button class="btn-close-modal" id="btn-close-withdraw-modal" onclick="closeWithdrawModal()"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-investment-withdraw" class="modal-form">
+                <input type="hidden" id="withdraw-investment-id">
+                
+                <div class="form-group">
+                    <label>Investment Name</label>
+                    <input type="text" id="withdraw-investment-name" readonly style="background:var(--bg-secondary); font-weight:700; color:var(--text-primary);">
+                </div>
+
+                <div style="background:var(--bg-primary); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:12px; color:var(--text-secondary);">Available Active Balance:</span>
+                    <strong id="withdraw-available-balance-display" style="font-size:14px; color:var(--primary);">₹0</strong>
+                </div>
+
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="withdraw-amount">Withdrawal / Return Amount (₹) *</label>
+                        <input type="number" id="withdraw-amount" required min="1" step="any" placeholder="e.g. 25000">
+                    </div>
+                    <div class="form-group">
+                        <label for="withdraw-date">Withdrawal Date *</label>
+                        <input type="date" id="withdraw-date" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="withdraw-account-select">Destination Account / Mode *</label>
+                    <select id="withdraw-account-select" required>
+                        <!-- Populated dynamically with Cash & Bank accounts -->
+                    </select>
+                    <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Amount will be credited into this account book.</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="withdraw-remark">Remark / Notes (Optional)</label>
+                    <input type="text" id="withdraw-remark" placeholder="e.g. Partial redemption / Maturity payout / Profit booking">
+                </div>
+
+                <div class="modal-footer-actions">
+                    <button type="button" class="btn btn-outline" id="btn-cancel-withdraw" onclick="closeWithdrawModal()">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="btn-submit-withdraw" style="display:inline-flex; align-items:center; gap:6px;">
+                        <i data-lucide="arrow-down-left" style="width:14px; height:14px;"></i> Record Withdrawal
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.6.2"></script>
-    <script src="app.js?v=6.6.2"></script>
-    <script src="sindhu_v1.js?v=6.6.2"></script>
+    <script src="firebase-config.js?v=6.7.0"></script>
+    <script src="app.js?v=6.7.0"></script>
+    <script src="sindhu_v1.js?v=6.7.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

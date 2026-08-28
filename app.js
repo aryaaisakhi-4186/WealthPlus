@@ -9,6 +9,7 @@ let state = {
     transactions: [],
     transfers: [], // Contra internal fund transfers: { id, fromAccount, toAccount, amount, date, type, remark }
     loans: [],     // Multi-entry loans & udhaar: { id, clientId, type: 'given'|'taken', amount, date, account, remark, timestamp }
+    investments: [], // Investment Portfolio: { id, name, category, amount, date, account, remark, withdrawals: [ { id, date, amount, account, remark, timestamp } ], timestamp }
     accounts: [], // Dynamic Accounts: { id, name, type }
     budgets: {},  // Monthly Budgets: { Category: Amount }
     customClientFields: [], // Custom Columns: { id, name, type }
@@ -33,6 +34,7 @@ let state = {
     activeReportTab: 'client',
     activeMasterTab: 'accounts',
     activeLoansTab: 'given',
+    activeInvestmentStatus: 'all',
     partyFilter: 'all',
     partyFyFilter: 'all',
     selectedPeriod: 'financial-year',
@@ -402,6 +404,17 @@ function initFirebaseSyncListeners() {
             renderPage(state.activePage);
         }
     }, err => console.error("Loans sync error:", err));
+
+    // 9. Investment Portfolio
+    firebaseDb.collection('investments').doc('all').onSnapshot(doc => {
+        if (!doc.exists) return;
+        const data = doc.data();
+        if (data.list && !isSame(state.investments, data.list)) {
+            state.investments = data.list;
+            saveStateLocalOnly();
+            renderPage(state.activePage);
+        }
+    }, err => console.error("Investments sync error:", err));
 }
 
 // --- CENTRAL DATA MUTATION FUNCTIONS ---
@@ -974,6 +987,44 @@ function getAccountLedger(accountId) {
         }
     });
 
+    // Filter Investments (Outflow) & Withdrawals (Inflow)
+    (state.investments || []).forEach(inv => {
+        // Outflow when making an investment (DEBIT in Account)
+        if (inv.account === account.name) {
+            const remarkSuffix = inv.remark ? ` (${inv.remark})` : '';
+            ledger.push({
+                id: inv.id,
+                investmentId: inv.id,
+                date: inv.date,
+                particulars: `Investment in ${inv.name} [${inv.category}]${remarkSuffix}`,
+                category: 'Investment (Debit)',
+                credit: 0,
+                debit: Number(inv.amount),
+                timestamp: new Date(inv.date).getTime(),
+                isInvestment: true
+            });
+        }
+
+        // Inflow when redeeming/withdrawing an investment (CREDIT in Account)
+        (inv.withdrawals || []).forEach(w => {
+            if (w.account === account.name) {
+                const remarkSuffix = w.remark ? ` (${w.remark})` : '';
+                ledger.push({
+                    id: w.id,
+                    investmentId: inv.id,
+                    withdrawalId: w.id,
+                    date: w.date,
+                    particulars: `Withdrawal from ${inv.name} [${inv.category}]${remarkSuffix}`,
+                    category: 'Investment Return / Withdrawal (Credit)',
+                    credit: Number(w.amount),
+                    debit: 0,
+                    timestamp: new Date(w.date).getTime(),
+                    isInvestmentWithdrawal: true
+                });
+            }
+        });
+    });
+
     // Sort chronologically (Opening balance timestamp 0 stays at the top)
     ledger.sort((a, b) => {
         if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
@@ -1110,6 +1161,8 @@ function navigateToPage(pageId) {
     const titles = {
         'dashboard': 'Dashboard Overview',
         'clients': 'Clients & Income Book',
+        'loans': 'Loans & Credit Manager',
+        'investments': 'Investment Portfolio',
         'expenses': 'Wealth Plus Entries',
         'reports': 'Reports & Bookkeeping',
         'master': 'Master Settings Dashboard'
@@ -1194,6 +1247,9 @@ function renderPage(pageId) {
             break;
         case 'loans':
             renderLoansPage();
+            break;
+        case 'investments':
+            renderInvestmentsPage();
             break;
         case 'expenses':
             renderExpensesPage();
@@ -1865,6 +1921,502 @@ function renderIncomeLogsTable() {
         tbody.appendChild(tr);
     });
     lucide.createIcons();
+}
+
+// ==========================================================================
+// INVESTMENT PORTFOLIO MANAGER
+// ==========================================================================
+
+function setInvestmentStatusFilter(status) {
+    state.activeInvestmentStatus = status;
+    saveState();
+
+    document.querySelectorAll('.inv-status-pill').forEach(el => {
+        el.classList.toggle('active', el.id === `pill-inv-status-${status}`);
+    });
+
+    renderInvestmentsPage();
+}
+
+function getInvestmentStats(investment) {
+    const invested = Number(investment.amount) || 0;
+    const withdrawals = investment.withdrawals || [];
+    const totalWithdrawn = withdrawals.reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
+    const activeBalance = Math.max(0, invested - totalWithdrawn);
+    const isClosed = activeBalance <= 0;
+    return {
+        invested,
+        totalWithdrawn,
+        activeBalance,
+        isClosed,
+        withdrawalsCount: withdrawals.length
+    };
+}
+
+function renderInvestmentsPage() {
+    const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
+    const container = document.getElementById('investments-list-container');
+    if (!container) return;
+
+    const investments = state.investments || [];
+    const searchInput = document.getElementById('investment-search-input');
+    const btnClear = document.getElementById('btn-clear-investment-search');
+    const searchQuery = (searchInput ? searchInput.value : '').trim().toLowerCase();
+    const catSelect = document.getElementById('investment-category-filter-select');
+    const selectedCategory = catSelect ? catSelect.value : 'all';
+    const statusFilter = state.activeInvestmentStatus || 'all';
+
+    // 1. Calculate Portfolio KPIs
+    let grossInvested = 0;
+    let grossWithdrawn = 0;
+    let activeHoldingsCount = 0;
+
+    investments.forEach(inv => {
+        const stats = getInvestmentStats(inv);
+        grossInvested += stats.invested;
+        grossWithdrawn += stats.totalWithdrawn;
+        if (!stats.isClosed) {
+            activeHoldingsCount++;
+        }
+    });
+
+    const netActive = Math.max(0, grossInvested - grossWithdrawn);
+
+    const elTotalInvested = document.getElementById('stat-inv-total-invested');
+    const elTotalWithdrawn = document.getElementById('stat-inv-total-withdrawn');
+    const elNetActive = document.getElementById('stat-inv-net-active');
+    const elCount = document.getElementById('stat-inv-count');
+
+    if (elTotalInvested) elTotalInvested.innerText = fC(grossInvested);
+    if (elTotalWithdrawn) elTotalWithdrawn.innerText = fC(grossWithdrawn);
+    if (elNetActive) elNetActive.innerText = fC(netActive);
+    if (elCount) elCount.innerText = activeHoldingsCount;
+
+    // 2. Filter Investments
+    let filtered = [...investments];
+
+    if (selectedCategory && selectedCategory !== 'all') {
+        filtered = filtered.filter(inv => inv.category === selectedCategory);
+    }
+
+    if (statusFilter === 'active') {
+        filtered = filtered.filter(inv => {
+            const s = getInvestmentStats(inv);
+            return !s.isClosed;
+        });
+    } else if (statusFilter === 'closed') {
+        filtered = filtered.filter(inv => {
+            const s = getInvestmentStats(inv);
+            return s.isClosed;
+        });
+    }
+
+    if (searchQuery) {
+        filtered = filtered.filter(inv => {
+            const nameMatch = inv.name && inv.name.toLowerCase().includes(searchQuery);
+            const catMatch = inv.category && inv.category.toLowerCase().includes(searchQuery);
+            const accMatch = inv.account && inv.account.toLowerCase().includes(searchQuery);
+            const remMatch = inv.remark && inv.remark.toLowerCase().includes(searchQuery);
+            const amtMatch = inv.amount && String(inv.amount).includes(searchQuery);
+            return nameMatch || catMatch || accMatch || remMatch || amtMatch;
+        });
+    }
+
+    // Sort: Active investments first, then by date descending
+    filtered.sort((a, b) => {
+        const statsA = getInvestmentStats(a);
+        const statsB = getInvestmentStats(b);
+        if (statsA.isClosed !== statsB.isClosed) {
+            return statsA.isClosed ? 1 : -1; // Active first
+        }
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+
+    // 3. Render Cards
+    container.innerHTML = '';
+
+    if (filtered.length === 0) {
+        const msg = searchQuery 
+            ? `No investments found matching "${searchQuery}".` 
+            : (selectedCategory !== 'all') 
+                ? `No investments found under "${selectedCategory}".` 
+                : (statusFilter === 'active')
+                    ? 'No active investments currently running.'
+                    : (statusFilter === 'closed')
+                        ? 'No closed / redeemed investments.'
+                        : 'No investments added yet. Click "+ Add Investment" to create your first portfolio entry!';
+        container.innerHTML = `<div class="empty-state" style="grid-column:1/-1; padding:36px 16px; text-align:center;">${msg}</div>`;
+        return;
+    }
+
+    filtered.forEach(inv => {
+        const stats = getInvestmentStats(inv);
+        const isClosed = stats.isClosed;
+        const statusBadge = isClosed 
+            ? `<span class="badge" style="background:rgba(100, 116, 139, 0.15); color:#64748b; font-size:10px; font-weight:700; border:1px solid rgba(100, 116, 139, 0.3);">Closed / Redeemed</span>`
+            : `<span class="badge" style="background:rgba(16, 185, 129, 0.15); color:#10b981; font-size:10px; font-weight:700; border:1px solid rgba(16, 185, 129, 0.3);">Active Portfolio</span>`;
+
+        // Category icon & color mapping
+        const catIcons = {
+            'Mutual Funds / SIP': { icon: 'trending-up', color: '#0d9488' },
+            'Fixed Deposit (FD)': { icon: 'landmark', color: '#3b82f6' },
+            'Shares / Stocks': { icon: 'bar-chart-2', color: '#8b5cf6' },
+            'Gold / Silver': { icon: 'award', color: '#f59e0b' },
+            'Real Estate': { icon: 'home', color: '#ec4899' },
+            'PPF / EPF / Bonds': { icon: 'file-text', color: '#06b6d4' },
+            'Other Investments': { icon: 'briefcase', color: '#64748b' }
+        };
+        const catMeta = catIcons[inv.category] || { icon: 'pie-chart', color: '#0d9488' };
+
+        // Withdrawals history rows
+        let withdrawalsHTML = '';
+        if (inv.withdrawals && inv.withdrawals.length > 0) {
+            withdrawalsHTML = `
+                <div class="inv-withdrawals-section" style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--border-color);">
+                    <div style="font-size:11px; font-weight:700; color:var(--text-secondary); margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+                        <span>Withdrawal / Return History (${inv.withdrawals.length}):</span>
+                        <span style="color:#10b981; font-weight:700;">Total: +${fC(stats.totalWithdrawn)}</span>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px;">
+                        ${inv.withdrawals.map((w) => `
+                            <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-primary); border:1px solid var(--border-color); border-radius:4px; padding:5px 8px; font-size:11px;">
+                                <div>
+                                    <span style="font-weight:600; color:var(--text-primary);">${formatDbDate(w.date)}</span>
+                                    <span style="color:var(--text-muted); font-size:10px; margin-left:4px;">➔ ${w.account || 'Account'}</span>
+                                    ${w.remark ? `<div style="color:var(--text-secondary); font-size:10px;">${w.remark}</div>` : ''}
+                                </div>
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <strong style="color:#10b981;">+${fC(Number(w.amount))}</strong>
+                                    <button type="button" class="btn-icon-only" onclick="deleteWithdrawal('${inv.id}', '${w.id}')" title="Delete Withdrawal" style="width:20px; height:20px; color:var(--danger); display:var(--staff-access-display, inline-flex);">
+                                        <i data-lucide="x" style="width:12px; height:12px;"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        const card = document.createElement('div');
+        card.className = `client-card ${isClosed ? 'settled-card' : ''}`;
+        card.style.background = isClosed ? 'var(--bg-secondary)' : 'var(--bg-secondary)';
+        card.style.border = isClosed ? '1.5px solid var(--border-color)' : '1.5px solid var(--border-color)';
+        
+        card.innerHTML = `
+            <div class="client-card-header" style="border-bottom:1px solid var(--border-color); padding-bottom:8px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:3px;">
+                        <span class="badge" style="background:rgba(13, 148, 136, 0.12); color:${catMeta.color}; font-size:10px; font-weight:700; border:1px solid rgba(13, 148, 136, 0.25);">
+                            <i data-lucide="${catMeta.icon}" style="width:10px; height:10px; vertical-align:middle;"></i> ${inv.category}
+                        </span>
+                        ${statusBadge}
+                    </div>
+                    <h4 style="margin:0; font-size:15px; font-weight:700; color:var(--text-primary);">${inv.name}</h4>
+                </div>
+                <div style="text-align:right;">
+                    <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:600; display:block;">Active Balance</span>
+                    <h3 style="margin:0; font-size:16px; font-weight:800; color:${isClosed ? '#64748b' : '#0d9488'};">${fC(stats.activeBalance)}</h3>
+                </div>
+            </div>
+
+            <div class="client-card-body" style="display:flex; flex-direction:column; gap:4px; font-size:12px;">
+                <div class="c-stat-row" style="display:flex; justify-content:space-between;">
+                    <span class="c-stat-label" style="color:var(--text-secondary);">Invested Principal:</span>
+                    <strong class="c-stat-val" style="color:var(--text-primary);">${fC(stats.invested)}</strong>
+                </div>
+                <div class="c-stat-row" style="display:flex; justify-content:space-between;">
+                    <span class="c-stat-label" style="color:var(--text-secondary);">Start Date & Account:</span>
+                    <span class="c-stat-val" style="color:var(--text-primary);">${formatDbDate(inv.date)} • <span class="badge-acctype" style="font-size:10px;">${inv.account}</span></span>
+                </div>
+                <div class="c-stat-row" style="display:flex; justify-content:space-between;">
+                    <span class="c-stat-label" style="color:var(--text-secondary);">Total Withdrawn:</span>
+                    <strong class="c-stat-val" style="color:#10b981;">${stats.totalWithdrawn > 0 ? '+' + fC(stats.totalWithdrawn) : '₹0'}</strong>
+                </div>
+                ${inv.remark ? `
+                <div class="c-stat-row" style="display:flex; justify-content:space-between; margin-top:2px;">
+                    <span class="c-stat-label" style="color:var(--text-secondary);">Remark / Notes:</span>
+                    <span class="c-stat-val" style="color:var(--text-secondary); max-width:65%; text-align:right; font-style:italic;">${inv.remark}</span>
+                </div>
+                ` : ''}
+
+                ${withdrawalsHTML}
+            </div>
+
+            <div class="client-card-footer" style="display:flex; justify-content:flex-end; align-items:center; gap:6px; margin-top:10px; padding-top:8px; border-top:1px solid var(--border-color); flex-wrap:wrap;">
+                ${!isClosed ? `
+                <button type="button" class="btn btn-success btn-sm" onclick="openWithdrawModal('${inv.id}')" style="padding:4px 10px; font-size:11px; display:inline-flex; align-items:center; gap:4px; font-weight:700;">
+                    <i data-lucide="arrow-down-left" style="width:12px; height:12px;"></i> Withdraw
+                </button>
+                ` : ''}
+                <button type="button" class="btn btn-outline btn-sm" onclick="openInvestmentModal('${inv.id}')" style="padding:4px 8px; font-size:11px; display:inline-flex; align-items:center; gap:4px;">
+                    <i data-lucide="edit-3" style="width:12px; height:12px;"></i> Edit
+                </button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="deleteInvestment('${inv.id}')" style="padding:4px 8px; font-size:11px; color:var(--danger); border-color:rgba(225,29,72,0.3); display:var(--staff-access-display, inline-flex); align-items:center; gap:4px;">
+                    <i data-lucide="trash-2" style="width:12px; height:12px;"></i> Delete
+                </button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+
+    if (window.lucide) lucide.createIcons();
+}
+
+function openInvestmentModal(id = null) {
+    const modal = document.getElementById('modal-investment');
+    const form = document.getElementById('form-investment');
+    const title = document.getElementById('modal-investment-title');
+    const accSelect = document.getElementById('investment-account-select');
+
+    if (!modal || !form) return;
+    form.reset();
+
+    // Populate Account select with Cash and Bank accounts
+    if (accSelect) {
+        accSelect.innerHTML = '';
+        (state.accounts || []).forEach(acc => {
+            accSelect.innerHTML += `<option value="${acc.name}">${acc.name} (${acc.type})</option>`;
+        });
+    }
+
+    const editIdInput = document.getElementById('edit-investment-id');
+    const dateInput = document.getElementById('investment-date');
+    if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+
+    if (id) {
+        const inv = (state.investments || []).find(i => i.id === id);
+        if (inv) {
+            title.innerText = 'Edit Investment Details';
+            editIdInput.value = inv.id;
+            document.getElementById('investment-name').value = inv.name || '';
+            document.getElementById('investment-category').value = inv.category || 'Mutual Funds / SIP';
+            document.getElementById('investment-amount').value = inv.amount || '';
+            if (dateInput) dateInput.value = inv.date || '';
+            if (accSelect) accSelect.value = inv.account || '';
+            document.getElementById('investment-remark').value = inv.remark || '';
+        }
+    } else {
+        title.innerText = 'Add New Investment';
+        editIdInput.value = '';
+    }
+
+    modal.classList.add('active');
+}
+
+function closeInvestmentModal() {
+    const modal = document.getElementById('modal-investment');
+    if (modal) modal.classList.remove('active');
+}
+
+async function handleInvestmentSubmit(e) {
+    e.preventDefault();
+    const editId = document.getElementById('edit-investment-id').value;
+    const name = document.getElementById('investment-name').value.trim();
+    const category = document.getElementById('investment-category').value;
+    const amount = Number(document.getElementById('investment-amount').value) || 0;
+    const date = document.getElementById('investment-date').value;
+    const account = document.getElementById('investment-account-select').value;
+    const remark = document.getElementById('investment-remark').value.trim();
+
+    if (!name || amount <= 0 || !date || !account) {
+        alert("Please enter a valid investment name, amount, date, and payment account.");
+        return;
+    }
+
+    if (!state.investments) state.investments = [];
+
+    if (editId) {
+        const inv = state.investments.find(i => i.id === editId);
+        if (inv) {
+            inv.name = name;
+            inv.category = category;
+            inv.amount = amount;
+            inv.date = date;
+            inv.account = account;
+            inv.remark = remark;
+        }
+    } else {
+        const newInv = {
+            id: 'inv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            name,
+            category,
+            amount,
+            date,
+            account,
+            remark,
+            withdrawals: [],
+            timestamp: Date.now()
+        };
+        state.investments.unshift(newInv);
+    }
+
+    saveState();
+    closeInvestmentModal();
+    renderPage(state.activePage);
+
+    if (state.cloudSyncEnabled && firebaseDb) {
+        try {
+            await firebaseDb.collection('investments').doc('all').set({ list: state.investments });
+        } catch (err) {
+            console.error("Firebase investments sync error:", err);
+        }
+    }
+}
+
+function openWithdrawModal(investmentId) {
+    const modal = document.getElementById('modal-investment-withdraw');
+    const form = document.getElementById('form-investment-withdraw');
+    if (!modal || !form) return;
+
+    form.reset();
+
+    const inv = (state.investments || []).find(i => i.id === investmentId);
+    if (!inv) {
+        alert("Investment not found.");
+        return;
+    }
+
+    const stats = getInvestmentStats(inv);
+    if (stats.activeBalance <= 0) {
+        alert("This investment is already fully withdrawn/closed.");
+        return;
+    }
+
+    document.getElementById('withdraw-investment-id').value = inv.id;
+    document.getElementById('withdraw-investment-name').value = `${inv.name} (${inv.category})`;
+    document.getElementById('withdraw-available-balance-display').innerText = '₹' + Math.round(stats.activeBalance).toLocaleString('en-IN');
+    
+    const amountInput = document.getElementById('withdraw-amount');
+    if (amountInput) {
+        amountInput.max = stats.activeBalance;
+        amountInput.placeholder = `Max: ${stats.activeBalance}`;
+    }
+
+    const dateInput = document.getElementById('withdraw-date');
+    if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+
+    const accSelect = document.getElementById('withdraw-account-select');
+    if (accSelect) {
+        accSelect.innerHTML = '';
+        (state.accounts || []).forEach(acc => {
+            accSelect.innerHTML += `<option value="${acc.name}">${acc.name} (${acc.type})</option>`;
+        });
+        if (inv.account && Array.from(accSelect.options).some(o => o.value === inv.account)) {
+            accSelect.value = inv.account;
+        }
+    }
+
+    modal.classList.add('active');
+}
+
+function closeWithdrawModal() {
+    const modal = document.getElementById('modal-investment-withdraw');
+    if (modal) modal.classList.remove('active');
+}
+
+async function handleWithdrawSubmit(e) {
+    e.preventDefault();
+    const investmentId = document.getElementById('withdraw-investment-id').value;
+    const amount = Number(document.getElementById('withdraw-amount').value) || 0;
+    const date = document.getElementById('withdraw-date').value;
+    const account = document.getElementById('withdraw-account-select').value;
+    const remark = document.getElementById('withdraw-remark').value.trim();
+
+    const inv = (state.investments || []).find(i => i.id === investmentId);
+    if (!inv) {
+        alert("Investment not found.");
+        return;
+    }
+
+    const stats = getInvestmentStats(inv);
+    if (amount <= 0) {
+        alert("Please enter a valid withdrawal amount.");
+        return;
+    }
+
+    if (amount > stats.activeBalance) {
+        alert(`Withdrawal amount (₹${amount}) cannot exceed the available active balance (₹${stats.activeBalance}).`);
+        return;
+    }
+
+    if (!inv.withdrawals) inv.withdrawals = [];
+
+    const newWithdrawal = {
+        id: 'w_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        amount,
+        date,
+        account,
+        remark,
+        timestamp: Date.now()
+    };
+
+    inv.withdrawals.push(newWithdrawal);
+    saveState();
+    closeWithdrawModal();
+    renderPage(state.activePage);
+
+    if (state.cloudSyncEnabled && firebaseDb) {
+        try {
+            await firebaseDb.collection('investments').doc('all').set({ list: state.investments });
+        } catch (err) {
+            console.error("Firebase investments sync error:", err);
+        }
+    }
+}
+
+async function deleteInvestment(id) {
+    const currentUser = state.currentUser;
+    if (currentUser && currentUser.role === 'Staff') {
+        alert("🔒 Access Denied: Only Admin can delete investments.");
+        return;
+    }
+
+    const inv = (state.investments || []).find(i => i.id === id);
+    if (!inv) return;
+
+    if (!confirm(`Are you sure you want to delete the investment "${inv.name}"?\n\nThis will also remove its corresponding ledger entries.`)) {
+        return;
+    }
+
+    state.investments = (state.investments || []).filter(i => i.id !== id);
+    saveState();
+    renderPage(state.activePage);
+
+    if (state.cloudSyncEnabled && firebaseDb) {
+        try {
+            await firebaseDb.collection('investments').doc('all').set({ list: state.investments });
+        } catch (err) {
+            console.error("Firebase investments sync error:", err);
+        }
+    }
+}
+
+async function deleteWithdrawal(investmentId, withdrawalId) {
+    const currentUser = state.currentUser;
+    if (currentUser && currentUser.role === 'Staff') {
+        alert("🔒 Access Denied: Only Admin can delete withdrawal entries.");
+        return;
+    }
+
+    const inv = (state.investments || []).find(i => i.id === investmentId);
+    if (!inv || !inv.withdrawals) return;
+
+    if (!confirm("Are you sure you want to delete this withdrawal entry?")) {
+        return;
+    }
+
+    inv.withdrawals = inv.withdrawals.filter(w => w.id !== withdrawalId);
+    saveState();
+    renderPage(state.activePage);
+
+    if (state.cloudSyncEnabled && firebaseDb) {
+        try {
+            await firebaseDb.collection('investments').doc('all').set({ list: state.investments });
+        } catch (err) {
+            console.error("Firebase investments sync error:", err);
+        }
+    }
 }
 
 // EXPENSES ACCORDION & HELPERS
@@ -3249,6 +3801,32 @@ function initEventHandlers() {
         });
     }
 
+    // Investments Search Input & Category Filter
+    const invSearchInput = document.getElementById('investment-search-input');
+    const btnClearInvSearch = document.getElementById('btn-clear-investment-search');
+    if (invSearchInput) {
+        invSearchInput.addEventListener('input', function() {
+            if (btnClearInvSearch) {
+                btnClearInvSearch.style.display = this.value ? 'block' : 'none';
+            }
+            renderInvestmentsPage();
+        });
+    }
+    if (btnClearInvSearch && invSearchInput) {
+        btnClearInvSearch.addEventListener('click', function() {
+            invSearchInput.value = '';
+            btnClearInvSearch.style.display = 'none';
+            invSearchInput.focus();
+            renderInvestmentsPage();
+        });
+    }
+    const invCatSelect = document.getElementById('investment-category-filter-select');
+    if (invCatSelect) {
+        invCatSelect.addEventListener('change', function() {
+            renderInvestmentsPage();
+        });
+    }
+
     // Modals triggers
     document.getElementById('btn-add-client').addEventListener('click', () => openClientModal());
     document.getElementById('btn-close-client-modal').addEventListener('click', () => closeClientModal());
@@ -3261,6 +3839,19 @@ function initEventHandlers() {
     document.getElementById('btn-add-expense').addEventListener('click', () => openExpenseModal());
     document.getElementById('btn-close-expense-modal').addEventListener('click', () => closeExpenseModal());
     document.getElementById('btn-cancel-expense').addEventListener('click', () => closeExpenseModal());
+
+    // Investments Modal Triggers
+    const btnAddInv = document.getElementById('btn-add-investment');
+    if (btnAddInv) btnAddInv.addEventListener('click', () => openInvestmentModal());
+    const btnCloseInv = document.getElementById('btn-close-investment-modal');
+    if (btnCloseInv) btnCloseInv.addEventListener('click', () => closeInvestmentModal());
+    const btnCancelInv = document.getElementById('btn-cancel-investment');
+    if (btnCancelInv) btnCancelInv.addEventListener('click', () => closeInvestmentModal());
+
+    const btnCloseWithdraw = document.getElementById('btn-close-withdraw-modal');
+    if (btnCloseWithdraw) btnCloseWithdraw.addEventListener('click', () => closeWithdrawModal());
+    const btnCancelWithdraw = document.getElementById('btn-cancel-withdraw');
+    if (btnCancelWithdraw) btnCancelWithdraw.addEventListener('click', () => closeWithdrawModal());
 
     document.getElementById('btn-master-add-account').addEventListener('click', () => openAccountModal());
     document.getElementById('btn-close-account-modal').addEventListener('click', () => closeAccountModal());
@@ -3293,6 +3884,11 @@ function initEventHandlers() {
     document.getElementById('form-client').addEventListener('submit', handleClientSubmit);
     document.getElementById('form-income').addEventListener('submit', handleIncomeSubmit);
     document.getElementById('form-expense').addEventListener('submit', handleExpenseSubmit);
+    const formInvestment = document.getElementById('form-investment');
+    if (formInvestment) formInvestment.addEventListener('submit', handleInvestmentSubmit);
+    const formWithdraw = document.getElementById('form-investment-withdraw');
+    if (formWithdraw) formWithdraw.addEventListener('submit', handleWithdrawSubmit);
+    document.getElementById('form-account').addEventListener('submit', handleAccountSubmit);
     document.getElementById('form-account').addEventListener('submit', handleAccountSubmit);
     const formTransfer = document.getElementById('form-transfer');
     if (formTransfer) formTransfer.addEventListener('submit', handleTransferSubmit);
@@ -5776,6 +6372,10 @@ async function uploadLocalDataToFirebase() {
     for (let m of state.members) {
         await firebaseDb.collection('members').doc(m.id).set(m);
     }
+    // Upload investments
+    if (state.investments) {
+        await firebaseDb.collection('investments').doc('all').set({ list: state.investments });
+    }
     // Upload settings
     await firebaseDb.collection('settings').doc('config').set({
         budgets: state.budgets,
@@ -5900,6 +6500,9 @@ async function handleResetAppClick() {
             const clientSnapshot = await firebaseDb.collection('clients').get();
             for (const doc of clientSnapshot.docs) await doc.ref.delete();
 
+            // Wipe investments from Firestore
+            await firebaseDb.collection('investments').doc('all').delete();
+
             alert("Cloud database records cleared successfully!");
         } catch (e) {
             console.error("Cloud reset error:", e);
@@ -5911,6 +6514,7 @@ async function handleResetAppClick() {
     state.transactions = [];
     state.incomeLogs = [];
     state.loans = [];
+    state.investments = [];
     state.clients = defaultClients;
     state.accounts = defaultAccounts;
     
