@@ -3340,4 +3340,36 @@ h1, h2, h3, h4, h5, h6 {
     border: 1px solid var(--border-color);
 }
 
+.inv-kpi-card {
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    user-select: none;
+}
+
+.inv-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.inv-kpi-card.active-kpi-filter {
+    box-shadow: 0 0 0 2px var(--primary), var(--shadow-md) !important;
+    background: var(--bg-primary) !important;
+}
+
+.inv-view-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
 

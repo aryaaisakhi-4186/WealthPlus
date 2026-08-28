@@ -25,7 +25,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=6.7.2">
+    <link rel="stylesheet" href="style.css?v=6.7.3">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -484,48 +484,53 @@
                         </button>
                     </div>
 
-                    <!-- Summary KPI Cards -->
+                    <!-- Summary KPI Cards (Interactive & Clickable) -->
                     <div class="stats-grid" style="margin-bottom: 16px;">
-                        <div class="stat-card" style="border-left: 4px solid var(--primary);">
+                        <div class="stat-card inv-kpi-card" id="card-inv-stat-invested" onclick="setInvestmentKpiView('invested')" style="border-left: 4px solid var(--primary);" title="Click to view all invested principal details">
                             <div class="stat-icon" style="background: rgba(13, 148, 136, 0.1); color: var(--primary);">
                                 <i data-lucide="wallet"></i>
                             </div>
                             <div class="stat-info">
                                 <h3>Total Invested</h3>
                                 <span class="amount" id="stat-inv-total-invested" style="color:var(--primary);">₹0</span>
-                                <span class="helper-text">Gross Principal Invested</span>
+                                <span class="helper-text">Gross Principal Invested (Click)</span>
                             </div>
                         </div>
-                        <div class="stat-card" style="border-left: 4px solid #10b981;">
+                        <div class="stat-card inv-kpi-card" id="card-inv-stat-withdrawn" onclick="setInvestmentKpiView('withdrawn')" style="border-left: 4px solid #10b981;" title="Click to view all withdrawals and returns list">
                             <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
                                 <i data-lucide="arrow-down-left"></i>
                             </div>
                             <div class="stat-info">
                                 <h3>Total Withdrawn</h3>
                                 <span class="amount" id="stat-inv-total-withdrawn" style="color:#10b981;">₹0</span>
-                                <span class="helper-text">Returns & Capital Pulled</span>
+                                <span class="helper-text">Returns & Withdrawals (Click)</span>
                             </div>
                         </div>
-                        <div class="stat-card" style="border-left: 4px solid #3b82f6;">
+                        <div class="stat-card inv-kpi-card" id="card-inv-stat-active" onclick="setInvestmentKpiView('active')" style="border-left: 4px solid #3b82f6;" title="Click to view active running investments">
                             <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">
                                 <i data-lucide="trending-up"></i>
                             </div>
                             <div class="stat-info">
                                 <h3>Active Portfolio</h3>
                                 <span class="amount" id="stat-inv-net-active" style="color:#3b82f6;">₹0</span>
-                                <span class="helper-text">Net Invested Balance</span>
+                                <span class="helper-text">Active Invested Balance (Click)</span>
                             </div>
                         </div>
-                        <div class="stat-card" style="border-left: 4px solid #8b5cf6;">
+                        <div class="stat-card inv-kpi-card" id="card-inv-stat-holdings" onclick="setInvestmentKpiView('holdings')" style="border-left: 4px solid #8b5cf6;" title="Click to view category-wise holdings breakdown">
                             <div class="stat-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">
                                 <i data-lucide="pie-chart"></i>
                             </div>
                             <div class="stat-info">
                                 <h3>Holdings Count</h3>
                                 <span class="amount" id="stat-inv-count" style="color:#8b5cf6;">0</span>
-                                <span class="helper-text">Active Investment Plans</span>
+                                <span class="helper-text">Category Holdings (Click)</span>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Investment Active KPI View Banner -->
+                    <div id="inv-kpi-view-banner" class="inv-view-banner" style="display: none;">
+                        <!-- Rendered dynamically -->
                     </div>
 
                     <!-- Investment Filter Bar -->
@@ -2001,9 +2006,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.7.2"></script>
-    <script src="app.js?v=6.7.2"></script>
-    <script src="sindhu_v1.js?v=6.7.2"></script>
+    <script src="firebase-config.js?v=6.7.3"></script>
+    <script src="app.js?v=6.7.3"></script>
+    <script src="sindhu_v1.js?v=6.7.3"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

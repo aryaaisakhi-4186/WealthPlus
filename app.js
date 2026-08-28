@@ -35,6 +35,7 @@ let state = {
     activeMasterTab: 'accounts',
     activeLoansTab: 'given',
     activeInvestmentStatus: 'all',
+    investmentKpiView: 'all', // 'all' | 'invested' | 'withdrawn' | 'active' | 'holdings'
     partyFilter: 'all',
     partyFyFilter: 'all',
     selectedPeriod: 'financial-year',
@@ -1931,6 +1932,16 @@ function renderIncomeLogsTable() {
 // INVESTMENT PORTFOLIO MANAGER
 // ==========================================================================
 
+function setInvestmentKpiView(view) {
+    if (state.investmentKpiView === view && view !== 'all') {
+        state.investmentKpiView = 'all'; // Toggle back to all
+    } else {
+        state.investmentKpiView = view;
+    }
+    saveState();
+    renderInvestmentsPage();
+}
+
 function setInvestmentStatusFilter(status) {
     state.activeInvestmentStatus = status;
     saveState();
@@ -1969,6 +1980,7 @@ function renderInvestmentsPage() {
     const catSelect = document.getElementById('investment-category-filter-select');
     const selectedCategory = catSelect ? catSelect.value : 'all';
     const statusFilter = state.activeInvestmentStatus || 'all';
+    const kpiView = state.investmentKpiView || 'all';
 
     // 1. Calculate Portfolio KPIs
     let grossInvested = 0;
@@ -1996,14 +2008,206 @@ function renderInvestmentsPage() {
     if (elNetActive) elNetActive.innerText = fC(netActive);
     if (elCount) elCount.innerText = activeHoldingsCount;
 
-    // 2. Filter Investments
+    // Highlight Active KPI Card
+    const cardInvested = document.getElementById('card-inv-stat-invested');
+    const cardWithdrawn = document.getElementById('card-inv-stat-withdrawn');
+    const cardActive = document.getElementById('card-inv-stat-active');
+    const cardHoldings = document.getElementById('card-inv-stat-holdings');
+
+    if (cardInvested) cardInvested.classList.toggle('active-kpi-filter', kpiView === 'invested');
+    if (cardWithdrawn) cardWithdrawn.classList.toggle('active-kpi-filter', kpiView === 'withdrawn');
+    if (cardActive) cardActive.classList.toggle('active-kpi-filter', kpiView === 'active');
+    if (cardHoldings) cardHoldings.classList.toggle('active-kpi-filter', kpiView === 'holdings');
+
+    // 2. Render Active View Notification Banner
+    const bannerEl = document.getElementById('inv-kpi-view-banner');
+    if (bannerEl) {
+        if (kpiView === 'invested') {
+            bannerEl.style.display = 'flex';
+            bannerEl.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <i data-lucide="wallet" style="width:16px; height:16px; color:var(--primary);"></i>
+                    <span><strong>Total Invested Details:</strong> All ${investments.length} investment plans (Gross Principal: ${fC(grossInvested)})</span>
+                </div>
+                <button type="button" class="btn btn-outline btn-sm" onclick="setInvestmentKpiView('all')" style="padding:2px 8px; font-size:11px;">Reset View</button>
+            `;
+        } else if (kpiView === 'withdrawn') {
+            let totalWCount = 0;
+            investments.forEach(i => totalWCount += (i.withdrawals || []).length);
+            bannerEl.style.display = 'flex';
+            bannerEl.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <i data-lucide="arrow-down-left" style="width:16px; height:16px; color:#10b981;"></i>
+                    <span><strong>All Withdrawals & Returns List:</strong> ${totalWCount} withdrawals recorded (Total Pulled: ${fC(grossWithdrawn)})</span>
+                </div>
+                <button type="button" class="btn btn-outline btn-sm" onclick="setInvestmentKpiView('all')" style="padding:2px 8px; font-size:11px;">Show All Investments</button>
+            `;
+        } else if (kpiView === 'active') {
+            bannerEl.style.display = 'flex';
+            bannerEl.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <i data-lucide="trending-up" style="width:16px; height:16px; color:#3b82f6;"></i>
+                    <span><strong>Active Portfolio:</strong> ${activeHoldingsCount} running plans (Net Active Balance: ${fC(netActive)})</span>
+                </div>
+                <button type="button" class="btn btn-outline btn-sm" onclick="setInvestmentKpiView('all')" style="padding:2px 8px; font-size:11px;">Show All</button>
+            `;
+        } else if (kpiView === 'holdings') {
+            bannerEl.style.display = 'flex';
+            bannerEl.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <i data-lucide="pie-chart" style="width:16px; height:16px; color:#8b5cf6;"></i>
+                    <span><strong>Category Holdings Breakdown:</strong> ${activeHoldingsCount} active asset holdings</span>
+                </div>
+                <button type="button" class="btn btn-outline btn-sm" onclick="setInvestmentKpiView('all')" style="padding:2px 8px; font-size:11px;">Show All</button>
+            `;
+        } else {
+            bannerEl.style.display = 'none';
+        }
+    }
+
+    // 3. SPECIAL VIEW: All Withdrawals / Returns Log Drilldown
+    if (kpiView === 'withdrawn') {
+        let allWithdrawals = [];
+        investments.forEach(inv => {
+            (inv.withdrawals || []).forEach(w => {
+                allWithdrawals.push({
+                    ...w,
+                    investmentId: inv.id,
+                    investmentName: inv.name,
+                    category: inv.category
+                });
+            });
+        });
+
+        if (searchQuery) {
+            allWithdrawals = allWithdrawals.filter(w => {
+                const nameMatch = w.investmentName && w.investmentName.toLowerCase().includes(searchQuery);
+                const accMatch = w.account && w.account.toLowerCase().includes(searchQuery);
+                const remMatch = w.remark && w.remark.toLowerCase().includes(searchQuery);
+                const amtMatch = w.amount && String(w.amount).includes(searchQuery);
+                return nameMatch || accMatch || remMatch || amtMatch;
+            });
+        }
+
+        allWithdrawals.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        container.innerHTML = '';
+        if (allWithdrawals.length === 0) {
+            container.innerHTML = `<div class="empty-state" style="grid-column:1/-1; padding:36px 16px; text-align:center;">No withdrawal or return records found.</div>`;
+            if (window.lucide) lucide.createIcons();
+            return;
+        }
+
+        allWithdrawals.forEach(w => {
+            const card = document.createElement('div');
+            card.className = 'client-card';
+            card.style.borderLeft = '4px solid #10b981';
+            card.innerHTML = `
+                <div class="client-card-header" style="border-bottom:1px solid var(--border-color); padding-bottom:8px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <span class="badge" style="background:rgba(16, 185, 129, 0.12); color:#10b981; font-size:10px; font-weight:700; border:1px solid rgba(16, 185, 129, 0.25);">
+                            <i data-lucide="arrow-down-left" style="width:10px; height:10px; vertical-align:middle;"></i> Withdrawal / Return
+                        </span>
+                        <h4 style="margin:4px 0 0 0; font-size:15px; font-weight:700; color:var(--text-primary);">${w.investmentName}</h4>
+                        <span style="font-size:11px; color:var(--text-muted);">${w.category}</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:600; display:block;">Amount Received</span>
+                        <h3 style="margin:0; font-size:16px; font-weight:800; color:#10b981;">+${fC(Number(w.amount))}</h3>
+                    </div>
+                </div>
+                <div class="client-card-body" style="display:flex; flex-direction:column; gap:4px; font-size:12px;">
+                    <div class="c-stat-row" style="display:flex; justify-content:space-between;">
+                        <span class="c-stat-label" style="color:var(--text-secondary);">Withdrawal Date:</span>
+                        <strong class="c-stat-val" style="color:var(--text-primary);">${formatDbDate(w.date)}</strong>
+                    </div>
+                    <div class="c-stat-row" style="display:flex; justify-content:space-between;">
+                        <span class="c-stat-label" style="color:var(--text-secondary);">Credited Into Account:</span>
+                        <span class="badge-acctype" style="font-size:10px;">${w.account || 'Account'}</span>
+                    </div>
+                    ${w.remark ? `
+                    <div class="c-stat-row" style="display:flex; justify-content:space-between; margin-top:2px;">
+                        <span class="c-stat-label" style="color:var(--text-secondary);">Remark / Notes:</span>
+                        <span class="c-stat-val" style="color:var(--text-secondary); max-width:65%; text-align:right; font-style:italic;">${w.remark}</span>
+                    </div>
+                    ` : ''}
+                </div>
+                <div class="client-card-footer" style="display:flex; justify-content:flex-end; align-items:center; gap:6px; margin-top:10px; padding-top:8px; border-top:1px solid var(--border-color);">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="deleteWithdrawal('${w.investmentId}', '${w.id}')" style="padding:4px 8px; font-size:11px; color:var(--danger); border-color:rgba(225,29,72,0.3); display:var(--staff-access-display, inline-flex); align-items:center; gap:4px;">
+                        <i data-lucide="trash-2" style="width:12px; height:12px;"></i> Delete Record
+                    </button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+        if (window.lucide) lucide.createIcons();
+        return;
+    }
+
+    // 4. SPECIAL VIEW: Category Holdings Distribution Matrix
+    let categoryHeaderHTML = '';
+    if (kpiView === 'holdings') {
+        const catMap = {};
+        investments.forEach(inv => {
+            const stats = getInvestmentStats(inv);
+            if (!catMap[inv.category]) {
+                catMap[inv.category] = { count: 0, activeCount: 0, invested: 0, activeBalance: 0 };
+            }
+            catMap[inv.category].count++;
+            if (!stats.isClosed) catMap[inv.category].activeCount++;
+            catMap[inv.category].invested += stats.invested;
+            catMap[inv.category].activeBalance += stats.activeBalance;
+        });
+
+        const catIcons = {
+            'Mutual Funds / SIP': { icon: 'trending-up', color: '#0d9488' },
+            'Fixed Deposit (FD)': { icon: 'landmark', color: '#3b82f6' },
+            'Shares / Stocks': { icon: 'bar-chart-2', color: '#8b5cf6' },
+            'Gold / Silver': { icon: 'award', color: '#f59e0b' },
+            'Real Estate': { icon: 'home', color: '#ec4899' },
+            'PPF / EPF / Bonds': { icon: 'file-text', color: '#06b6d4' },
+            'Other Investments': { icon: 'briefcase', color: '#64748b' }
+        };
+
+        const catKeys = Object.keys(catMap);
+        if (catKeys.length > 0) {
+            categoryHeaderHTML = `
+                <div style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 14px;">
+                    ${catKeys.map(cat => {
+                        const data = catMap[cat];
+                        const meta = catIcons[cat] || { icon: 'pie-chart', color: '#0d9488' };
+                        const share = netActive > 0 ? Math.round((data.activeBalance / netActive) * 100) : 0;
+                        return `
+                            <div class="dash-acc-bal-card" style="cursor:pointer; border-left:3px solid ${meta.color};" onclick="document.getElementById('investment-category-filter-select').value='${cat}'; renderInvestmentsPage();" title="Click to filter ${cat}">
+                                <div style="display:flex; flex-direction:column; gap:2px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                        <span class="acc-name" style="font-size:12px; font-weight:700; color:var(--text-primary);">
+                                            <i data-lucide="${meta.icon}" style="width:12px; height:12px; vertical-align:middle; color:${meta.color};"></i> ${cat}
+                                        </span>
+                                        <span class="badge" style="font-size:9px; font-weight:700; background:rgba(13,148,136,0.1); color:var(--primary);">${share}%</span>
+                                    </div>
+                                    <span style="font-size:11px; color:var(--text-secondary);">${data.activeCount} Active Plans (${data.count} Total)</span>
+                                </div>
+                                <div style="text-align:right;">
+                                    <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:600; display:block;">Active Value</span>
+                                    <strong style="font-size:13px; color:var(--primary);">${fC(data.activeBalance)}</strong>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+    }
+
+    // 5. Filter Standard Investments List
     let filtered = [...investments];
 
     if (selectedCategory && selectedCategory !== 'all') {
         filtered = filtered.filter(inv => inv.category === selectedCategory);
     }
 
-    if (statusFilter === 'active') {
+    if (kpiView === 'active' || statusFilter === 'active') {
         filtered = filtered.filter(inv => {
             const s = getInvestmentStats(inv);
             return !s.isClosed;
@@ -2036,20 +2240,21 @@ function renderInvestmentsPage() {
         return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
 
-    // 3. Render Cards
-    container.innerHTML = '';
+    // 6. Render Cards
+    container.innerHTML = categoryHeaderHTML;
 
     if (filtered.length === 0) {
         const msg = searchQuery 
             ? `No investments found matching "${searchQuery}".` 
             : (selectedCategory !== 'all') 
                 ? `No investments found under "${selectedCategory}".` 
-                : (statusFilter === 'active')
+                : (kpiView === 'active' || statusFilter === 'active')
                     ? 'No active investments currently running.'
                     : (statusFilter === 'closed')
                         ? 'No closed / redeemed investments.'
                         : 'No investments added yet. Click "+ Add Investment" to create your first portfolio entry!';
-        container.innerHTML = `<div class="empty-state" style="grid-column:1/-1; padding:36px 16px; text-align:center;">${msg}</div>`;
+        container.innerHTML += `<div class="empty-state" style="grid-column:1/-1; padding:36px 16px; text-align:center;">${msg}</div>`;
+        if (window.lucide) lucide.createIcons();
         return;
     }
 
