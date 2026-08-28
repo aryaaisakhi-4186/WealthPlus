@@ -47,12 +47,14 @@ let state = {
 // Seed Data
 const defaultClients = [
     { id: "c1", name: "Acme Corporation", group: "Debtor", monthlyPay: 35000, yearlyPay: 420000, openingBalance: 0 },
-    { id: "c2", name: "StarLabs Ltd", group: "Debtor", monthlyPay: 20000, yearlyPay: 240000, openingBalance: 0 }
+    { id: "c2", name: "StarLabs Ltd", group: "Debtor", monthlyPay: 20000, yearlyPay: 240000, openingBalance: 0 },
+    { id: "client_sbi_cc", name: "SBI Credit Card", group: "Creditor", cardLimit: 24000, openingBalance: 0, creditAmount: 24000, monthlyPay: 0, yearlyPay: 0, pendingYear: "2026-2027", notes: "SBI Credit Card (Limit: ₹24,000)" }
 ];
 
 const defaultAccounts = [
     { id: "acc_1", name: "Main Cash", type: "Cash", openingBalance: 0 },
-    { id: "acc_2", name: "HDFC Bank", type: "Bank", openingBalance: 0 }
+    { id: "acc_2", name: "HDFC Bank", type: "Bank", openingBalance: 0 },
+    { id: "acc_sbi_cc", name: "SBI Credit Card", type: "Credit Card", limit: 24000, openingBalance: 0 }
 ];
 
 const defaultBudgets = {
@@ -195,6 +197,46 @@ function runStateMigrations() {
         if (tx.mode === 'Cash') { tx.mode = 'Main Cash'; updated = true; }
         else if (tx.mode === 'Bank' || tx.mode === 'UPI') { tx.mode = 'HDFC Bank'; updated = true; }
     });
+
+    // Auto-setup SBI Credit Card as a Loan / Creditor & Account if missing
+    if (!state.clients.some(c => c.name.toLowerCase().includes('sbi credit card'))) {
+        state.clients.push({
+            id: 'client_sbi_cc',
+            name: 'SBI Credit Card',
+            group: 'Creditor',
+            cardLimit: 24000,
+            openingBalance: 0,
+            creditAmount: 24000,
+            monthlyPay: 0,
+            yearlyPay: 0,
+            pendingYear: '2026-2027',
+            notes: 'SBI Credit Card (Limit: ₹24,000)'
+        });
+        updated = true;
+    } else {
+        const sbiClient = state.clients.find(c => c.name.toLowerCase().includes('sbi credit card'));
+        if (sbiClient && !sbiClient.cardLimit) {
+            sbiClient.cardLimit = 24000;
+            updated = true;
+        }
+    }
+
+    if (!state.accounts.some(a => a.name.toLowerCase().includes('sbi credit card'))) {
+        state.accounts.push({
+            id: 'acc_sbi_cc',
+            name: 'SBI Credit Card',
+            type: 'Credit Card',
+            limit: 24000,
+            openingBalance: 0
+        });
+        updated = true;
+    } else {
+        const sbiAcc = state.accounts.find(a => a.name.toLowerCase().includes('sbi credit card'));
+        if (sbiAcc && !sbiAcc.limit) {
+            sbiAcc.limit = 24000;
+            updated = true;
+        }
+    }
 
     if (!state.selectedLedgerAccountId && state.accounts.length > 0) {
         state.selectedLedgerAccountId = state.accounts[0].id;
@@ -3481,11 +3523,16 @@ function renderMasterAccounts() {
         const ledger = getAccountLedger(acc.id);
         const closingBal = ledger.length > 0 ? ledger[ledger.length - 1].balance : (Number(acc.openingBalance) || 0);
         const openingBal = Number(acc.openingBalance) || 0;
+        const isCreditCard = acc.type === 'Credit Card' || acc.name.toLowerCase().includes('credit card');
+        const limitStr = acc.limit ? ` (Limit: ${fC(acc.limit)})` : (isCreditCard ? ' (Limit: ₹24,000)' : '');
+        const typeBadge = isCreditCard 
+            ? `<span class="badge-acctype" style="background:rgba(239, 68, 68, 0.12); color:#dc2626; border:1px solid rgba(239, 68, 68, 0.25);">💳 Credit Card${limitStr}</span>`
+            : `<span class="badge-acctype">${acc.type} Book</span>`;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="font-weight:600;">${acc.name}</td>
-            <td><span class="badge-acctype">${acc.type} Book</span></td>
+            <td>${typeBadge}</td>
             <td style="min-width: 170px;">
                 <div style="display: inline-flex; align-items: center; gap: 6px;">
                     <span style="font-weight: 600; color: var(--text-muted); font-size: 13px;">₹</span>
@@ -4438,6 +4485,8 @@ window.openClientModal = function(editId = '') {
             if (yearlyInput) yearlyInput.value = client.yearlyPay || (client.monthlyPay ? client.monthlyPay * 12 : '') || '';
             if (pendingYearSelect) pendingYearSelect.value = client.pendingYear || '2026-2027';
             if (openingBalanceInput) openingBalanceInput.value = client.openingBalance || 0;
+            const cardLimitInput = document.getElementById('client-card-limit');
+            if (cardLimitInput) cardLimitInput.value = client.cardLimit || (client.name.toLowerCase().includes('credit card') ? 24000 : 0);
 
             // Custom fields
             (state.customClientFields || []).forEach(f => {
@@ -4469,6 +4518,8 @@ window.openClientModal = function(editId = '') {
         if (title) title.innerText = 'Add New Party';
         if (editIdInput) editIdInput.value = '';
         if (pendingYearSelect) pendingYearSelect.value = '2026-2027';
+        const cardLimitInput = document.getElementById('client-card-limit');
+        if (cardLimitInput) cardLimitInput.value = '0';
         activeContractItems = [];
     }
 
@@ -4501,6 +4552,7 @@ function handleClientSubmit(e) {
     const id = document.getElementById('edit-client-id').value;
     const name = document.getElementById('client-name').value.trim();
     const group = document.getElementById('client-group').value || 'Client';
+    const cardLimit = Number(document.getElementById('client-card-limit')?.value) || 0;
     const creditAmount = Number(document.getElementById('client-credit-amount').value) || 0;
     const loanSourceAccount = document.getElementById('client-loan-source-account')?.value || '';
     const loanDate = document.getElementById('client-loan-date')?.value || new Date().toISOString().split('T')[0];
@@ -4512,7 +4564,7 @@ function handleClientSubmit(e) {
     // Filter valid contract items
     const validContractItems = (activeContractItems || []).filter(ci => ci.particulars || ci.amount > 0 || ci.rate > 0);
 
-    let clientObj = { name, group, creditAmount, loanSourceAccount, loanDate, monthlyPay, yearlyPay, pendingYear, openingBalance, contractItems: validContractItems };
+    let clientObj = { name, group, cardLimit, creditAmount, loanSourceAccount, loanDate, monthlyPay, yearlyPay, pendingYear, openingBalance, contractItems: validContractItems };
 
     state.customClientFields.forEach(f => {
         const val = document.getElementById(`custom-field-${f.name}`).value;
@@ -5425,6 +5477,7 @@ function openAccountModal(editId = '') {
     const modal = document.getElementById('modal-account');
     const title = document.getElementById('modal-account-title');
     const form = document.getElementById('form-account');
+    const limitInput = document.getElementById('account-credit-limit');
     form.reset();
 
     if (editId) {
@@ -5435,11 +5488,13 @@ function openAccountModal(editId = '') {
             document.getElementById('account-name').value = acc.name;
             document.getElementById('account-type').value = acc.type;
             document.getElementById('account-opening-balance').value = acc.openingBalance !== undefined ? acc.openingBalance : 0;
+            if (limitInput) limitInput.value = acc.limit !== undefined ? acc.limit : (acc.type === 'Credit Card' ? 24000 : 0);
         }
     } else {
         title.innerText = 'Add New Account Book';
         document.getElementById('edit-account-id').value = '';
         document.getElementById('account-opening-balance').value = '0';
+        if (limitInput) limitInput.value = '0';
     }
     modal.classList.add('active');
 }
@@ -5454,8 +5509,9 @@ function handleAccountSubmit(e) {
     const name = document.getElementById('account-name').value.trim();
     const type = document.getElementById('account-type').value;
     const openingBalance = Number(document.getElementById('account-opening-balance').value) || 0;
+    const limit = Number(document.getElementById('account-credit-limit')?.value) || (type === 'Credit Card' ? 24000 : 0);
 
-    let accountObj = { name, type, openingBalance };
+    let accountObj = { name, type, openingBalance, limit };
     if (id) {
         accountObj.id = id;
         const oldAcc = state.accounts.find(a => a.id === id);
@@ -6031,6 +6087,8 @@ function renderLoansPage() {
     if (containerTaken) {
         containerTaken.innerHTML = '';
         let takenLoans = (state.loans || []).filter(l => l.type === 'taken');
+        const creditCardParties = state.clients.filter(c => c.group === 'Creditor' || (c.cardLimit && c.cardLimit > 0) || c.name.toLowerCase().includes('credit card'));
+
         if (searchQuery) {
             takenLoans = takenLoans.filter(l => {
                 const c = state.clients.find(cl => cl.id === l.clientId);
@@ -6038,7 +6096,68 @@ function renderLoansPage() {
             });
         }
 
-        if (takenLoans.length === 0) {
+        // Render Credit Card / Credit Line Cards (e.g. SBI Credit Card)
+        creditCardParties.forEach(cc => {
+            if (searchQuery && !cc.name.toLowerCase().includes(searchQuery)) return;
+            const limit = Number(cc.cardLimit) || 24000;
+            const opening = Number(cc.openingBalance) || 0;
+            const ccLoans = (state.loans || []).filter(l => l.clientId === cc.id && l.type === 'taken');
+            const borrowed = ccLoans.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+            const totalDue = opening + borrowed;
+            const available = Math.max(0, limit - totalDue);
+
+            const card = document.createElement('div');
+            card.className = 'client-card';
+            card.style.borderLeft = '4px solid #ef4444';
+            card.innerHTML = `
+                <div class="client-card-header" style="border-bottom:1px solid var(--border-color); padding-bottom:8px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <span class="badge" style="background:rgba(239, 68, 68, 0.12); color:#dc2626; font-size:10px; font-weight:700; border:1px solid rgba(239, 68, 68, 0.25);">
+                            💳 Credit Card / Loan Line
+                        </span>
+                        <h4 style="margin:4px 0 0 0; font-size:15px; font-weight:700; color:var(--text-primary);">${cc.name}</h4>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:600; display:block;">Card Limit</span>
+                        <h3 style="margin:0; font-size:16px; font-weight:800; color:var(--text-primary);">${fC(limit)}</h3>
+                    </div>
+                </div>
+                <div class="client-card-body" style="display:flex; flex-direction:column; gap:4px; font-size:12px;">
+                    <div class="c-stat-row" style="display:flex; justify-content:space-between;">
+                        <span class="c-stat-label" style="color:var(--text-secondary);">Opening Balance (Dues):</span>
+                        <div style="display:inline-flex; align-items:center; gap:4px;">
+                            <strong class="c-stat-val" style="color:${opening > 0 ? 'var(--danger)' : 'var(--text-primary)'};">${fC(opening)}</strong>
+                            <button type="button" class="btn-icon-only" onclick="openClientModal('${cc.id}')" title="Edit Opening Balance" style="width:18px; height:18px; color:var(--primary);">
+                                <i data-lucide="edit-3" style="width:11px; height:11px;"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="c-stat-row" style="display:flex; justify-content:space-between;">
+                        <span class="c-stat-label" style="color:var(--text-secondary);">Borrowed / Swiped:</span>
+                        <strong class="c-stat-val" style="color:#d97706;">${fC(borrowed)}</strong>
+                    </div>
+                    <div class="c-stat-row" style="display:flex; justify-content:space-between; border-top:1px dashed var(--border-color); padding-top:4px; margin-top:2px;">
+                        <span class="c-stat-label" style="font-weight:700; color:var(--text-primary);">Total Outstanding Due:</span>
+                        <strong class="c-stat-val" style="font-weight:800; color:var(--danger);">${fC(totalDue)}</strong>
+                    </div>
+                    <div class="c-stat-row" style="display:flex; justify-content:space-between;">
+                        <span class="c-stat-label" style="font-weight:700; color:var(--text-secondary);">Available Limit:</span>
+                        <strong class="c-stat-val" style="font-weight:800; color:var(--success);">${fC(available)}</strong>
+                    </div>
+                </div>
+                <div class="client-card-footer" style="display:flex; justify-content:flex-end; align-items:center; gap:6px; margin-top:10px; padding-top:8px; border-top:1px solid var(--border-color);">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="openLoanModal('taken', '${cc.id}')" style="font-size:11px; padding:4px 9px; display:inline-flex; align-items:center; gap:4px; color:#d97706; border-color:rgba(217,119,6,0.4); background:rgba(217,119,6,0.06); font-weight:600;">
+                        <i data-lucide="plus" style="width:12px; height:12px;"></i> + Log Card Swipe / Loan
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="openClientModal('${cc.id}')" style="font-size:11px; padding:4px 8px; display:inline-flex; align-items:center; gap:4px;">
+                        <i data-lucide="edit-3" style="width:12px; height:12px;"></i> Edit Card / Opening
+                    </button>
+                </div>
+            `;
+            containerTaken.appendChild(card);
+        });
+
+        if (takenLoans.length === 0 && creditCardParties.length === 0) {
             containerTaken.innerHTML = `<div class="empty-state" style="grid-column:1/-1; padding:32px; text-align:center;">No loans taken logged. Click "+ Take Loan" to log funds borrowed from a creditor or party.</div>`;
         } else {
             takenLoans.forEach(loan => {

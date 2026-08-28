@@ -25,7 +25,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=6.7.3">
+    <link rel="stylesheet" href="style.css?v=6.7.4">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -1488,10 +1488,17 @@
                     </select>
                     <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Select which financial year this party contract / due belongs to. New clients for upcoming years can be set up easily.</span>
                 </div>
-                <div class="form-group">
-                    <label for="client-opening-balance">Opening Balance (₹) (Initial Due / Advance)</label>
-                    <input type="number" id="client-opening-balance" placeholder="0 (e.g. 5000 or -2000)" step="any" inputmode="numeric" value="0">
-                    <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Enter pending balance (positive) or advance payment (negative).</span>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="client-opening-balance">Opening Balance (₹) (Initial Due / Advance)</label>
+                        <input type="number" id="client-opening-balance" placeholder="0 (e.g. 5000 or -2000)" step="any" inputmode="numeric" value="0">
+                        <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Enter initial pending balance (due) or advance.</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="client-card-limit">Card / Credit Limit (₹) (For Credit Card / Loan)</label>
+                        <input type="number" id="client-card-limit" placeholder="e.g. 24000" min="0" step="any" inputmode="numeric" value="0">
+                        <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Approved limit (e.g. ₹24,000 for SBI Credit Card).</span>
+                    </div>
                 </div>
                 <!-- Dynamic client custom fields container -->
                 <div id="client-modal-custom-fields-container"></div>
@@ -1652,12 +1659,20 @@
                     <select id="account-type" required>
                         <option value="Bank">Bank Account (UPI / NetBanking / Cards)</option>
                         <option value="Cash">Cash Book (Physical Cash-in-hand)</option>
+                        <option value="Credit Card">💳 Credit Card / Loan Line (Liability)</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label for="account-opening-balance">Opening Balance (₹)</label>
-                    <input type="number" id="account-opening-balance" placeholder="0 (e.g. 50000 or -5000)" step="any" inputmode="numeric" value="0">
-                    <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Enter opening cash/bank balance (positive for credit balance, negative for overdraft).</span>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="account-opening-balance">Opening Balance (₹)</label>
+                        <input type="number" id="account-opening-balance" placeholder="0 (e.g. 50000 or -5000)" step="any" inputmode="numeric" value="0">
+                        <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Enter opening cash/bank/card balance.</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="account-credit-limit">Credit / Card Limit (₹)</label>
+                        <input type="number" id="account-credit-limit" placeholder="e.g. 24000" min="0" step="any" inputmode="numeric" value="0">
+                        <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">For Credit Cards (e.g. ₹24,000).</span>
+                    </div>
                 </div>
                 <div class="modal-footer-actions">
                     <button type="button" class="btn btn-outline" id="btn-cancel-account">Cancel</button>
@@ -2006,9 +2021,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.7.3"></script>
-    <script src="app.js?v=6.7.3"></script>
-    <script src="sindhu_v1.js?v=6.7.3"></script>
+    <script src="firebase-config.js?v=6.7.4"></script>
+    <script src="app.js?v=6.7.4"></script>
+    <script src="sindhu_v1.js?v=6.7.4"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">
