@@ -3050,6 +3050,22 @@ h1, h2, h3, h4, h5, h6 {
     box-sizing: border-box;
 }
 
+.filter-controls-grid-3 {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+    .filter-controls-grid-3 {
+        grid-template-columns: 1fr !important;
+        gap: 6px !important;
+    }
+}
+
 .searchable-dropdown-menu {
     position: absolute;
     top: calc(100% + 4px);

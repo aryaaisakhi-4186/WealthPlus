@@ -992,11 +992,15 @@ function getAccountLedger(accountId) {
         // Outflow when making an investment (DEBIT in Account)
         if (inv.account === account.name) {
             const remarkSuffix = inv.remark ? ` (${inv.remark})` : '';
+            let fundSuffix = '';
+            if (inv.fundSource) {
+                fundSuffix = ` [Fund: ${resolveFundSourceText(inv.fundSource)}]`;
+            }
             ledger.push({
                 id: inv.id,
                 investmentId: inv.id,
                 date: inv.date,
-                particulars: `Investment in ${inv.name} [${inv.category}]${remarkSuffix}`,
+                particulars: `Investment in ${inv.name} [${inv.category}]${fundSuffix}${remarkSuffix}`,
                 category: 'Investment (Debit)',
                 credit: 0,
                 debit: Number(inv.amount),
@@ -1964,7 +1968,20 @@ function renderInvestmentsPage() {
     const searchQuery = (searchInput ? searchInput.value : '').trim().toLowerCase();
     const catSelect = document.getElementById('investment-category-filter-select');
     const selectedCategory = catSelect ? catSelect.value : 'all';
+    const accFilterSelect = document.getElementById('investment-account-filter-select');
     const statusFilter = state.activeInvestmentStatus || 'all';
+
+    // Populate Account Filter Select
+    if (accFilterSelect) {
+        const currentAccVal = accFilterSelect.value || 'all';
+        let accOpts = `<option value="all">🏦 All Source Accounts</option>`;
+        (state.accounts || []).forEach(a => {
+            accOpts += `<option value="${a.name}">${a.name} (${a.type})</option>`;
+        });
+        accFilterSelect.innerHTML = accOpts;
+        accFilterSelect.value = currentAccVal;
+    }
+    const selectedAccount = accFilterSelect ? accFilterSelect.value : 'all';
 
     // 1. Calculate Portfolio KPIs
     let grossInvested = 0;
@@ -1992,11 +2009,79 @@ function renderInvestmentsPage() {
     if (elNetActive) elNetActive.innerText = fC(netActive);
     if (elCount) elCount.innerText = activeHoldingsCount;
 
-    // 2. Filter Investments
+    // 2. Render Account Allocation Breakdown Matrix
+    const allocationGrid = document.getElementById('investments-account-allocation-grid');
+    if (allocationGrid) {
+        allocationGrid.innerHTML = '';
+        (state.accounts || []).forEach(acc => {
+            let accInvested = 0;
+            let accWithdrawn = 0;
+            let count = 0;
+
+            investments.forEach(inv => {
+                if (inv.account === acc.name) {
+                    accInvested += (Number(inv.amount) || 0);
+                    count++;
+                }
+                (inv.withdrawals || []).forEach(w => {
+                    if (w.account === acc.name) {
+                        accWithdrawn += (Number(w.amount) || 0);
+                    }
+                });
+            });
+
+            const accActive = Math.max(0, accInvested - accWithdrawn);
+            const sharePct = grossInvested > 0 ? Math.round((accInvested / grossInvested) * 100) : 0;
+            const isCash = acc.type === 'Cash';
+            const isSelected = selectedAccount === acc.name;
+
+            const card = document.createElement('div');
+            card.className = 'dash-acc-bal-card';
+            card.style.cursor = 'pointer';
+            card.style.transition = 'all 0.2s ease';
+            if (isSelected) {
+                card.style.borderColor = 'var(--primary)';
+                card.style.boxShadow = '0 0 0 2px rgba(13, 148, 136, 0.25)';
+            }
+            card.title = `Click to filter investments funded from ${acc.name}`;
+            card.innerHTML = `
+                <div style="display:flex; flex-direction:column; gap:2px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                        <span class="acc-name" style="font-weight:700; font-size:12px; color:var(--text-primary); display:flex; align-items:center; gap:4px;">
+                            ${isCash ? '💵' : '🏦'} ${acc.name}
+                        </span>
+                        <span class="badge" style="font-size:9px; font-weight:700; background:rgba(13,148,136,0.12); color:var(--primary); padding:1px 6px; border-radius:4px;">
+                            ${sharePct}% Share
+                        </span>
+                    </div>
+                    <span style="font-size:11px; color:var(--text-secondary); margin-top:3px;">
+                        Invested: <strong style="color:var(--text-primary);">${fC(accInvested)}</strong> • Ret: <span style="color:#10b981; font-weight:600;">+${fC(accWithdrawn)}</span>
+                    </span>
+                </div>
+                <div style="text-align:right;">
+                    <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:600; display:block;">Active Allocated</span>
+                    <span class="acc-bal ${accActive > 0 ? 'pos-bal' : ''}" style="font-size:13px; font-weight:800; color:${accActive > 0 ? 'var(--primary)' : 'var(--text-muted)'};">${fC(accActive)}</span>
+                </div>
+            `;
+            card.addEventListener('click', () => {
+                if (accFilterSelect) {
+                    accFilterSelect.value = (accFilterSelect.value === acc.name) ? 'all' : acc.name;
+                    renderInvestmentsPage();
+                }
+            });
+            allocationGrid.appendChild(card);
+        });
+    }
+
+    // 3. Filter Investments
     let filtered = [...investments];
 
     if (selectedCategory && selectedCategory !== 'all') {
         filtered = filtered.filter(inv => inv.category === selectedCategory);
+    }
+
+    if (selectedAccount && selectedAccount !== 'all') {
+        filtered = filtered.filter(inv => inv.account === selectedAccount);
     }
 
     if (statusFilter === 'active') {
@@ -2018,7 +2103,8 @@ function renderInvestmentsPage() {
             const accMatch = inv.account && inv.account.toLowerCase().includes(searchQuery);
             const remMatch = inv.remark && inv.remark.toLowerCase().includes(searchQuery);
             const amtMatch = inv.amount && String(inv.amount).includes(searchQuery);
-            return nameMatch || catMatch || accMatch || remMatch || amtMatch;
+            const fundMatch = inv.fundSource && resolveFundSourceText(inv.fundSource).toLowerCase().includes(searchQuery);
+            return nameMatch || catMatch || accMatch || remMatch || amtMatch || fundMatch;
         });
     }
 
@@ -2032,19 +2118,21 @@ function renderInvestmentsPage() {
         return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
 
-    // 3. Render Cards
+    // 4. Render Cards
     container.innerHTML = '';
 
     if (filtered.length === 0) {
         const msg = searchQuery 
             ? `No investments found matching "${searchQuery}".` 
-            : (selectedCategory !== 'all') 
-                ? `No investments found under "${selectedCategory}".` 
-                : (statusFilter === 'active')
-                    ? 'No active investments currently running.'
-                    : (statusFilter === 'closed')
-                        ? 'No closed / redeemed investments.'
-                        : 'No investments added yet. Click "+ Add Investment" to create your first portfolio entry!';
+            : (selectedAccount !== 'all')
+                ? `No investments found allocated from "${selectedAccount}".`
+                : (selectedCategory !== 'all') 
+                    ? `No investments found under "${selectedCategory}".` 
+                    : (statusFilter === 'active')
+                        ? 'No active investments currently running.'
+                        : (statusFilter === 'closed')
+                            ? 'No closed / redeemed investments.'
+                            : 'No investments added yet. Click "+ Add Investment" to create your first portfolio entry!';
         container.innerHTML = `<div class="empty-state" style="grid-column:1/-1; padding:36px 16px; text-align:center;">${msg}</div>`;
         return;
     }
@@ -2098,6 +2186,8 @@ function renderInvestmentsPage() {
             `;
         }
 
+        const fundSourceLabel = inv.fundSource ? resolveFundSourceLabel(inv.fundSource) : '<span style="color:var(--text-muted); font-style:italic;">General Account Surplus</span>';
+
         const card = document.createElement('div');
         card.className = `client-card ${isClosed ? 'settled-card' : ''}`;
         card.style.background = isClosed ? 'var(--bg-secondary)' : 'var(--bg-secondary)';
@@ -2126,8 +2216,12 @@ function renderInvestmentsPage() {
                     <strong class="c-stat-val" style="color:var(--text-primary);">${fC(stats.invested)}</strong>
                 </div>
                 <div class="c-stat-row" style="display:flex; justify-content:space-between;">
-                    <span class="c-stat-label" style="color:var(--text-secondary);">Start Date & Account:</span>
+                    <span class="c-stat-label" style="color:var(--text-secondary);">Disbursed From / Mode:</span>
                     <span class="c-stat-val" style="color:var(--text-primary);">${formatDbDate(inv.date)} • <span class="badge-acctype" style="font-size:10px;">${inv.account}</span></span>
+                </div>
+                <div class="c-stat-row" style="display:flex; justify-content:space-between;">
+                    <span class="c-stat-label" style="color:var(--text-secondary);">Fund Allocated From:</span>
+                    <span class="c-stat-val" style="color:var(--text-primary); font-size:11px; text-align:right;">${fundSourceLabel}</span>
                 </div>
                 <div class="c-stat-row" style="display:flex; justify-content:space-between;">
                     <span class="c-stat-label" style="color:var(--text-secondary);">Total Withdrawn:</span>
@@ -2168,9 +2262,12 @@ function openInvestmentModal(id = null) {
     const form = document.getElementById('form-investment');
     const title = document.getElementById('modal-investment-title');
     const accSelect = document.getElementById('investment-account-select');
+    const fundSelect = document.getElementById('investment-fund-source');
 
     if (!modal || !form) return;
     form.reset();
+
+    const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
 
     // Populate Account select with Cash and Bank accounts
     if (accSelect) {
@@ -2178,6 +2275,30 @@ function openInvestmentModal(id = null) {
         (state.accounts || []).forEach(acc => {
             accSelect.innerHTML += `<option value="${acc.name}">${acc.name} (${acc.type})</option>`;
         });
+    }
+
+    // Populate Fund Origin / Inflow Source Select
+    if (fundSelect) {
+        let capitalOptions = `
+            <option value="opening_bank">🏦 Bank Opening Balance</option>
+            <option value="opening_cash">💵 Cash Opening Balance</option>
+        `;
+        if (state.accounts && state.accounts.length > 0) {
+            state.accounts.forEach(a => {
+                const icon = a.type === 'Cash' ? '💵' : '🏦';
+                const balStr = a.openingBalance ? ` (${fC(a.openingBalance)})` : '';
+                capitalOptions += `<option value="opening_acc_${a.id}">${icon} ${a.name} Opening${balStr}</option>`;
+            });
+        }
+        fundSelect.innerHTML = `
+            <option value="">General Surplus / Direct Account Book</option>
+            <optgroup label="Capital / Opening Funds">
+                ${capitalOptions}
+            </optgroup>
+            <optgroup label="Party / Client Inflow">
+                ${(state.clients || []).map(c => `<option value="${c.id}">👤 ${c.name} (${c.group || 'Client'})</option>`).join('')}
+            </optgroup>
+        `;
     }
 
     const editIdInput = document.getElementById('edit-investment-id');
@@ -2194,6 +2315,7 @@ function openInvestmentModal(id = null) {
             document.getElementById('investment-amount').value = inv.amount || '';
             if (dateInput) dateInput.value = inv.date || '';
             if (accSelect) accSelect.value = inv.account || '';
+            if (fundSelect) fundSelect.value = inv.fundSource || '';
             document.getElementById('investment-remark').value = inv.remark || '';
         }
     } else {
@@ -2217,6 +2339,7 @@ async function handleInvestmentSubmit(e) {
     const amount = Number(document.getElementById('investment-amount').value) || 0;
     const date = document.getElementById('investment-date').value;
     const account = document.getElementById('investment-account-select').value;
+    const fundSource = document.getElementById('investment-fund-source') ? document.getElementById('investment-fund-source').value : '';
     const remark = document.getElementById('investment-remark').value.trim();
 
     if (!name || amount <= 0 || !date || !account) {
@@ -2234,6 +2357,7 @@ async function handleInvestmentSubmit(e) {
             inv.amount = amount;
             inv.date = date;
             inv.account = account;
+            inv.fundSource = fundSource;
             inv.remark = remark;
         }
     } else {
@@ -2244,6 +2368,7 @@ async function handleInvestmentSubmit(e) {
             amount,
             date,
             account,
+            fundSource,
             remark,
             withdrawals: [],
             timestamp: Date.now()
@@ -3823,6 +3948,12 @@ function initEventHandlers() {
     const invCatSelect = document.getElementById('investment-category-filter-select');
     if (invCatSelect) {
         invCatSelect.addEventListener('change', function() {
+            renderInvestmentsPage();
+        });
+    }
+    const invAccSelect = document.getElementById('investment-account-filter-select');
+    if (invAccSelect) {
+        invAccSelect.addEventListener('change', function() {
             renderInvestmentsPage();
         });
     }

@@ -25,7 +25,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=6.7.0">
+    <link rel="stylesheet" href="style.css?v=6.7.1">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -528,6 +528,20 @@
                         </div>
                     </div>
 
+                    <!-- Account Allocation Breakdown Matrix -->
+                    <div style="background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:16px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:4px;">
+                            <span style="font-size:12px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+                                <i data-lucide="layers" style="width:15px; height:15px; color:var(--primary);"></i>
+                                Account Allocation Breakdown (खाता अनुसार फंड आवंटन)
+                            </span>
+                            <span style="font-size:11px; color:var(--text-muted);" id="inv-allocation-summary-text">Source Accounts Distribution</span>
+                        </div>
+                        <div id="investments-account-allocation-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap:10px;">
+                            <!-- Rendered dynamically -->
+                        </div>
+                    </div>
+
                     <!-- Investment Filter Bar -->
                     <div class="party-filter-dropdown-wrapper" style="margin-bottom: 14px; padding: 10px 12px;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
@@ -542,10 +556,10 @@
                                 <button type="button" class="btn btn-outline btn-sm inv-status-pill" id="pill-inv-status-closed" onclick="setInvestmentStatusFilter('closed')" style="padding: 2px 8px; font-size: 11px; font-weight: 600;">Closed</button>
                             </div>
                         </div>
-                        <div class="filter-controls-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
+                        <div class="filter-controls-grid-3" style="display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 8px; width: 100%;">
                             <div class="searchable-input-wrapper" style="position: relative; width: 100%;">
                                 <i data-lucide="search" class="search-input-icon" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-muted); pointer-events: none;"></i>
-                                <input type="text" id="investment-search-input" class="searchable-input" placeholder="🔍 Search investment by name, folio, remark..." autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 0 28px 0 30px !important; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 12px; height: 34px; outline: none; margin: 0;">
+                                <input type="text" id="investment-search-input" class="searchable-input" placeholder="🔍 Search investment, folio, fund source..." autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 0 28px 0 30px !important; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 12px; height: 34px; outline: none; margin: 0;">
                                 <button type="button" class="btn-clear-search" id="btn-clear-investment-search" style="display: none; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;" title="Clear search">
                                     <i data-lucide="x" style="width: 12px; height: 12px;"></i>
                                 </button>
@@ -560,6 +574,12 @@
                                     <option value="Real Estate">🏡 Real Estate / Property</option>
                                     <option value="PPF / EPF / Bonds">📜 PPF / EPF / Bonds</option>
                                     <option value="Other Investments">💼 Other Investments</option>
+                                </select>
+                            </div>
+                            <div style="width: 100%;">
+                                <select id="investment-account-filter-select" class="party-category-select" style="width: 100%; box-sizing: border-box; padding: 0 8px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-weight: 600; font-size: 12px; height: 34px; outline: none; margin: 0;">
+                                    <option value="all">🏦 All Source Accounts</option>
+                                    <!-- Populated dynamically -->
                                 </select>
                             </div>
                         </div>
@@ -1913,11 +1933,19 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="investment-account-select">Payment Mode / Source Account *</label>
+                    <label for="investment-account-select">Disbursed From / Source Account *</label>
                     <select id="investment-account-select" required>
                         <!-- Populated dynamically with Cash & Bank accounts -->
                     </select>
                     <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Amount will be deducted (debited) from this account book.</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="investment-fund-source">Fund Origin / Allocated From (आया हुआ पैसा / फंड सोर्स) *</label>
+                    <select id="investment-fund-source">
+                        <!-- Populated dynamically with General Surplus, Opening Balances, and Party Receipts -->
+                    </select>
+                    <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Select which party inflow, account surplus, or opening balance funded this investment.</span>
                 </div>
 
                 <div class="form-group">
@@ -1993,9 +2021,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.7.0"></script>
-    <script src="app.js?v=6.7.0"></script>
-    <script src="sindhu_v1.js?v=6.7.0"></script>
+    <script src="firebase-config.js?v=6.7.1"></script>
+    <script src="app.js?v=6.7.1"></script>
+    <script src="sindhu_v1.js?v=6.7.1"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">
