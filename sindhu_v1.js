@@ -976,7 +976,7 @@
 
     // Helper: Fetch Gemini API with Retry and Model Fallback
     async function fetchGeminiWithRetry(requestBody, apiKey, maxRetries = 3, initialDelay = 1000) {
-        const models = ["gemini-2.5-flash", "gemini-1.5-flash"];
+        const models = ["gemini-3.7-flash", "gemini-2.5-flash", "gemini-1.5-flash"];
         let lastError = null;
 
         for (let model of models) {
