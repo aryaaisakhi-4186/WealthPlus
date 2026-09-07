@@ -910,12 +910,15 @@ function getAccountLedger(accountId) {
     // Prepend Opening Balance if non-zero (Positive is Credit deposit, Negative is Debit overdraft)
     if (openingBal !== 0) {
         ledger.push({
+            id: account.id,
+            accountId: account.id,
             date: 'Opening Balance',
             particulars: 'Opening Balance',
             category: 'Opening Balance',
             credit: openingBal > 0 ? openingBal : 0,
             debit: openingBal < 0 ? Math.abs(openingBal) : 0,
-            timestamp: 0
+            timestamp: 0,
+            isOpeningBalance: true
         });
     }
 
@@ -924,12 +927,15 @@ function getAccountLedger(accountId) {
         if (log.mode === account.name) {
             const client = state.clients.find(c => c.id === log.clientId);
             ledger.push({
+                id: log.id,
+                incomeId: log.id,
                 date: log.date,
                 particulars: `Received from ${client ? client.name : 'Unknown Party'}`,
                 category: 'Inflow (Credit)',
                 credit: Number(log.amount),
                 debit: 0,
-                timestamp: new Date(log.date).getTime()
+                timestamp: new Date(log.date).getTime(),
+                isIncome: true
             });
         }
     });
@@ -948,12 +954,15 @@ function getAccountLedger(accountId) {
                 fundSuffix = ` [Fund: ${resolveFundSourceText(tx.clientId)}]`;
             }
             ledger.push({
+                id: tx.id,
+                txId: tx.id,
                 date: tx.date,
                 particulars: `${tx.description}${fundSuffix}`,
                 category: tx.category,
                 credit: 0,
                 debit: Number(tx.amount),
-                timestamp: new Date(tx.date).getTime()
+                timestamp: new Date(tx.date).getTime(),
+                isExpense: true
             });
         }
     });
@@ -2421,6 +2430,8 @@ function renderInvestmentsPage() {
 }
 
 function openInvestmentModal(id = null) {
+    window.openInvestmentModal = openInvestmentModal;
+    window.openEditInvestment = openInvestmentModal;
     const modal = document.getElementById('modal-investment');
     const form = document.getElementById('form-investment');
     const title = document.getElementById('modal-investment-title');
@@ -2776,10 +2787,105 @@ function renderExpensesPage() {
             catOptions += `<option value="${cat}">${cat} (${catTxs.length} • ${fC(catSum)})</option>`;
         });
 
+        const transferCount = (state.transfers || []).length;
+        const transferSum = (state.transfers || []).reduce((sum, tr) => sum + (Number(tr.amount) || 0), 0);
+        if (transferCount > 0) {
+            catOptions += `<option value="__contra_transfers__">🔁 Contra Transfers (${transferCount} • ${fC(transferSum)})</option>`;
+        }
+
         catSelect.innerHTML = catOptions;
         if (currentVal && Array.from(catSelect.options).some(o => o.value === currentVal)) {
             catSelect.value = currentVal;
         }
+    }
+
+    // If Contra Transfers is explicitly selected
+    if (selectedCat === '__contra_transfers__') {
+        const accordionContainer = document.getElementById('expense-categories-accordion-container');
+        if (accordionContainer) {
+            accordionContainer.innerHTML = '';
+            let filteredTransfers = [...(state.transfers || [])];
+            if (searchQuery) {
+                filteredTransfers = filteredTransfers.filter(tr => {
+                    return (tr.fromAccount && tr.fromAccount.toLowerCase().includes(searchQuery)) ||
+                           (tr.toAccount && tr.toAccount.toLowerCase().includes(searchQuery)) ||
+                           (tr.remark && tr.remark.toLowerCase().includes(searchQuery)) ||
+                           (tr.amount && String(tr.amount).includes(searchQuery));
+                });
+            }
+
+            if (filteredTransfers.length === 0) {
+                accordionContainer.innerHTML = `<div class="empty-state" style="grid-column: 1/-1; padding: 32px 16px; text-align: center;">No contra fund transfers found.</div>`;
+            } else {
+                let rowsHTML = '';
+                filteredTransfers.forEach(tr => {
+                    let typeBadgeClass = 'custom';
+                    if (tr.type === 'Cash to Bank') typeBadgeClass = 'cash-to-bank';
+                    else if (tr.type === 'Bank to Cash') typeBadgeClass = 'bank-to-cash';
+                    else if (tr.type === 'Bank to Bank') typeBadgeClass = 'bank-to-bank';
+
+                    rowsHTML += `
+                        <div class="exp-entry-row" onclick="openEditTransfer('${tr.id}')" title="Click to edit this contra transfer">
+                            <div class="exp-entry-main">
+                                <div class="exp-entry-title">
+                                    <span class="badge-transfer-type ${typeBadgeClass}" style="margin-right:6px;">${tr.type || 'Transfer'}</span>
+                                    <strong style="color:var(--danger);">${tr.fromAccount}</strong> ➔ <strong style="color:var(--success);">${tr.toAccount}</strong>
+                                </div>
+                                <div class="exp-entry-meta">
+                                    <span style="font-weight:600; color:var(--text-secondary);"><i data-lucide="calendar" style="width:11px; height:11px; display:inline-block; vertical-align:middle; margin-right:2px;"></i> ${formatDbDate(tr.date)}</span>
+                                    ${tr.remark ? `<span style="color:var(--text-secondary); font-size:11px;">${tr.remark}</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="exp-entry-right" onclick="event.stopPropagation()">
+                                <div class="exp-entry-amount" style="color:var(--primary);">${fC(tr.amount)}</div>
+                                <div class="exp-entry-actions">
+                                    <button type="button" class="btn-exp-row-edit" onclick="openEditTransfer('${tr.id}')" title="Edit Contra Transfer">
+                                        <i data-lucide="edit-3" style="width:12px; height:12px;"></i> Edit
+                                    </button>
+                                    <button type="button" class="btn-exp-row-delete" onclick="deleteTransfer('${tr.id}')" title="Delete Contra Transfer">
+                                        <i data-lucide="trash-2" style="width:12px; height:12px;"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                const trTotal = filteredTransfers.reduce((sum, tr) => sum + (Number(tr.amount) || 0), 0);
+                const card = document.createElement('div');
+                card.className = `expense-category-card expanded`;
+                card.innerHTML = `
+                    <div class="exp-cat-header">
+                        <div class="exp-cat-title-col">
+                            <span class="exp-cat-color-pill" style="background: #6366f1;"></span>
+                            <div class="exp-cat-info">
+                                <div class="exp-cat-name-row">
+                                    <h4 class="exp-cat-name">Internal Contra Transfers</h4>
+                                    <span class="exp-cat-count-badge">${filteredTransfers.length} transfers</span>
+                                </div>
+                                <span class="exp-cat-pct">Cash ↔ Bank ↔ Bank Transfers</span>
+                            </div>
+                        </div>
+                        <div class="exp-cat-total-col">
+                            <div class="exp-cat-amount" style="color:var(--primary);">${fC(trTotal)}</div>
+                        </div>
+                    </div>
+                    <div class="exp-cat-body" style="display: block;">
+                        <div class="exp-entries-list">
+                            ${rowsHTML}
+                        </div>
+                        <div style="display:flex; justify-content:flex-end; margin-top:12px; padding-top:10px; border-top:1px dashed var(--border-color);">
+                            <button class="btn btn-primary btn-sm" onclick="openTransferModal('cash-to-bank')" style="font-size:11px; padding:5px 12px; display:inline-flex; align-items:center; gap:4px;">
+                                <i data-lucide="plus" style="width:12px; height:12px;"></i> + New Contra Transfer
+                            </button>
+                        </div>
+                    </div>
+                `;
+                accordionContainer.appendChild(card);
+            }
+        }
+        if (window.lucide) lucide.createIcons();
+        return;
     }
 
     // Filter transactions by Category and Search Query
@@ -3158,7 +3264,7 @@ function renderAccountLedgerDetails() {
     
     const accId = state.selectedLedgerAccountId;
     if (!accId) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:24px;">Please select an account.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:24px;">Please select an account.</td></tr>`;
         return;
     }
 
@@ -3174,7 +3280,7 @@ function renderAccountLedgerDetails() {
     if (elClosing) elClosing.innerText = fC(closingBal);
 
     if (ledger.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px;">No transactions logged in this account book. Initial Opening Balance: ${fC(openingBal)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:32px;">No transactions logged in this account book. Initial Opening Balance: ${fC(openingBal)}</td></tr>`;
         return;
     }
 
@@ -3183,17 +3289,77 @@ function renderAccountLedgerDetails() {
         const deb = row.debit > 0 ? `-${fC(row.debit)}` : '-';
         const balanceColor = row.balance < 0 ? 'color: var(--danger);' : '';
 
+        let actionsHTML = '';
+        if (row.isOpeningBalance) {
+            actionsHTML = `
+                <div class="actions-wrapper" style="justify-content: center;">
+                    <button class="btn-icon-only edit-btn" onclick="openEditAccount('${acc.id}')" title="Edit Opening Balance"><i data-lucide="edit-3"></i></button>
+                </div>
+            `;
+        } else if (row.isTransfer || row.transferId) {
+            const trId = row.transferId || row.id;
+            actionsHTML = `
+                <div class="actions-wrapper" style="justify-content: center;">
+                    <button class="btn-icon-only edit-btn" onclick="openEditTransfer('${trId}')" title="Edit Contra Transfer"><i data-lucide="edit-3"></i></button>
+                    <button class="btn-icon-only delete-btn" onclick="deleteTransfer('${trId}')" title="Delete Contra Transfer"><i data-lucide="trash-2"></i></button>
+                </div>
+            `;
+        } else if (row.isIncome || row.incomeId) {
+            const incId = row.incomeId || row.id;
+            actionsHTML = `
+                <div class="actions-wrapper" style="justify-content: center;">
+                    <button class="btn-icon-only edit-btn" onclick="openEditIncome('${incId}')" title="Edit Income Entry"><i data-lucide="edit-3"></i></button>
+                    <button class="btn-icon-only delete-btn" onclick="deleteIncome('${incId}')" title="Delete Income Entry"><i data-lucide="trash-2"></i></button>
+                </div>
+            `;
+        } else if (row.isExpense || row.txId) {
+            const expId = row.txId || row.id;
+            actionsHTML = `
+                <div class="actions-wrapper" style="justify-content: center;">
+                    <button class="btn-icon-only edit-btn" onclick="openEditExpense('${expId}')" title="Edit Expense"><i data-lucide="edit-3"></i></button>
+                    <button class="btn-icon-only delete-btn" onclick="deleteExpense('${expId}')" title="Delete Expense"><i data-lucide="trash-2"></i></button>
+                </div>
+            `;
+        } else if (row.isLoan || row.loanId) {
+            const lId = row.loanId || row.id;
+            actionsHTML = `
+                <div class="actions-wrapper" style="justify-content: center;">
+                    <button class="btn-icon-only edit-btn" onclick="openEditLoan('${lId}')" title="Edit Loan"><i data-lucide="edit-3"></i></button>
+                    <button class="btn-icon-only delete-btn" onclick="deleteLoan('${lId}')" title="Delete Loan"><i data-lucide="trash-2"></i></button>
+                </div>
+            `;
+        } else if (row.isInvestment || row.investmentId) {
+            const invId = row.investmentId || row.id;
+            actionsHTML = `
+                <div class="actions-wrapper" style="justify-content: center;">
+                    <button class="btn-icon-only edit-btn" onclick="openInvestmentModal('${invId}')" title="Edit Investment"><i data-lucide="edit-3"></i></button>
+                    <button class="btn-icon-only delete-btn" onclick="deleteInvestment('${invId}')" title="Delete Investment"><i data-lucide="trash-2"></i></button>
+                </div>
+            `;
+        } else if (row.isInvestmentWithdrawal) {
+            const invId = row.investmentId;
+            const wId = row.withdrawalId || row.id;
+            actionsHTML = `
+                <div class="actions-wrapper" style="justify-content: center;">
+                    <button class="btn-icon-only delete-btn" onclick="deleteWithdrawal('${invId}', '${wId}')" title="Delete Withdrawal"><i data-lucide="trash-2"></i></button>
+                </div>
+            `;
+        }
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${formatDbDate(row.date)}</td>
+            <td>${row.date === 'Opening Balance' ? 'Opening Balance' : formatDbDate(row.date)}</td>
             <td style="font-weight:600;">${row.particulars}</td>
             <td><span style="font-size:11px; color:var(--text-secondary);">${row.category}</span></td>
             <td class="text-right credit-amt">${cre}</td>
             <td class="text-right debit-amt">${deb}</td>
             <td class="text-right bal-amt" style="${balanceColor}">${fC(row.balance)}</td>
+            <td class="actions-col text-center">${actionsHTML}</td>
         `;
         tbody.appendChild(tr);
     });
+
+    if (window.lucide) lucide.createIcons();
 }
 
 function renderBudgetAnalysisReport() {
@@ -5547,10 +5713,10 @@ window.deleteAccount = function(id) {
     }
 };
 
-// --- CONTRA & FUND TRANSFERS CONTROLLER (Cash to Bank / Bank to Cash) ---
+// --- CONTRA & FUND TRANSFERS CONTROLLER (Cash to Bank / Bank to Cash / Bank to Bank) ---
 let currentTransferPreset = 'cash-to-bank';
 
-window.setTransferPreset = function(preset) {
+window.setTransferPreset = function(preset, updateValues = true) {
     currentTransferPreset = preset;
     document.querySelectorAll('.transfer-type-pill').forEach(btn => btn.classList.remove('active'));
     
@@ -5564,23 +5730,41 @@ window.setTransferPreset = function(preset) {
     if (preset === 'cash-to-bank') {
         const pill = document.getElementById('pill-cash-to-bank');
         if (pill) pill.classList.add('active');
-        if (cashAccounts.length > 0) fromSel.value = cashAccounts[0].name;
-        if (bankAccounts.length > 0) toSel.value = bankAccounts[0].name;
-        if (!remarkInput.value || remarkInput.value.includes('withdrawal') || remarkInput.value.includes('deposit')) {
-            remarkInput.value = 'Cash deposit in Bank';
+        if (updateValues) {
+            if (cashAccounts.length > 0) fromSel.value = cashAccounts[0].name;
+            if (bankAccounts.length > 0) toSel.value = bankAccounts[0].name;
+            if (!remarkInput.value || remarkInput.value.includes('withdrawal') || remarkInput.value.includes('deposit') || remarkInput.value.includes('transfer') || remarkInput.value.includes('Transfer')) {
+                remarkInput.value = 'Cash deposit in Bank';
+            }
         }
     } else if (preset === 'bank-to-cash') {
         const pill = document.getElementById('pill-bank-to-cash');
         if (pill) pill.classList.add('active');
-        if (bankAccounts.length > 0) fromSel.value = bankAccounts[0].name;
-        if (cashAccounts.length > 0) toSel.value = cashAccounts[0].name;
-        if (!remarkInput.value || remarkInput.value.includes('withdrawal') || remarkInput.value.includes('deposit')) {
-            remarkInput.value = 'Cash withdrawal from Bank (ATM / Counter)';
+        if (updateValues) {
+            if (bankAccounts.length > 0) fromSel.value = bankAccounts[0].name;
+            if (cashAccounts.length > 0) toSel.value = cashAccounts[0].name;
+            if (!remarkInput.value || remarkInput.value.includes('withdrawal') || remarkInput.value.includes('deposit') || remarkInput.value.includes('transfer') || remarkInput.value.includes('Transfer')) {
+                remarkInput.value = 'Cash withdrawal from Bank (ATM / Counter)';
+            }
+        }
+    } else if (preset === 'bank-to-bank') {
+        const pill = document.getElementById('pill-bank-to-bank');
+        if (pill) pill.classList.add('active');
+        if (updateValues) {
+            if (bankAccounts.length > 0) fromSel.value = bankAccounts[0].name;
+            if (bankAccounts.length > 1) {
+                toSel.value = bankAccounts[1].name;
+            } else {
+                toSel.value = state.accounts.find(a => a.name !== fromSel.value)?.name || (state.accounts[0]?.name || '');
+            }
+            if (!remarkInput.value || remarkInput.value.includes('withdrawal') || remarkInput.value.includes('deposit') || remarkInput.value.includes('transfer') || remarkInput.value.includes('Transfer')) {
+                remarkInput.value = 'Bank to Bank fund transfer';
+            }
         }
     } else {
         const pill = document.getElementById('pill-custom-transfer');
         if (pill) pill.classList.add('active');
-        if (state.accounts.length > 1) {
+        if (updateValues && state.accounts.length > 1) {
             fromSel.value = state.accounts[0].name;
             toSel.value = state.accounts[1].name;
         }
@@ -5612,7 +5796,7 @@ window.openTransferModal = function(preset = 'cash-to-bank', editId = '') {
     if (editId) {
         const tr = state.transfers.find(t => t.id === editId);
         if (tr) {
-            title.innerHTML = `<i data-lucide="edit-3" style="width:20px; height:20px; color:var(--primary);"></i> Edit Fund Transfer`;
+            title.innerHTML = `<i data-lucide="edit-3" style="width:20px; height:20px; color:var(--primary);"></i> Edit Contra Fund Transfer`;
             document.getElementById('edit-transfer-id').value = tr.id;
             fromSel.value = tr.fromAccount;
             toSel.value = tr.toAccount;
@@ -5623,17 +5807,19 @@ window.openTransferModal = function(preset = 'cash-to-bank', editId = '') {
             const fromAcc = state.accounts.find(a => a.name === tr.fromAccount);
             const toAcc = state.accounts.find(a => a.name === tr.toAccount);
             if (fromAcc && toAcc && fromAcc.type === 'Cash' && toAcc.type === 'Bank') {
-                setTransferPreset('cash-to-bank');
+                setTransferPreset('cash-to-bank', false);
             } else if (fromAcc && toAcc && fromAcc.type === 'Bank' && toAcc.type === 'Cash') {
-                setTransferPreset('bank-to-cash');
+                setTransferPreset('bank-to-cash', false);
+            } else if (fromAcc && toAcc && fromAcc.type === 'Bank' && toAcc.type === 'Bank') {
+                setTransferPreset('bank-to-bank', false);
             } else {
-                setTransferPreset('custom');
+                setTransferPreset('custom', false);
             }
         }
     } else {
-        title.innerHTML = `<i data-lucide="arrow-left-right" style="width:20px; height:20px; color:var(--primary);"></i> Cash ↔ Bank Fund Transfer`;
+        title.innerHTML = `<i data-lucide="arrow-left-right" style="width:20px; height:20px; color:var(--primary);"></i> Cash ↔ Bank ↔ Bank Fund Transfer`;
         document.getElementById('edit-transfer-id').value = '';
-        setTransferPreset(preset);
+        setTransferPreset(preset, true);
     }
 
     modal.classList.add('active');
@@ -5666,10 +5852,12 @@ function handleTransferSubmit(e) {
 
     const fromAcc = state.accounts.find(a => a.name === fromAccount);
     const toAcc = state.accounts.find(a => a.name === toAccount);
-    let type = 'Transfer';
+    let type = 'Contra Transfer';
     if (fromAcc && toAcc) {
         if (fromAcc.type === 'Cash' && toAcc.type === 'Bank') type = 'Cash to Bank';
         else if (fromAcc.type === 'Bank' && toAcc.type === 'Cash') type = 'Bank to Cash';
+        else if (fromAcc.type === 'Bank' && toAcc.type === 'Bank') type = 'Bank to Bank';
+        else if (fromAcc.type === 'Cash' && toAcc.type === 'Cash') type = 'Cash to Cash';
     }
 
     const transferObj = {
@@ -5685,12 +5873,26 @@ function handleTransferSubmit(e) {
     addTransferDirect(transferObj);
     closeTransferModal();
     renderPage(state.activePage);
+    if (state.activePage === 'master') {
+        renderMasterAccounts();
+        renderMasterTransfers();
+    }
+    if (state.activePage === 'reports') {
+        renderAccountLedgerDetails();
+    }
 }
 
 window.deleteTransfer = function(id) {
     if (confirm("Are you sure you want to delete this internal transfer entry? Both account balances will be restored.")) {
         deleteTransferDirect(id);
         renderPage(state.activePage);
+        if (state.activePage === 'master') {
+            renderMasterAccounts();
+            renderMasterTransfers();
+        }
+        if (state.activePage === 'reports') {
+            renderAccountLedgerDetails();
+        }
     }
 };
 
@@ -5715,6 +5917,7 @@ function renderMasterTransfers() {
         let typeBadgeClass = 'custom';
         if (tr.type === 'Cash to Bank') typeBadgeClass = 'cash-to-bank';
         else if (tr.type === 'Bank to Cash') typeBadgeClass = 'bank-to-cash';
+        else if (tr.type === 'Bank to Bank') typeBadgeClass = 'bank-to-bank';
 
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -5726,8 +5929,8 @@ function renderMasterTransfers() {
             <td style="font-size:12px; color:var(--text-secondary); max-width:200px; word-break:break-word;">${tr.remark || '-'}</td>
             <td class="actions-col">
                 <div class="actions-wrapper">
-                    <button class="btn-icon-only edit-btn" onclick="openEditTransfer('${tr.id}')" title="Edit Transfer"><i data-lucide="edit-3"></i></button>
-                    <button class="btn-icon-only delete-btn" onclick="deleteTransfer('${tr.id}')" title="Delete Transfer"><i data-lucide="trash-2"></i></button>
+                    <button class="btn-icon-only edit-btn" onclick="openEditTransfer('${tr.id}')" title="Edit Contra Transfer"><i data-lucide="edit-3"></i></button>
+                    <button class="btn-icon-only delete-btn" onclick="deleteTransfer('${tr.id}')" title="Delete Contra Transfer"><i data-lucide="trash-2"></i></button>
                 </div>
             </td>
         `;

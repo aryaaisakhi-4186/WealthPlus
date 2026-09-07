@@ -3216,6 +3216,12 @@ h1, h2, h3, h4, h5, h6 {
     border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
+.badge-transfer-type.bank-to-bank {
+    background: rgba(59, 130, 246, 0.1);
+    color: #2563eb;
+    border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
 .badge-transfer-type.custom {
     background: rgba(99, 102, 241, 0.1);
     color: #6366f1;

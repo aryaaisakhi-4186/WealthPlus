@@ -25,7 +25,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=6.7.5">
+    <link rel="stylesheet" href="style.css?v=6.7.6">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -774,6 +774,7 @@
                                             <th class="text-right">Credit (Deposit)</th>
                                             <th class="text-right">Debit (Withdrawal)</th>
                                             <th class="text-right">Running Balance</th>
+                                            <th class="text-center actions-col" style="min-width: 80px;">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="account-ledger-tbody">
@@ -1697,15 +1698,18 @@
                 <!-- Quick Preset Transfer Type Selectors -->
                 <div class="form-group">
                     <label>Transfer Direction / Mode *</label>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;">
                         <button type="button" class="btn btn-outline btn-sm transfer-type-pill active" id="pill-cash-to-bank" onclick="setTransferPreset('cash-to-bank')" style="padding: 8px 4px; font-size: 11px; font-weight: 600; text-align: center;">
                             💵 ➔ 🏦 Cash to Bank
                         </button>
                         <button type="button" class="btn btn-outline btn-sm transfer-type-pill" id="pill-bank-to-cash" onclick="setTransferPreset('bank-to-cash')" style="padding: 8px 4px; font-size: 11px; font-weight: 600; text-align: center;">
                             🏦 ➔ 💵 Bank to Cash
                         </button>
+                        <button type="button" class="btn btn-outline btn-sm transfer-type-pill" id="pill-bank-to-bank" onclick="setTransferPreset('bank-to-bank')" style="padding: 8px 4px; font-size: 11px; font-weight: 600; text-align: center;">
+                            🏦 ➔ 🏦 Bank to Bank
+                        </button>
                         <button type="button" class="btn btn-outline btn-sm transfer-type-pill" id="pill-custom-transfer" onclick="setTransferPreset('custom')" style="padding: 8px 4px; font-size: 11px; font-weight: 600; text-align: center;">
-                            🔁 Other Transfer
+                            🔁 Custom Transfer
                         </button>
                     </div>
                 </div>
@@ -2021,9 +2025,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.7.5"></script>
-    <script src="app.js?v=6.7.5"></script>
-    <script src="sindhu_v1.js?v=6.7.5"></script>
+    <script src="firebase-config.js?v=6.7.6"></script>
+    <script src="app.js?v=6.7.6"></script>
+    <script src="sindhu_v1.js?v=6.7.6"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">
