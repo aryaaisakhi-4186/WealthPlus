@@ -2868,16 +2868,23 @@ function renderExpensesPage() {
                         </div>
                         <div class="exp-cat-total-col">
                             <div class="exp-cat-amount" style="color:var(--primary);">${fC(trTotal)}</div>
+                            <button type="button" class="btn btn-primary btn-sm exp-header-add-btn" onclick="event.stopPropagation(); openTransferModal('cash-to-bank')" title="New Contra Transfer" style="font-size:11px; padding:3px 9px; display:inline-flex; align-items:center; gap:4px; height:26px; border-radius:4px; font-weight:600; white-space:nowrap; background:#6366f1; border-color:#6366f1;">
+                                <i data-lucide="plus" style="width:12px; height:12px;"></i> + Transfer
+                            </button>
                         </div>
                     </div>
                     <div class="exp-cat-body" style="display: block;">
-                        <div class="exp-entries-list">
-                            ${rowsHTML}
-                        </div>
-                        <div style="display:flex; justify-content:flex-end; margin-top:12px; padding-top:10px; border-top:1px dashed var(--border-color);">
-                            <button class="btn btn-primary btn-sm" onclick="openTransferModal('cash-to-bank')" style="font-size:11px; padding:5px 12px; display:inline-flex; align-items:center; gap:4px;">
+                        <!-- TOP ACTION BAR FOR TRANSFERS -->
+                        <div class="exp-cat-top-bar" style="background:rgba(99,102,241,0.08); border-color:rgba(99,102,241,0.25);" onclick="event.stopPropagation()">
+                            <span style="font-size:12px; color:var(--text-secondary); font-weight:600;">
+                                Total Contra Transferred: <strong style="color:var(--primary); font-size:13px;">${fC(trTotal)}</strong> (${filteredTransfers.length} entries)
+                            </span>
+                            <button class="btn btn-primary btn-sm" onclick="openTransferModal('cash-to-bank')" style="font-size:11px; padding:5px 12px; display:inline-flex; align-items:center; gap:4px; font-weight:700; background:#6366f1; border-color:#6366f1; box-shadow:0 2px 4px rgba(99,102,241,0.25);">
                                 <i data-lucide="plus" style="width:12px; height:12px;"></i> + New Contra Transfer
                             </button>
+                        </div>
+                        <div class="exp-entries-list">
+                            ${rowsHTML}
                         </div>
                     </div>
                 `;
@@ -2992,21 +2999,31 @@ function renderExpensesPage() {
                         </div>
                         <div class="exp-cat-total-col">
                             <div class="exp-cat-amount">-₹${Math.round(catTotal).toLocaleString('en-IN')}</div>
+                            <button type="button" class="btn btn-primary btn-sm exp-header-add-btn" onclick="event.stopPropagation(); openAddExpenseForCategory('${cat}')" title="Add new expense to ${cat}" style="font-size:11px; padding:3px 9px; display:inline-flex; align-items:center; gap:4px; height:26px; border-radius:4px; font-weight:600; white-space:nowrap;">
+                                <i data-lucide="plus" style="width:12px; height:12px;"></i> Add
+                            </button>
                             <div class="party-card-toggle-btn" title="Click to view/hide transactions">
                                 <i data-lucide="chevron-down" class="exp-chevron-icon"></i>
                             </div>
                         </div>
                     </div>
                     <div class="exp-cat-body" style="display: ${autoExpand ? 'block' : 'none'};">
+                        <!-- TOP ACTION BAR: ADD BUTTON ABOVE EXPENSES LIST -->
+                        <div class="exp-cat-top-bar" onclick="event.stopPropagation()">
+                            <span style="font-size:12px; color:var(--text-secondary); font-weight:600;">
+                                Category Total: <strong style="color:var(--danger); font-size:13px;">-₹${Math.round(catTotal).toLocaleString('en-IN')}</strong> (${txList.length} ${txList.length === 1 ? 'entry' : 'entries'})
+                            </span>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="openAddExpenseForCategory('${cat}')" style="font-size:11px; padding:5px 12px; display:inline-flex; align-items:center; gap:4px; font-weight:700; box-shadow:0 2px 5px rgba(13,148,136,0.25);">
+                                <i data-lucide="plus" style="width:13px; height:13px;"></i> + Add Expense to ${cat}
+                            </button>
+                        </div>
                         <div class="exp-entries-list">
                             ${rowsHTML}
                         </div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:10px; border-top:1px dashed var(--border-color); flex-wrap:wrap; gap:8px;" onclick="event.stopPropagation()">
-                            <span style="font-size:12px; color:var(--text-secondary); font-weight:600;">
-                                Category Total: <strong style="color:var(--danger);">-₹${Math.round(catTotal).toLocaleString('en-IN')}</strong> (${txList.length} entries)
-                            </span>
-                            <button class="btn btn-outline btn-sm" onclick="openAddExpenseForCategory('${cat}')" style="font-size:11px; padding:5px 12px; display:inline-flex; align-items:center; gap:4px; color:var(--primary); border-color:var(--primary); font-weight:600;">
-                                <i data-lucide="plus" style="width:12px; height:12px;"></i> Add to ${cat}
+                        <!-- BOTTOM ACTION BAR: RETAINED FOR CONVENIENCE -->
+                        <div style="display:flex; justify-content:flex-end; align-items:center; margin-top:10px; padding-top:8px; border-top:1px dashed var(--border-color);" onclick="event.stopPropagation()">
+                            <button type="button" class="btn btn-outline btn-sm" onclick="openAddExpenseForCategory('${cat}')" style="font-size:11px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px; color:var(--primary); border-color:var(--primary); font-weight:600;">
+                                <i data-lucide="plus" style="width:12px; height:12px;"></i> + Add Entry
                             </button>
                         </div>
                     </div>
