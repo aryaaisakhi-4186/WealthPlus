@@ -1134,12 +1134,15 @@ function getAccountLedger(accountId) {
 function getGlobalStats() {
     let totalCashBalance = 0;
     let totalBankBalance = 0;
+    let totalPettyCashBalance = 0;
 
     state.accounts.forEach(acc => {
         const ledger = getAccountLedger(acc.id);
         const closingBal = ledger.length > 0 ? ledger[ledger.length - 1].balance : (Number(acc.openingBalance) || 0);
         
-        if (acc.type === 'Cash') {
+        if (acc.name.toLowerCase().includes('household petty cash') || acc.id === 'acc_petty_cash') {
+            totalPettyCashBalance += closingBal;
+        } else if (acc.type === 'Cash') {
             totalCashBalance += closingBal;
         } else if (acc.type === 'Bank') {
             totalBankBalance += closingBal;
@@ -1173,7 +1176,7 @@ function getGlobalStats() {
         }
     });
 
-    return { cashBalance: totalCashBalance, bankBalance: totalBankBalance, periodExpenses, totalLoansGiven, totalLoansTaken };
+    return { cashBalance: totalCashBalance, bankBalance: totalBankBalance, pettyCashBalance: totalPettyCashBalance, periodExpenses, totalLoansGiven, totalLoansTaken };
 }
 
 function getClientReportStats(clientId) {
@@ -6219,10 +6222,12 @@ window.setTransferPreset = function(preset, updateValues = true) {
         const pill = document.getElementById('pill-bank-to-cash');
         if (pill) pill.classList.add('active');
         if (updateValues) {
+            const mainCash = state.accounts.find(a => a.name === 'Main Cash' || a.id === 'acc_1');
             if (bankAccounts.length > 0) fromSel.value = bankAccounts[0].name;
-            if (cashAccounts.length > 0) toSel.value = cashAccounts[0].name;
+            if (mainCash) toSel.value = mainCash.name;
+            else if (cashAccounts.length > 0) toSel.value = cashAccounts[0].name;
             if (!remarkInput.value || remarkInput.value.includes('withdrawal') || remarkInput.value.includes('deposit') || remarkInput.value.includes('transfer') || remarkInput.value.includes('Transfer') || remarkInput.value.includes('Disbursed')) {
-                remarkInput.value = 'Cash withdrawal from Bank (ATM / Counter)';
+                remarkInput.value = 'Cash withdrawal from Bank (Main Cash)';
             }
         }
     } else if (preset === 'bank-to-bank') {
@@ -6281,12 +6286,22 @@ window.openTransferModal = function(preset = 'cash-to-bank', editId = '') {
     form.reset();
     if (feedback) feedback.style.display = 'none';
 
-    // Populate Accounts dropdowns
+    // Populate Accounts dropdowns with clear descriptive labels
     fromSel.innerHTML = '';
     toSel.innerHTML = '';
     state.accounts.forEach(a => {
-        fromSel.innerHTML += `<option value="${a.name}">${a.name} (${a.type})</option>`;
-        toSel.innerHTML += `<option value="${a.name}">${a.name} (${a.type})</option>`;
+        let label = `${a.name} (${a.type})`;
+        if (a.name.toLowerCase().includes('household petty cash') || a.id === 'acc_petty_cash') {
+            label = `🏠 Household Petty Cash (घरेलू रोकड़ Wallet)`;
+        } else if (a.name === 'Main Cash' || a.id === 'acc_1') {
+            label = `💵 Main Cash (मुख्य व्यावसायिक रोकड़)`;
+        } else if (a.type === 'Bank') {
+            label = `🏦 ${a.name} (Bank Account)`;
+        } else if (a.type === 'Credit Card') {
+            label = `💳 ${a.name} (Credit Card)`;
+        }
+        fromSel.innerHTML += `<option value="${a.name}">${label}</option>`;
+        toSel.innerHTML += `<option value="${a.name}">${label}</option>`;
     });
 
     document.getElementById('transfer-date').value = new Date().toISOString().split('T')[0];
