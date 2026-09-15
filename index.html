@@ -95,6 +95,10 @@
                     <i data-lucide="arrow-up-right"></i>
                     <span>Expenses</span>
                 </a>
+                <a href="#" class="menu-item" data-page="petty-cash" id="nav-petty-cash">
+                    <i data-lucide="home"></i>
+                    <span>Petty Cash (घरेलू)</span>
+                </a>
                 <a href="#" class="menu-item" data-page="reports" id="nav-reports">
                     <i data-lucide="file-bar-chart"></i>
                     <span>Reports & Ledgers</span>
@@ -648,7 +652,191 @@
                     </div>
                 </section>
 
-                <!-- 4. REPORTS & LEDGERS PAGE -->
+                <!-- 5. HOUSEHOLD PETTY CASH PAGE -->
+                <section id="page-petty-cash" class="app-page">
+                    <div class="section-actions-header">
+                        <div>
+                            <h3 style="margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="home" style="color: #0d9488; width: 22px; height: 22px;"></i> Household Petty Cash
+                            </h3>
+                            <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">Separate Household Cash Wallet • Admin Fund Inflows • Member Expense Heads</p>
+                        </div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button class="btn btn-primary" id="btn-petty-admin-fund" onclick="openTransferModal('admin-to-petty')" style="background: #0d9488; border-color: #0d9488; font-weight: 700;">
+                                <i data-lucide="arrow-down-left"></i> ➕ Admin Fund Transfer
+                            </button>
+                            <button class="btn btn-outline" id="btn-add-petty-expense" onclick="openAddExpenseForCategory('Household Petty Cash')" style="color: #0d9488; border-color: #0d9488; font-weight: 700;">
+                                <i data-lucide="plus"></i> 💸 Add Petty Expense
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Distinction Banner: Main Cash vs Household Petty Cash -->
+                    <div class="petty-cash-distinction-banner" style="background: linear-gradient(135deg, rgba(13,148,136,0.1) 0%, rgba(99,102,241,0.05) 100%); border: 1.5px solid rgba(13,148,136,0.3); border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 20px;">🛡️</span>
+                            <div>
+                                <strong style="font-size: 13px; color: var(--text-primary);">Independent Cash Separation:</strong>
+                                <span style="font-size: 12px; color: var(--text-secondary); display: block;">Main Cash (व्यावसायिक रोकड़) and Household Petty Cash (घरेलू खर्च रोकड़) are strictly separated.</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 12px; font-size: 11px;">
+                                <span style="color: var(--text-secondary);">💵 Main Cash in Hand:</span>
+                                <strong id="petty-main-cash-display" style="color: var(--text-primary); margin-left: 4px; font-size: 12px;">₹0</strong>
+                            </div>
+                            <div style="background: rgba(13,148,136,0.12); border: 1px solid rgba(13,148,136,0.35); border-radius: 6px; padding: 6px 12px; font-size: 11px;">
+                                <span style="color: #0d9488; font-weight: 600;">🏠 Petty Cash Wallet:</span>
+                                <strong id="petty-wallet-balance-display" style="color: #0d9488; margin-left: 4px; font-size: 13px;">₹0</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4-KPI Petty Cash Wallet Stats Grid -->
+                    <div class="stats-grid" style="margin-bottom: 20px;">
+                        <div class="stat-card" style="border-left: 4px solid #0d9488;">
+                            <div class="stat-icon" style="background: rgba(13,148,136,0.12); color: #0d9488;">
+                                <i data-lucide="wallet"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Available Petty Balance</h3>
+                                <span class="amount" id="stat-petty-balance" style="color: #0d9488;">₹0</span>
+                                <span class="helper-text">Ready for Member Expenses</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid var(--success);">
+                            <div class="stat-icon" style="background: rgba(16,185,129,0.12); color: var(--success);">
+                                <i data-lucide="arrow-down-left"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Disbursed by Admin</h3>
+                                <span class="amount" id="stat-petty-inflow" style="color: var(--success);">+₹0</span>
+                                <span class="helper-text" id="stat-petty-inflow-sub">0 Contra Transfers</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid var(--danger);">
+                            <div class="stat-icon" style="background: rgba(225,29,72,0.12); color: var(--danger);">
+                                <i data-lucide="arrow-up-right"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Spent by Members</h3>
+                                <span class="amount" id="stat-petty-outflow" style="color: var(--danger);">-₹0</span>
+                                <span class="helper-text" id="stat-petty-outflow-sub">0 Expenses logged</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid #6366f1;">
+                            <div class="stat-icon" style="background: rgba(99,102,241,0.12); color: #6366f1;">
+                                <i data-lucide="tags"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3>Active Expense Heads</h3>
+                                <span class="amount" id="stat-petty-heads-count" style="color: #6366f1;">10 Heads</span>
+                                <span class="helper-text">Subcategories Configured</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Expense Head Breakdown Section ("Kis Head me Kitna Kharcha Hua") -->
+                    <div class="dashboard-box" style="margin-bottom: 20px;">
+                        <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 18px;">📊</span>
+                                <div>
+                                    <h4 style="margin: 0;">Kis Head me Kitna Kharcha Hua (Expense Head Breakdown)</h4>
+                                    <span style="font-size: 11px; color: var(--text-secondary);">Click on any head to record an expense for it</span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="openAddExpenseForCategory('Household Petty Cash')" style="font-size: 11px; padding: 4px 10px;">
+                                <i data-lucide="plus" style="width: 12px; height: 12px;"></i> + Add Expense
+                            </button>
+                        </div>
+                        <div class="petty-heads-grid" id="petty-page-heads-grid" style="margin-top: 14px; margin-bottom: 0;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Member Spending Breakdown Section ("Kis Member ne Kitna Kharcha Kiya") -->
+                    <div class="dashboard-box" style="margin-bottom: 20px;">
+                        <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 18px;">👥</span>
+                                <div>
+                                    <h4 style="margin: 0;">Kis Member ne Kitna Kharcha Kiya (Member Spending Breakdown)</h4>
+                                    <span style="font-size: 11px; color: var(--text-secondary);">Member-wise petty cash expenditure distribution</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="petty-members-wrapper" id="petty-page-members-grid" style="margin-top: 14px; margin-bottom: 0;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Petty Cash Filter & Search Bar -->
+                    <div class="party-filter-dropdown-wrapper" style="margin-bottom: 14px; padding: 10px 12px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+                            <label style="font-size: 12px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 5px;">
+                                <i data-lucide="filter" style="width: 14px; height: 14px; color: #0d9488;"></i> Filter Petty Cash Transactions:
+                            </label>
+                            <span id="petty-table-total-badge" class="badge" style="font-size: 11px; padding: 2px 8px; background: rgba(13,148,136,0.12); color: #0d9488;">Total: ₹0 (0 Entries)</span>
+                        </div>
+                        <div class="filter-controls-grid-2" style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; width: 100%;">
+                            <div class="searchable-input-wrapper" style="position: relative; width: 100%;">
+                                <i data-lucide="search" class="search-input-icon" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-muted); pointer-events: none;"></i>
+                                <input type="text" id="petty-search-input" class="searchable-input" placeholder="🔍 Search description, head, member, amount..." autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 0 28px 0 30px !important; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 12px; height: 34px; outline: none; margin: 0;">
+                                <button type="button" class="btn-clear-search" id="btn-clear-petty-search" style="display: none; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;" title="Clear search">
+                                    <i data-lucide="x" style="width: 12px; height: 12px;"></i>
+                                </button>
+                            </div>
+                            <div>
+                                <select id="petty-head-filter-select" style="width: 100%; box-sizing: border-box; padding: 0 8px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-weight: 600; font-size: 12px; height: 34px; outline: none; margin: 0;">
+                                    <option value="all">🏷️ All Heads</option>
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+                            <div>
+                                <select id="petty-member-filter-select" style="width: 100%; box-sizing: border-box; padding: 0 8px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-weight: 600; font-size: 12px; height: 34px; outline: none; margin: 0;">
+                                    <option value="all">👤 All Members</option>
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Petty Cash Statement & Detailed Ledger Table -->
+                    <div class="section-actions-header" style="margin-top: 16px; margin-bottom: 12px;">
+                        <h4 style="margin: 0; font-size: 15px; color: var(--text-primary);">Petty Cash Statement & Transaction Log</h4>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="btn btn-outline btn-sm" id="btn-print-petty-statement" onclick="printPettyCashStatement()" style="font-size: 11px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 5px;">
+                                <i data-lucide="printer" style="width: 12px; height: 12px;"></i> Print Statement
+                            </button>
+                            <button class="btn btn-success btn-sm" id="btn-export-petty-excel" onclick="exportPettyCashToExcel()" style="font-size: 11px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 5px; background: #107c41; border-color: #107c41; color: #fff;">
+                                <i data-lucide="download" style="width: 12px; height: 12px;"></i> Export Excel
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-container" id="petty-table-container">
+                        <table class="data-table" id="table-petty-cash">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Particulars & Head</th>
+                                    <th>Spent By Member</th>
+                                    <th>Type / Account</th>
+                                    <th style="text-align: right; color: var(--success);">Inflow / Admin (₹)</th>
+                                    <th style="text-align: right; color: var(--danger);">Expense / Outflow (₹)</th>
+                                    <th style="text-align: right;">Running Balance (₹)</th>
+                                    <th class="actions-col">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="petty-cash-tbody">
+                                <!-- Rendered dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 6. REPORTS & LEDGERS PAGE -->
                 <section id="page-reports" class="app-page">
                     <div class="reports-header-bar">
                         <div class="reports-nav-tabs">
@@ -1369,6 +1557,10 @@
             <a href="#" class="bottom-nav-item" data-page="expenses">
                 <i data-lucide="arrow-up-right"></i>
                 <span>Expenses</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-page="petty-cash">
+                <i data-lucide="home"></i>
+                <span>Petty</span>
             </a>
             <a href="#" class="bottom-nav-item" data-page="reports">
                 <i data-lucide="file-bar-chart"></i>

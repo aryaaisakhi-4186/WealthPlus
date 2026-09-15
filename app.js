@@ -1254,6 +1254,7 @@ function navigateToPage(pageId) {
         'loans': 'Loans & Credit Manager',
         'investments': 'Investment Portfolio',
         'expenses': 'Wealth Plus Entries',
+        'petty-cash': 'Household Petty Cash Manager',
         'reports': 'Reports & Bookkeeping',
         'master': 'Master Settings Dashboard'
     };
@@ -1343,6 +1344,9 @@ function renderPage(pageId) {
             break;
         case 'expenses':
             renderExpensesPage();
+            break;
+        case 'petty-cash':
+            renderPettyCashPage();
             break;
         case 'reports':
             renderReportsPage();
@@ -3277,6 +3281,374 @@ function renderExpensesPage() {
     if (window.lucide) lucide.createIcons();
 }
 
+// 5. HOUSEHOLD PETTY CASH PAGE RENDERER
+function renderPettyCashPage() {
+    const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
+    
+    // Locate Petty Cash & Main Cash accounts
+    const pettyAcc = state.accounts.find(a => a.name.toLowerCase().includes('household petty cash') || a.id === 'acc_petty_cash');
+    const pettyAccId = pettyAcc ? pettyAcc.id : 'acc_petty_cash';
+    const pettyAccName = pettyAcc ? pettyAcc.name : 'Household Petty Cash';
+    
+    const mainCashAcc = state.accounts.find(a => a.name === 'Main Cash' || a.id === 'acc_1');
+    const mainCashLedger = mainCashAcc ? getAccountLedger(mainCashAcc.id) : [];
+    const mainCashBalance = mainCashLedger.length > 0 ? mainCashLedger[mainCashLedger.length - 1].balance : (Number(mainCashAcc?.openingBalance) || 0);
+
+    // Get live Ledger for Household Petty Cash
+    const pettyLedger = getAccountLedger(pettyAccId);
+    const pettyBalance = pettyLedger.length > 0 ? pettyLedger[pettyLedger.length - 1].balance : (Number(pettyAcc?.openingBalance) || 0);
+
+    // Calculate Inflows & Outflows
+    const adminInflowTotal = pettyLedger.reduce((sum, r) => sum + (Number(r.credit) || 0), 0);
+    const adminTransfers = (state.transfers || []).filter(tr => tr.toAccount && (tr.toAccount === pettyAccName || tr.toAccount.toLowerCase().includes('household petty cash')));
+    
+    const memberOutflowTotal = pettyLedger.reduce((sum, r) => sum + (Number(r.debit) || 0), 0);
+    const memberExpenses = state.transactions.filter(t => t.category === 'Household Petty Cash' || t.mode === pettyAccName);
+
+    // Update Distinction Banner
+    const mainCashEl = document.getElementById('petty-main-cash-display');
+    if (mainCashEl) mainCashEl.innerText = fC(mainCashBalance);
+
+    const walletBalEl = document.getElementById('petty-wallet-balance-display');
+    if (walletBalEl) walletBalEl.innerText = fC(pettyBalance);
+
+    // Update 4-KPI Grid
+    const statBal = document.getElementById('stat-petty-balance');
+    if (statBal) {
+        statBal.innerText = fC(pettyBalance);
+        statBal.style.color = pettyBalance >= 0 ? '#0d9488' : 'var(--danger)';
+    }
+
+    const statIn = document.getElementById('stat-petty-inflow');
+    if (statIn) statIn.innerText = `+${fC(adminInflowTotal)}`;
+
+    const statInSub = document.getElementById('stat-petty-inflow-sub');
+    if (statInSub) statInSub.innerText = `${adminTransfers.length} Transfers + Opening`;
+
+    const statOut = document.getElementById('stat-petty-outflow');
+    if (statOut) statOut.innerText = `-${fC(memberOutflowTotal)}`;
+
+    const statOutSub = document.getElementById('stat-petty-outflow-sub');
+    if (statOutSub) statOutSub.innerText = `${memberExpenses.length} Expenses logged`;
+
+    const statHeads = document.getElementById('stat-petty-heads-count');
+    if (statHeads) statHeads.innerText = `${defaultHouseholdHeads.length} Heads`;
+
+    // 1. Render Head-wise Breakdown Cards ("Kis Head me Kitna Kharcha Hua")
+    const headsGrid = document.getElementById('petty-page-heads-grid');
+    if (headsGrid) {
+        headsGrid.innerHTML = '';
+        const allHouseholdHeadsList = Array.from(new Set([
+            ...defaultHouseholdHeads,
+            ...memberExpenses.map(t => t.head).filter(Boolean)
+        ]));
+
+        allHouseholdHeadsList.forEach(headName => {
+            const headTxs = memberExpenses.filter(t => (t.head || 'Misc Household Expenses') === headName || (!t.head && headName === 'Misc Household Expenses'));
+            const headSum = headTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+            const headPct = memberOutflowTotal > 0 ? Math.round((headSum / memberOutflowTotal) * 100) : 0;
+
+            let emoji = '📌';
+            if (headName.includes('Grocery') || headName.includes('Ration')) emoji = '🛒';
+            else if (headName.includes('Vegetables') || headName.includes('Fruits')) emoji = '🥦';
+            else if (headName.includes('Milk') || headName.includes('Dairy')) emoji = '🥛';
+            else if (headName.includes('Maid') || headName.includes('Cook')) emoji = '🧹';
+            else if (headName.includes('Maintenance') || headName.includes('Repairs')) emoji = '🔧';
+            else if (headName.includes('Electricity') || headName.includes('Gas') || headName.includes('Water')) emoji = '⚡';
+            else if (headName.includes('Children') || headName.includes('Education')) emoji = '📚';
+            else if (headName.includes('Medical') || headName.includes('Medicines')) emoji = '💊';
+            else if (headName.includes('Transport') || headName.includes('Fuel')) emoji = '🚗';
+            else if (headName.includes('Misc')) emoji = '📦';
+
+            const card = document.createElement('div');
+            card.className = `petty-head-card ${headSum > 0 ? 'active' : ''}`;
+            card.title = `Click to log expense under ${headName}`;
+            card.onclick = () => openAddExpenseForCategory('Household Petty Cash', headName);
+            card.innerHTML = `
+                <div class="petty-head-header">
+                    <span class="petty-head-icon">${emoji}</span>
+                    <span class="petty-head-name">${headName}</span>
+                </div>
+                <div class="petty-head-amount-row">
+                    <span class="petty-head-amount">${fC(headSum)}</span>
+                    <span class="petty-head-count">${headTxs.length} ${headTxs.length === 1 ? 'entry' : 'entries'}</span>
+                </div>
+                <div class="petty-head-progress-bg">
+                    <div class="petty-head-progress-fill" style="width: ${headPct}%;"></div>
+                </div>
+                <div class="petty-head-footer">
+                    <span class="petty-head-pct">${headPct}% of petty spend</span>
+                    <span class="petty-head-add-link">+ Add</span>
+                </div>
+            `;
+            headsGrid.appendChild(card);
+        });
+    }
+
+    // 2. Render Member Spending Breakdown ("Kis Member ne Kitna Kharcha Kiya")
+    const membersGrid = document.getElementById('petty-page-members-grid');
+    if (membersGrid) {
+        membersGrid.innerHTML = '';
+        const memberSpendMap = {};
+        memberExpenses.forEach(t => {
+            const memberName = t.spentBy || 'Admin / Unspecified';
+            memberSpendMap[memberName] = (memberSpendMap[memberName] || 0) + (Number(t.amount) || 0);
+        });
+
+        if (Object.keys(memberSpendMap).length === 0) {
+            membersGrid.innerHTML = `<span style="font-size:12px; color:var(--text-muted); font-style:italic;">No member expenses logged yet.</span>`;
+        } else {
+            Object.keys(memberSpendMap).forEach(mName => {
+                const mSum = memberSpendMap[mName];
+                const mPct = memberOutflowTotal > 0 ? Math.round((mSum / memberOutflowTotal) * 100) : 0;
+
+                const chip = document.createElement('div');
+                chip.className = 'petty-member-chip';
+                chip.title = `Click to add expense for ${mName}`;
+                chip.onclick = () => openExpenseModal('', 'Household Petty Cash', 'Household Petty Cash', '', mName);
+                chip.innerHTML = `
+                    <span class="petty-member-icon">👤</span>
+                    <strong class="petty-member-name">${mName}:</strong>
+                    <span class="petty-member-amount">${fC(mSum)}</span>
+                    <span class="petty-member-pct">(${mPct}%)</span>
+                `;
+                membersGrid.appendChild(chip);
+            });
+        }
+    }
+
+    // 3. Populate Filter Dropdowns
+    const headSelect = document.getElementById('petty-head-filter-select');
+    if (headSelect) {
+        const curHead = headSelect.value || 'all';
+        const allHeads = Array.from(new Set([
+            ...defaultHouseholdHeads,
+            ...memberExpenses.map(t => t.head).filter(Boolean)
+        ]));
+        let headOpts = `<option value="all">🏷️ All Heads (${allHeads.length})</option>`;
+        allHeads.forEach(h => {
+            headOpts += `<option value="${h}">${h}</option>`;
+        });
+        headSelect.innerHTML = headOpts;
+        if (curHead && Array.from(headSelect.options).some(o => o.value === curHead)) {
+            headSelect.value = curHead;
+        }
+    }
+
+    const memberSelect = document.getElementById('petty-member-filter-select');
+    if (memberSelect) {
+        const curMem = memberSelect.value || 'all';
+        let memOpts = `<option value="all">👤 All Members</option>`;
+        (state.members || []).forEach(m => {
+            memOpts += `<option value="${m.name}">${m.name} (${m.role || 'Member'})</option>`;
+        });
+        memberSelect.innerHTML = memOpts;
+        if (curMem && Array.from(memberSelect.options).some(o => o.value === curMem)) {
+            memberSelect.value = curMem;
+        }
+    }
+
+    // 4. Filter & Render Statement Table
+    const searchInput = document.getElementById('petty-search-input');
+    const searchQuery = (searchInput ? searchInput.value : '').trim().toLowerCase();
+    const selectedHead = (headSelect ? headSelect.value : 'all') || 'all';
+    const selectedMember = (memberSelect ? memberSelect.value : 'all') || 'all';
+
+    // Filter petty ledger rows
+    let displayRows = [...pettyLedger];
+
+    if (selectedHead !== 'all') {
+        displayRows = displayRows.filter(r => {
+            if (r.isOpeningBalance || r.isTransfer) return false;
+            const tx = state.transactions.find(t => t.id === r.txId);
+            return (tx && tx.head === selectedHead) || (r.particulars && r.particulars.includes(`[Head: ${selectedHead}]`));
+        });
+    }
+
+    if (selectedMember !== 'all') {
+        displayRows = displayRows.filter(r => {
+            if (r.isOpeningBalance || r.isTransfer) return false;
+            const tx = state.transactions.find(t => t.id === r.txId);
+            return (tx && tx.spentBy === selectedMember) || (r.particulars && r.particulars.includes(`(By: ${selectedMember})`));
+        });
+    }
+
+    if (searchQuery) {
+        displayRows = displayRows.filter(r => {
+            const partMatch = r.particulars && r.particulars.toLowerCase().includes(searchQuery);
+            const dateMatch = r.date && String(r.date).toLowerCase().includes(searchQuery);
+            const credMatch = r.credit && String(r.credit).includes(searchQuery);
+            const debMatch = r.debit && String(r.debit).includes(searchQuery);
+            return partMatch || dateMatch || credMatch || debMatch;
+        });
+    }
+
+    const tableBadge = document.getElementById('petty-table-total-badge');
+    if (tableBadge) {
+        tableBadge.innerText = `Total: ${fC(pettyBalance)} (${displayRows.length} Entries)`;
+    }
+
+    const tbody = document.getElementById('petty-cash-tbody');
+    if (tbody) {
+        tbody.innerHTML = '';
+        if (displayRows.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:32px;">No petty cash transactions found matching filters.</td></tr>`;
+        } else {
+            // Sort newest first
+            const sortedRows = [...displayRows].sort((a, b) => b.timestamp - a.timestamp);
+
+            sortedRows.forEach(row => {
+                const tr = document.createElement('tr');
+                
+                let headPill = '';
+                let memberPill = '<span style="color:var(--text-muted); font-size:11px;">-</span>';
+                let txRef = null;
+
+                if (row.isExpense) {
+                    txRef = state.transactions.find(t => t.id === row.txId);
+                    if (txRef) {
+                        if (txRef.head) headPill = `<span class="badge-head" style="margin-right:4px;">🏷️ ${txRef.head}</span>`;
+                        if (txRef.spentBy) memberPill = `<span class="badge-spent-by">👤 ${txRef.spentBy}</span>`;
+                    }
+                } else if (row.isTransfer) {
+                    headPill = `<span class="badge-transfer-type admin-to-petty" style="margin-right:4px;">Admin Transfer</span>`;
+                } else if (row.isOpeningBalance) {
+                    headPill = `<span class="badge" style="background:rgba(99,102,241,0.1); color:#6366f1; margin-right:4px;">Opening</span>`;
+                }
+
+                let actionBtns = '';
+                if (row.isExpense && row.txId) {
+                    actionBtns = `
+                        <div class="actions-wrapper">
+                            <button class="btn-icon-only edit-btn" onclick="openEditExpense('${row.txId}')" title="Edit Expense"><i data-lucide="edit-3"></i></button>
+                            <button class="btn-icon-only delete-btn" style="display: var(--staff-access-display, inline-flex);" onclick="deleteExpense('${row.txId}')" title="Delete Expense"><i data-lucide="trash-2"></i></button>
+                        </div>
+                    `;
+                } else if (row.isTransfer && row.transferId) {
+                    actionBtns = `
+                        <div class="actions-wrapper">
+                            <button class="btn-icon-only edit-btn" onclick="openEditTransfer('${row.transferId}')" title="Edit Transfer"><i data-lucide="edit-3"></i></button>
+                            <button class="btn-icon-only delete-btn" style="display: var(--staff-access-display, inline-flex);" onclick="deleteTransfer('${row.transferId}')" title="Delete Transfer"><i data-lucide="trash-2"></i></button>
+                        </div>
+                    `;
+                } else {
+                    actionBtns = `<span style="color:var(--text-muted); font-size:11px;">-</span>`;
+                }
+
+                tr.innerHTML = `
+                    <td style="white-space:nowrap; font-weight:600;">${row.date === 'Opening Balance' ? 'Opening' : formatDbDate(row.date)}</td>
+                    <td style="font-weight:600;">${headPill}${row.particulars}</td>
+                    <td>${memberPill}</td>
+                    <td><span class="badge-acctype">${row.category || 'Petty Cash'}</span></td>
+                    <td style="text-align:right; font-weight:700; color:var(--success);">${row.credit > 0 ? `+${fC(row.credit)}` : '-'}</td>
+                    <td style="text-align:right; font-weight:700; color:var(--danger);">${row.debit > 0 ? `-${fC(row.debit)}` : '-'}</td>
+                    <td style="text-align:right; font-weight:800; color:${row.balance >= 0 ? 'var(--text-primary)' : 'var(--danger)'};">${fC(row.balance)}</td>
+                    <td class="actions-col">${actionBtns}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    }
+
+    if (window.lucide) lucide.createIcons();
+}
+
+window.exportPettyCashToExcel = function() {
+    const pettyAcc = state.accounts.find(a => a.name.toLowerCase().includes('household petty cash') || a.id === 'acc_petty_cash');
+    const pettyLedger = getAccountLedger(pettyAcc ? pettyAcc.id : 'acc_petty_cash');
+    
+    if (pettyLedger.length === 0) {
+        alert("No petty cash records found to export.");
+        return;
+    }
+
+    const excelRows = pettyLedger.map((r, idx) => {
+        const tx = r.txId ? state.transactions.find(t => t.id === r.txId) : null;
+        return {
+            'S.No': idx + 1,
+            'Date': r.date,
+            'Particulars': r.particulars,
+            'Expense Head': tx ? (tx.head || '-') : (r.isTransfer ? 'Admin Transfer' : '-'),
+            'Spent By Member': tx ? (tx.spentBy || '-') : '-',
+            'Inflow / Credit (₹)': r.credit > 0 ? r.credit : 0,
+            'Outflow / Debit (₹)': r.debit > 0 ? r.debit : 0,
+            'Running Balance (₹)': r.balance
+        };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(excelRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Petty Cash Statement");
+    XLSX.writeFile(workbook, `Household_Petty_Cash_${new Date().toISOString().split('T')[0]}.xlsx`);
+};
+
+window.printPettyCashStatement = function() {
+    const pettyAcc = state.accounts.find(a => a.name.toLowerCase().includes('household petty cash') || a.id === 'acc_petty_cash');
+    const pettyLedger = getAccountLedger(pettyAcc ? pettyAcc.id : 'acc_petty_cash');
+    const closingBal = pettyLedger.length > 0 ? pettyLedger[pettyLedger.length - 1].balance : 0;
+    const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
+
+    let rowsHTML = '';
+    pettyLedger.forEach((r, idx) => {
+        const tx = r.txId ? state.transactions.find(t => t.id === r.txId) : null;
+        rowsHTML += `
+            <tr>
+                <td>${idx + 1}</td>
+                <td>${r.date}</td>
+                <td>${r.particulars}</td>
+                <td>${tx ? (tx.head || '-') : (r.isTransfer ? 'Admin Transfer' : '-')}</td>
+                <td>${tx ? (tx.spentBy || '-') : '-'}</td>
+                <td style="text-align:right; color:#10b981;">${r.credit > 0 ? fC(r.credit) : '-'}</td>
+                <td style="text-align:right; color:#e11d48;">${r.debit > 0 ? fC(r.debit) : '-'}</td>
+                <td style="text-align:right; font-weight:700;">${fC(r.balance)}</td>
+            </tr>
+        `;
+    });
+
+    const printWin = window.open('', '_blank', 'width=900,height=700');
+    printWin.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Household Petty Cash Statement - Wealth Plus</title>
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; color: #1e293b; }
+                h2, h4 { margin: 0 0 6px 0; }
+                table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+                th, td { border: 1px solid #cbd5e1; padding: 8px 10px; font-size: 12px; }
+                th { background: #f1f5f9; font-weight: 700; text-align: left; }
+                .header-box { border-bottom: 2px solid #0d9488; padding-bottom: 12px; margin-bottom: 16px; }
+            </style>
+        </head>
+        <body>
+            <div class="header-box">
+                <h2>Wealth Plus - Household Petty Cash Statement</h2>
+                <p style="font-size:12px; color:#64748b; margin:4px 0;">Generated on: ${new Date().toLocaleString('en-IN')} | Net Wallet Balance: <strong>${fC(closingBal)}</strong></p>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Date</th>
+                        <th>Particulars</th>
+                        <th>Head</th>
+                        <th>Spent By</th>
+                        <th style="text-align:right;">Inflow (₹)</th>
+                        <th style="text-align:right;">Outflow (₹)</th>
+                        <th style="text-align:right;">Balance (₹)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHTML}
+                </tbody>
+            </table>
+            <script>window.print();<\/script>
+        </body>
+        </html>
+    `);
+    printWin.document.close();
+};
+
 // REPORTS PAGE RENDERER
 function renderReportsPage() {
     const clientSelect = document.getElementById('report-client-select');
@@ -4489,6 +4861,39 @@ function initEventHandlers() {
             renderInvestmentsPage();
         });
     }
+
+    // Household Petty Cash Live Search & Filters
+    const pettySearchInput = document.getElementById('petty-search-input');
+    const btnClearPettySearch = document.getElementById('btn-clear-petty-search');
+    if (pettySearchInput) {
+        pettySearchInput.addEventListener('input', function() {
+            if (btnClearPettySearch) {
+                btnClearPettySearch.style.display = this.value ? 'block' : 'none';
+            }
+            renderPettyCashPage();
+        });
+    }
+    if (btnClearPettySearch && pettySearchInput) {
+        btnClearPettySearch.addEventListener('click', function() {
+            pettySearchInput.value = '';
+            btnClearPettySearch.style.display = 'none';
+            pettySearchInput.focus();
+            renderPettyCashPage();
+        });
+    }
+    const pettyHeadFilter = document.getElementById('petty-head-filter-select');
+    if (pettyHeadFilter) {
+        pettyHeadFilter.addEventListener('change', function() {
+            renderPettyCashPage();
+        });
+    }
+    const pettyMemberFilter = document.getElementById('petty-member-filter-select');
+    if (pettyMemberFilter) {
+        pettyMemberFilter.addEventListener('change', function() {
+            renderPettyCashPage();
+        });
+    }
+
 
     // Modals triggers
     document.getElementById('btn-add-client').addEventListener('click', () => openClientModal());
