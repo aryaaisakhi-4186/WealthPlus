@@ -5303,13 +5303,13 @@ function buildClientStatementElement(client, stats, fy) {
         const mVal = (ci.months !== undefined && ci.months !== null && ci.months !== '') ? ci.months : (ci.months === 0 ? 0 : '-');
         const rVal = (Number(ci.rate) > 0) ? fC(ci.rate) : (ci.rate === 0 || ci.rate === '0' ? '₹0' : '-');
         contractRowsHTML += `
-            <tr>
-                <td style="text-align:center;">${idx + 1}</td>
-                <td><strong>${ci.particulars || 'Service / Retainer'}</strong></td>
-                <td>${ci.period || ('FY ' + fy)}</td>
-                <td style="text-align:center;">${mVal}</td>
-                <td style="text-align:right;">${rVal}</td>
-                <td style="text-align:right; font-weight:700;">${fC(ci.amount || 0)}</td>
+            <tr style="page-break-inside:avoid; break-inside:avoid;">
+                <td style="border:1px solid #cbd5e1; padding:5px 6px; text-align:center;">${idx + 1}</td>
+                <td style="border:1px solid #cbd5e1; padding:5px 6px;"><strong>${ci.particulars || 'Service / Retainer'}</strong></td>
+                <td style="border:1px solid #cbd5e1; padding:5px 6px;">${ci.period || ('FY ' + fy)}</td>
+                <td style="border:1px solid #cbd5e1; padding:5px 6px; text-align:center;">${mVal}</td>
+                <td style="border:1px solid #cbd5e1; padding:5px 6px; text-align:right;">${rVal}</td>
+                <td style="border:1px solid #cbd5e1; padding:5px 6px; text-align:right; font-weight:700;">${fC(ci.amount || 0)}</td>
             </tr>
         `;
     });
@@ -5318,27 +5318,29 @@ function buildClientStatementElement(client, stats, fy) {
     let loansRowsHTML = '';
     if (stats.loansList && stats.loansList.length > 0) {
         loansRowsHTML = `
-            <h4 style="margin: 18px 0 8px 0; color:#0f766e; border-bottom: 2px solid #0f766e; padding-bottom: 4px; font-size:14px;">Loans & Credit Record</h4>
-            <table style="width:100%; border-collapse:collapse; margin-bottom:15px;">
-                <thead>
-                    <tr style="background:#f0fdfa; color:#0f766e;">
-                        <th style="border:1px solid #cbd5e1; padding:6px 8px; text-align:left;">Date</th>
-                        <th style="border:1px solid #cbd5e1; padding:6px 8px; text-align:left;">Transaction / Particulars</th>
-                        <th style="border:1px solid #cbd5e1; padding:6px 8px; text-align:left;">Payment Account</th>
-                        <th style="border:1px solid #cbd5e1; padding:6px 8px; text-align:right;">Disbursed Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${stats.loansList.map(l => `
-                        <tr>
-                            <td style="border:1px solid #cbd5e1; padding:6px 8px;">${formatDbDate(l.date)}</td>
-                            <td style="border:1px solid #cbd5e1; padding:6px 8px;"><strong>${l.type === 'given' ? 'Loan Given' : 'Loan Taken'}</strong>${l.remark ? ' — ' + l.remark : ''}</td>
-                            <td style="border:1px solid #cbd5e1; padding:6px 8px;">${l.account || 'Direct'}</td>
-                            <td style="border:1px solid #cbd5e1; padding:6px 8px; text-align:right; font-weight:700; color:#0f766e;">${fC(l.amount)}</td>
+            <div class="pdf-avoid-break">
+                <h4 style="margin: 12px 0 6px 0; color:#0f766e; border-bottom: 2px solid #0f766e; padding-bottom: 3px; font-size:12px;">Loans & Credit Record</h4>
+                <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
+                    <thead>
+                        <tr style="background:#f0fdfa; color:#0f766e; font-size:10px;">
+                            <th style="border:1px solid #cbd5e1; padding:5px 6px; text-align:left;">Date</th>
+                            <th style="border:1px solid #cbd5e1; padding:5px 6px; text-align:left;">Transaction / Particulars</th>
+                            <th style="border:1px solid #cbd5e1; padding:5px 6px; text-align:left;">Payment Account</th>
+                            <th style="border:1px solid #cbd5e1; padding:5px 6px; text-align:right;">Disbursed Amount</th>
                         </tr>
-                    `).join('')}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody style="font-size:10.5px;">
+                        ${stats.loansList.map(l => `
+                            <tr style="page-break-inside:avoid; break-inside:avoid;">
+                                <td style="border:1px solid #cbd5e1; padding:4px 6px;">${formatDbDate(l.date)}</td>
+                                <td style="border:1px solid #cbd5e1; padding:4px 6px;"><strong>${l.type === 'given' ? 'Loan Given' : 'Loan Taken'}</strong>${l.remark ? ' — ' + l.remark : ''}</td>
+                                <td style="border:1px solid #cbd5e1; padding:4px 6px;">${l.account || 'Direct'}</td>
+                                <td style="border:1px solid #cbd5e1; padding:4px 6px; text-align:right; font-weight:700; color:#0f766e;">${fC(l.amount)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
         `;
     }
 
@@ -5347,17 +5349,17 @@ function buildClientStatementElement(client, stats, fy) {
     let incomeRowsHTML = '';
     if (incomeList.length > 0) {
         incomeRowsHTML = incomeList.map((log, idx) => `
-            <tr>
-                <td style="text-align:center;">${idx + 1}</td>
-                <td>${formatDbDate(log.date)}</td>
-                <td><strong>Payment Received</strong>${log.remark ? ' — ' + log.remark : ''}</td>
-                <td>${log.mode}</td>
-                <td style="text-align:right; font-weight:700; color:#16a34a;">${fC(log.amount)}</td>
-                <td style="text-align:right; color:#d97706;">${log.discount ? fC(log.discount) : '-'}</td>
+            <tr style="page-break-inside:avoid; break-inside:avoid;">
+                <td style="border:1px solid #cbd5e1; padding:5px 6px; text-align:center;">${idx + 1}</td>
+                <td style="border:1px solid #cbd5e1; padding:5px 6px;">${formatDbDate(log.date)}</td>
+                <td style="border:1px solid #cbd5e1; padding:5px 6px;"><strong>Payment Received</strong>${log.remark ? ' — ' + log.remark : ''}</td>
+                <td style="border:1px solid #cbd5e1; padding:5px 6px;">${log.mode}</td>
+                <td style="border:1px solid #cbd5e1; padding:5px 6px; text-align:right; font-weight:700; color:#16a34a;">${fC(log.amount)}</td>
+                <td style="border:1px solid #cbd5e1; padding:5px 6px; text-align:right; color:#d97706;">${log.discount ? fC(log.discount) : '-'}</td>
             </tr>
         `).join('');
     } else {
-        incomeRowsHTML = `<tr><td colspan="6" style="text-align:center; color:#64748b; padding:10px;">No payments received yet for this client.</td></tr>`;
+        incomeRowsHTML = `<tr><td colspan="6" style="border:1px solid #cbd5e1; text-align:center; color:#64748b; padding:8px;">No payments received yet for this client.</td></tr>`;
     }
 
     // Build printable HTML box
@@ -5366,139 +5368,184 @@ function buildClientStatementElement(client, stats, fy) {
     printContainer.style.position = 'fixed';
     printContainer.style.left = '-9999px';
     printContainer.style.top = '0';
-    printContainer.style.width = '800px';
+    printContainer.style.width = '750px';
     printContainer.style.background = '#ffffff';
 
     printContainer.innerHTML = `
-        <div class="pdf-statement-container" style="padding: 30px 35px; color:#1e293b; font-family:'Plus Jakarta Sans', Arial, sans-serif;">
+        <style>
+            .pdf-statement-container {
+                width: 100%;
+                box-sizing: border-box;
+                color: #1e293b;
+                font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+                font-size: 11px;
+                line-height: 1.35;
+                background: #ffffff;
+                padding: 16px 20px 20px 20px;
+            }
+            .pdf-statement-container * {
+                box-sizing: border-box;
+            }
+            .pdf-statement-container table {
+                width: 100%;
+                border-collapse: collapse;
+                page-break-inside: auto;
+            }
+            .pdf-statement-container thead {
+                display: table-header-group;
+            }
+            .pdf-statement-container tfoot {
+                display: table-footer-group;
+            }
+            .pdf-statement-container tr {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            .pdf-statement-container h4 {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+            }
+            .pdf-statement-container .pdf-avoid-break {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+        </style>
+        <div class="pdf-statement-container">
             <!-- Header -->
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #0d9488; padding-bottom:15px; margin-bottom:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2.5px solid #0d9488; padding-bottom:10px; margin-bottom:12px;">
                 <div>
-                    <h2 style="margin:0; font-size:24px; color:#0f766e; font-weight:800; letter-spacing:-0.5px;">ARYA ASSOCIATES</h2>
-                    <p style="margin:3px 0 0 0; font-size:12px; color:#475569; font-weight:600;">RAVI KATARA &nbsp;|&nbsp; Mobile: 8815052555, 8982147763</p>
-                    <p style="margin:2px 0 0 0; font-size:11px; color:#64748b;">Financial Accounting & Client Ledger Statement</p>
+                    <h2 style="margin:0; font-size:20px; color:#0f766e; font-weight:800; letter-spacing:-0.5px;">ARYA ASSOCIATES</h2>
+                    <p style="margin:2px 0 0 0; font-size:10.5px; color:#0d9488; font-weight:700;">Taxation, Accounting & Corporate Advisory Services</p>
+                    <p style="margin:2px 0 0 0; font-size:10px; color:#475569; font-weight:600;">RAVI KATARA &nbsp;|&nbsp; Mobile: 8815052555, 8982147763</p>
+                    <p style="margin:2px 0 0 0; font-size:9.5px; color:#64748b;">Financial Accounting & Client Ledger Statement</p>
                 </div>
                 <div style="text-align:right;">
-                    <span style="display:inline-block; background:#f0fdfa; color:#0f766e; border:1px solid #99f6e4; font-weight:700; font-size:12px; padding:4px 10px; border-radius:4px;">
+                    <span style="display:inline-block; background:#f0fdfa; color:#0f766e; border:1px solid #99f6e4; font-weight:700; font-size:11px; padding:3px 8px; border-radius:4px;">
                         FY: ${fy}
                     </span>
-                    <p style="margin:4px 0 0 0; font-size:11px; color:#64748b;">Date: ${dateStr}</p>
+                    <p style="margin:3px 0 0 0; font-size:10px; color:#64748b;">Date: ${dateStr}</p>
                 </div>
             </div>
 
             <!-- Party Details Box -->
-            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px 16px; margin-bottom:20px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div class="pdf-avoid-break" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px; margin-bottom:12px; display:grid; grid-template-columns:1.2fr 0.8fr; gap:10px; align-items:center;">
                 <div>
-                    <span style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:600;">Party / Client Name:</span>
-                    <h3 style="margin:2px 0; font-size:17px; color:#0f172a; font-weight:700;">${client.name}</h3>
-                    <span style="font-size:11px; color:#475569;">Category: <strong>${isVendor ? 'Vendor (Creditor)' : 'Client (Debtor)'}</strong></span>
+                    <span style="font-size:10px; color:#64748b; text-transform:uppercase; font-weight:600; display:block;">Party / Client Name:</span>
+                    <h3 style="margin:1px 0; font-size:15px; color:#0f172a; font-weight:700; text-transform:uppercase;">${client.name}</h3>
+                    <span style="font-size:10px; color:#475569;">Category: <strong>${isVendor ? 'Vendor (Creditor)' : 'Client (Debtor)'}</strong></span>
                 </div>
-                <div style="text-align:right;">
-                    <span style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:600;">Financial Year / Period:</span>
-                    <p style="margin:2px 0; font-size:14px; font-weight:700; color:#0f766e;">FY ${fy}</p>
-                    <div style="font-size:11px; color:#475569; display:flex; flex-direction:column; gap:2px; align-items:flex-end; margin-top:2px;">
-                        <span>Opening Balance: <strong>${fC(stats.openingBalance)}</strong></span>
-                        <span style="font-weight:700; color:#0f766e;">Total Dues: <strong>${fC(stats.totalReceivable)}</strong></span>
+                <div style="text-align:right; border-left:1px solid #e2e8f0; padding-left:10px;">
+                    <span style="font-size:10px; color:#64748b; text-transform:uppercase; font-weight:600; display:block;">Financial Year & Position:</span>
+                    <p style="margin:1px 0; font-size:12px; font-weight:700; color:#0f766e;">FY ${fy}</p>
+                    <div style="font-size:10px; color:#475569; display:flex; justify-content:flex-end; gap:8px; margin-top:2px;">
+                        <span>Opening: <strong>${fC(stats.openingBalance)}</strong></span>
+                        <span>Total Dues: <strong style="color:#0f766e;">${fC(stats.totalReceivable)}</strong></span>
                     </div>
                 </div>
             </div>
 
             <!-- Section 1: Services / Contract Retainer Breakdown Table -->
-            <h4 style="margin:15px 0 8px 0; color:#0f766e; border-bottom:2px solid #0f766e; padding-bottom:4px; font-size:14px;">
-                1. Services & Contract Retainer Breakdown
-            </h4>
-            <table style="width:100%; border-collapse:collapse; margin-bottom:15px;">
-                <thead>
-                    <tr style="background:#f1f5f9; color:#0f172a; font-size:11px;">
-                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:35px; text-align:center;">#</th>
-                        <th style="border:1px solid #cbd5e1; padding:7px 8px; text-align:left;">Particulars</th>
-                        <th style="border:1px solid #cbd5e1; padding:7px 8px; text-align:left; width:120px;">Period</th>
-                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:60px; text-align:center;">Months</th>
-                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:90px; text-align:right;">Rate (₹)</th>
-                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:100px; text-align:right;">Amount (₹)</th>
-                    </tr>
-                </thead>
-                <tbody style="font-size:11px;">
-                    ${contractRowsHTML}
-                </tbody>
-                <tfoot>
-                    <tr style="font-weight:600; background:#f8fafc; font-size:11px;">
-                        <td colspan="5" style="border:1px solid #cbd5e1; text-align:right; padding:5px 8px;">Subtotal (Services & Retainer):</td>
-                        <td style="border:1px solid #cbd5e1; text-align:right; color:#0f766e; padding:5px 8px; font-weight:700;">${fC(stats.yearlyContract)}</td>
-                    </tr>
-                    ${stats.openingBalance !== 0 ? `
-                    <tr style="font-weight:600; background:#f8fafc; font-size:11px;">
-                        <td colspan="5" style="border:1px solid #cbd5e1; text-align:right; padding:5px 8px;">Add: Opening Balance / Past Due:</td>
-                        <td style="border:1px solid #cbd5e1; text-align:right; color:#0f766e; padding:5px 8px; font-weight:700;">${fC(stats.openingBalance)}</td>
-                    </tr>
-                    ` : ''}
-                    ${stats.loansGiven > 0 ? `
-                    <tr style="font-weight:600; background:#f8fafc; font-size:11px;">
-                        <td colspan="5" style="border:1px solid #cbd5e1; text-align:right; padding:5px 8px;">Add: Loans / Credit Given:</td>
-                        <td style="border:1px solid #cbd5e1; text-align:right; color:#0f766e; padding:5px 8px; font-weight:700;">${fC(stats.loansGiven)}</td>
-                    </tr>
-                    ` : ''}
-                    <tr style="font-weight:800; background:#f0fdfa; font-size:12px;">
-                        <td colspan="5" style="border:1px solid #cbd5e1; text-align:right; padding:8px; color:#0f766e; font-weight:800;">TOTAL DUES (Opening Balance + Services):</td>
-                        <td style="border:1px solid #cbd5e1; text-align:right; color:#0f766e; padding:8px; font-weight:800; font-size:13px;">${fC(stats.totalReceivable)}</td>
-                    </tr>
-                </tfoot>
-            </table>
+            <div class="pdf-avoid-break">
+                <h4 style="margin:10px 0 5px 0; color:#0f766e; border-bottom:1.5px solid #0f766e; padding-bottom:3px; font-size:12px;">
+                    1. Services & Contract Retainer Breakdown
+                </h4>
+                <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
+                    <thead>
+                        <tr style="background:#f1f5f9; color:#0f172a; font-size:10.5px;">
+                            <th style="border:1px solid #cbd5e1; padding:5px 6px; width:30px; text-align:center;">#</th>
+                            <th style="border:1px solid #cbd5e1; padding:5px 6px; text-align:left;">Particulars</th>
+                            <th style="border:1px solid #cbd5e1; padding:5px 6px; text-align:left; width:110px;">Period</th>
+                            <th style="border:1px solid #cbd5e1; padding:5px 6px; width:50px; text-align:center;">Months</th>
+                            <th style="border:1px solid #cbd5e1; padding:5px 6px; width:80px; text-align:right;">Rate (₹)</th>
+                            <th style="border:1px solid #cbd5e1; padding:5px 6px; width:90px; text-align:right;">Amount (₹)</th>
+                        </tr>
+                    </thead>
+                    <tbody style="font-size:10.5px;">
+                        ${contractRowsHTML}
+                    </tbody>
+                    <tfoot>
+                        <tr style="font-weight:600; background:#f8fafc; font-size:10.5px; page-break-inside:avoid; break-inside:avoid;">
+                            <td colspan="5" style="border:1px solid #cbd5e1; text-align:right; padding:4px 6px;">Subtotal (Services & Retainer):</td>
+                            <td style="border:1px solid #cbd5e1; text-align:right; color:#0f766e; padding:4px 6px; font-weight:700;">${fC(stats.yearlyContract)}</td>
+                        </tr>
+                        ${stats.openingBalance !== 0 ? `
+                        <tr style="font-weight:600; background:#f8fafc; font-size:10.5px; page-break-inside:avoid; break-inside:avoid;">
+                            <td colspan="5" style="border:1px solid #cbd5e1; text-align:right; padding:4px 6px;">Add: Opening Balance / Past Due:</td>
+                            <td style="border:1px solid #cbd5e1; text-align:right; color:#0f766e; padding:4px 6px; font-weight:700;">${fC(stats.openingBalance)}</td>
+                        </tr>
+                        ` : ''}
+                        ${stats.loansGiven > 0 ? `
+                        <tr style="font-weight:600; background:#f8fafc; font-size:10.5px; page-break-inside:avoid; break-inside:avoid;">
+                            <td colspan="5" style="border:1px solid #cbd5e1; text-align:right; padding:4px 6px;">Add: Loans / Credit Given:</td>
+                            <td style="border:1px solid #cbd5e1; text-align:right; color:#0f766e; padding:4px 6px; font-weight:700;">${fC(stats.loansGiven)}</td>
+                        </tr>
+                        ` : ''}
+                        <tr style="font-weight:800; background:#f0fdfa; font-size:11.5px; page-break-inside:avoid; break-inside:avoid;">
+                            <td colspan="5" style="border:1px solid #cbd5e1; text-align:right; padding:6px; color:#0f766e; font-weight:800;">TOTAL DUES (Opening Balance + Services):</td>
+                            <td style="border:1px solid #cbd5e1; text-align:right; color:#0f766e; padding:6px; font-weight:800; font-size:12px;">${fC(stats.totalReceivable)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
 
             ${loansRowsHTML}
 
             <!-- Section 2: Payments Received & Discount Logs Table -->
-            <h4 style="margin:18px 0 8px 0; color:#0f766e; border-bottom:2px solid #0f766e; padding-bottom:4px; font-size:14px;">
-                2. Payments Received & Settlement Log
-            </h4>
-            <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
-                <thead>
-                    <tr style="background:#f1f5f9; color:#0f172a; font-size:11px;">
-                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:35px; text-align:center;">#</th>
-                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:85px; text-align:left;">Date</th>
-                        <th style="border:1px solid #cbd5e1; padding:7px 8px; text-align:left;">Particulars / Remarks</th>
-                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:110px; text-align:left;">Mode / Account</th>
-                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:100px; text-align:right;">Received (₹)</th>
-                        <th style="border:1px solid #cbd5e1; padding:7px 8px; width:80px; text-align:right;">Discount (₹)</th>
-                    </tr>
-                </thead>
-                <tbody style="font-size:11px;">
-                    ${incomeRowsHTML}
-                </tbody>
-                <tfoot>
-                    <tr style="font-weight:700; background:#f8fafc; font-size:11px;">
-                        <td colspan="4" style="border:1px solid #cbd5e1; text-align:right; padding:6px 8px;">Total Received & Discount:</td>
-                        <td style="border:1px solid #cbd5e1; text-align:right; color:#16a34a; padding:6px 8px;">${fC(stats.totalReceived)}</td>
-                        <td style="border:1px solid #cbd5e1; text-align:right; color:#d97706; padding:6px 8px;">${fC(stats.totalDiscount)}</td>
-                    </tr>
-                </tfoot>
-            </table>
+            <div class="pdf-avoid-break">
+                <h4 style="margin:12px 0 5px 0; color:#0f766e; border-bottom:1.5px solid #0f766e; padding-bottom:3px; font-size:12px;">
+                    2. Payments Received & Settlement Log
+                </h4>
+                <table style="width:100%; border-collapse:collapse; margin-bottom:12px;">
+                    <thead>
+                        <tr style="background:#f1f5f9; color:#0f172a; font-size:10.5px;">
+                            <th style="border:1px solid #cbd5e1; padding:5px 6px; width:30px; text-align:center;">#</th>
+                            <th style="border:1px solid #cbd5e1; padding:5px 6px; width:80px; text-align:left;">Date</th>
+                            <th style="border:1px solid #cbd5e1; padding:5px 6px; text-align:left;">Particulars / Remarks</th>
+                            <th style="border:1px solid #cbd5e1; padding:5px 6px; width:100px; text-align:left;">Mode / Account</th>
+                            <th style="border:1px solid #cbd5e1; padding:5px 6px; width:90px; text-align:right;">Received (₹)</th>
+                            <th style="border:1px solid #cbd5e1; padding:5px 6px; width:75px; text-align:right;">Discount (₹)</th>
+                        </tr>
+                    </thead>
+                    <tbody style="font-size:10.5px;">
+                        ${incomeRowsHTML}
+                    </tbody>
+                    <tfoot>
+                        <tr style="font-weight:700; background:#f8fafc; font-size:10.5px; page-break-inside:avoid; break-inside:avoid;">
+                            <td colspan="4" style="border:1px solid #cbd5e1; text-align:right; padding:5px 6px;">Total Received & Discount:</td>
+                            <td style="border:1px solid #cbd5e1; text-align:right; color:#16a34a; padding:5px 6px;">${fC(stats.totalReceived)}</td>
+                            <td style="border:1px solid #cbd5e1; text-align:right; color:#d97706; padding:5px 6px;">${fC(stats.totalDiscount)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
 
             <!-- Section 3: Final Account Settlement Summary Box -->
-            <div style="background:#f0fdfa; border:2px solid #0d9488; border-radius:8px; padding:16px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-                <div style="display:flex; flex-direction:column; gap:4px; font-size:12px;">
+            <div class="pdf-avoid-break" style="background:#f0fdfa; border:1.5px solid #0d9488; border-radius:6px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-top:10px;">
+                <div style="display:flex; flex-direction:column; gap:3px; font-size:11px;">
                     <span>Opening Balance / Past Due: <strong>${fC(stats.openingBalance)}</strong></span>
                     <span>Total Services & Contracts: <strong>${fC(stats.yearlyContract)}</strong></span>
                     ${stats.loansGiven > 0 ? `<span>Total Loans Given: <strong>${fC(stats.loansGiven)}</strong></span>` : ''}
-                    <span style="font-weight:800; color:#0f766e; font-size:13px; border-top:1px solid #99f6e4; padding-top:4px; margin-top:2px;">
+                    <span style="font-weight:800; color:#0f766e; font-size:11.5px; border-top:1px solid #99f6e4; padding-top:3px; margin-top:1px;">
                         TOTAL DUES (Total Receivable): <strong>${fC(stats.totalReceivable)}</strong>
                     </span>
                     <span style="color:#16a34a; font-weight:600;">Less: Total Payments Received: -${fC(stats.totalReceived)}</span>
                     ${stats.totalDiscount > 0 ? `<span style="color:#d97706; font-weight:600;">Less: Total Discount Allowed: -${fC(stats.totalDiscount)}</span>` : ''}
                 </div>
-                <div style="text-align:right; background:#ffffff; padding:12px 20px; border-radius:6px; border:1px solid #99f6e4;">
-                    <div style="font-size:11px; color:#64748b; margin-bottom:2px;">
+                <div style="text-align:right; background:#ffffff; padding:8px 14px; border-radius:6px; border:1px solid #99f6e4;">
+                    <div style="font-size:10px; color:#64748b; margin-bottom:1px;">
                         Total Dues: <strong style="color:#0f766e;">${fC(stats.totalReceivable)}</strong> | Received: <strong style="color:#16a34a;">${fC(stats.totalReceived)}</strong>
                     </div>
-                    <span style="font-size:11px; text-transform:uppercase; font-weight:700; color:#64748b; letter-spacing:0.5px;">Net Outstanding Balance Due</span>
-                    <h2 style="margin:4px 0 0 0; font-size:24px; font-weight:800; color:${stats.balanceReceivable > 0 ? '#0d9488' : '#16a34a'};">
+                    <span style="font-size:10px; text-transform:uppercase; font-weight:700; color:#64748b; letter-spacing:0.3px;">Net Outstanding Balance Due</span>
+                    <h2 style="margin:2px 0 0 0; font-size:20px; font-weight:800; color:${stats.balanceReceivable > 0 ? '#0d9488' : '#16a34a'};">
                         ${stats.balanceReceivable <= 0 ? 'Fully Settled (₹0)' : fC(stats.balanceReceivable)}
                     </h2>
                 </div>
             </div>
 
             <!-- Footer / Terms -->
-            <div style="margin-top:25px; padding-top:10px; border-top:1px dashed #cbd5e1; display:flex; justify-content:space-between; font-size:10px; color:#64748b;">
+            <div class="pdf-avoid-break" style="margin-top:14px; padding-top:6px; border-top:1px dashed #cbd5e1; display:flex; justify-content:space-between; font-size:9.5px; color:#64748b;">
                 <span>ARYA ASSOCIATES — Financial Accounting (Mob: 8815052555, 8982147763)</span>
                 <span style="font-weight:700; color:#0f766e;">RAVI KATARA (Authorized Signatory)</span>
             </div>
@@ -5522,11 +5569,12 @@ window.generateClientStatementPDF = function(clientId) {
 
     const safeClientName = client.name.replace(/[^a-zA-Z0-9_-]/g, '_');
     const opt = {
-        margin: [10, 10, 10, 10],
+        margin: [6, 6, 6, 6],
         filename: `${safeClientName}_Ledger_Statement_FY_${fy}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false, scrollY: 0, scrollX: 0 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'], avoid: ['tr', 'h4', '.pdf-avoid-break'] }
     };
 
     if (window.html2pdf) {
@@ -5624,11 +5672,12 @@ Mobile: 8815052555, 8982147763`;
     const fileName = `${safeClientName}_Statement_FY_${fy}.pdf`;
 
     const opt = {
-        margin: [10, 10, 10, 10],
+        margin: [6, 6, 6, 6],
         filename: fileName,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false, scrollY: 0, scrollX: 0 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'], avoid: ['tr', 'h4', '.pdf-avoid-break'] }
     };
 
     if (!window.html2pdf) {
