@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wealth-plus-cache-v64';
+const CACHE_NAME = 'wealth-plus-cache-v65';
 const ASSETS = [
   './',
   './index.html',

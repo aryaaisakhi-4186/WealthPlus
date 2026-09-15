@@ -1655,65 +1655,142 @@
         </div>
     </div>
 
-    <!-- Modal 2: Log/Edit Received Amount -->
+    <!-- Modal 2: Log/Edit Received Amount & Payment History -->
     <div id="modal-income" class="modal-overlay">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h4 id="modal-income-title">Log Received Amount</h4>
+        <div class="modal-box modal-lg" style="max-width: 820px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="background: linear-gradient(135deg, rgba(13,148,136,0.08), rgba(16,185,129,0.08)); border-bottom: 1.5px solid rgba(13,148,136,0.2);">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <i data-lucide="hand-coins" style="width:20px; height:20px; color:#0d9488;"></i>
+                    <h4 id="modal-income-title" style="margin:0; font-size:16px; font-weight:700; color:#0f766e;">Client Payment Receive & History</h4>
+                </div>
                 <button class="btn-close-modal" id="btn-close-income-modal"><i data-lucide="x"></i></button>
             </div>
-            <form id="form-income" class="modal-form">
-                <input type="hidden" id="edit-income-id">
-                <div class="form-group">
-                    <label for="income-client-search-input">Select Client *</label>
-                    <div class="searchable-select-container" id="income-client-searchable-container">
-                        <div class="searchable-input-wrapper">
-                            <i data-lucide="search" class="search-input-icon"></i>
-                            <input type="text" id="income-client-search-input" class="searchable-input" placeholder="🔍 Search client by name..." autocomplete="off">
-                            <button type="button" class="btn-clear-search" id="btn-clear-income-client-search" style="display: none;" title="Clear client">
-                                <i data-lucide="x"></i>
-                            </button>
+            
+            <div class="modal-body" style="padding: 16px 20px; overflow-y: auto; flex: 1;">
+                <!-- Client Quick Financial Summary Strip -->
+                <div id="income-modal-client-summary-strip" style="display: none; background: #f0fdfa; border: 1.5px solid #99f6e4; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <span style="font-size: 10.5px; color: #0f766e; text-transform: uppercase; font-weight: 700; letter-spacing: 0.3px;">Client Account Position:</span>
+                            <div id="income-modal-client-name-display" style="font-size: 14px; font-weight: 800; color: #0f172a;"></div>
                         </div>
-                        <select id="income-client-select" required style="position: absolute; opacity: 0; pointer-events: none; height: 0; width: 0;">
-                            <!-- Populated dynamically -->
-                        </select>
-                        <div class="searchable-dropdown-menu" id="income-client-dropdown-menu" style="display: none;"></div>
+                        <div style="display: flex; gap: 14px; font-size: 11.5px;">
+                            <div style="text-align: right;">
+                                <span style="font-size: 10px; color: #64748b; display: block;">Total Billed:</span>
+                                <strong id="income-modal-stat-billed" style="color: #0f766e;">₹0</strong>
+                            </div>
+                            <div style="text-align: right; border-left: 1px solid #ccfbf1; padding-left: 12px;">
+                                <span style="font-size: 10px; color: #64748b; display: block;">Total Received:</span>
+                                <strong id="income-modal-stat-received" style="color: #16a34a;">₹0</strong>
+                            </div>
+                            <div style="text-align: right; border-left: 1px solid #ccfbf1; padding-left: 12px;">
+                                <span style="font-size: 10px; color: #64748b; display: block;">Balance Due:</span>
+                                <strong id="income-modal-stat-due" style="color: #e11d48; font-weight: 800;">₹0</strong>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="form-group-row">
-                    <div class="form-group">
-                        <label for="income-amount">Amount Received (INR) *</label>
-                        <input type="number" id="income-amount" required min="1" placeholder="e.g. 50000">
+
+                <!-- Form Section -->
+                <form id="form-income" class="modal-form" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
+                    <input type="hidden" id="edit-income-id">
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">
+                        <span id="form-income-mode-badge" style="font-size: 12px; font-weight: 700; color: #0d9488; display: inline-flex; align-items: center; gap: 4px;">
+                            <i data-lucide="plus-circle" style="width:14px; height:14px;"></i> Log New Received Amount
+                        </span>
+                        <button type="button" id="btn-cancel-edit-income-mode" onclick="resetIncomeFormToNew()" style="display: none; font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; cursor: pointer; font-weight: 600;">
+                            ✖ Cancel Edit / New Entry
+                        </button>
                     </div>
-                    <div class="form-group">
-                        <label for="income-discount">Discount (INR) (Optional)</label>
-                        <input type="number" id="income-discount" min="0" placeholder="0 (e.g. 2000)" step="any">
+
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label for="income-client-search-input">Select Client *</label>
+                        <div class="searchable-select-container" id="income-client-searchable-container">
+                            <div class="searchable-input-wrapper">
+                                <i data-lucide="search" class="search-input-icon"></i>
+                                <input type="text" id="income-client-search-input" class="searchable-input" placeholder="🔍 Search client by name..." autocomplete="off">
+                                <button type="button" class="btn-clear-search" id="btn-clear-income-client-search" style="display: none;" title="Clear client">
+                                    <i data-lucide="x"></i>
+                                </button>
+                            </div>
+                            <select id="income-client-select" required style="position: absolute; opacity: 0; pointer-events: none; height: 0; width: 0;">
+                                <!-- Populated dynamically -->
+                            </select>
+                            <div class="searchable-dropdown-menu" id="income-client-dropdown-menu" style="display: none;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group-row">
+                        <div class="form-group">
+                            <label for="income-amount">Amount Received (INR) *</label>
+                            <input type="number" id="income-amount" required min="1" placeholder="e.g. 50000" style="font-weight: 700; color: #16a34a;">
+                        </div>
+                        <div class="form-group">
+                            <label for="income-discount">Discount Allowed (INR) (Optional)</label>
+                            <input type="number" id="income-discount" min="0" placeholder="0" step="any">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group-row">
+                        <div class="form-group">
+                            <label for="income-date">Received Date *</label>
+                            <input type="date" id="income-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="income-account-select">Destination Account *</label>
+                            <select id="income-account-select" required>
+                                <!-- Populated dynamically with dynamic accounts -->
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label for="income-remark">Particulars / Remark (Optional)</label>
+                        <input type="text" id="income-remark" placeholder="e.g. Retainer fee / IT Return / Bank Ref # / Cheque #">
+                    </div>
+                    
+                    <!-- Dynamic income custom fields container -->
+                    <div id="income-modal-custom-fields-container"></div>
+                    
+                    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+                        <button type="button" class="btn btn-outline" id="btn-cancel-income" onclick="closeIncomeModal()">Close</button>
+                        <button type="submit" class="btn btn-success" id="btn-submit-income" style="display: inline-flex; align-items: center; gap: 5px;">
+                            <i data-lucide="check" style="width:14px; height:14px;"></i> Save Received Payment
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Client Payment History Section -->
+                <div id="income-modal-history-container" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <i data-lucide="history" style="width: 16px; height: 16px; color: #0d9488;"></i>
+                            <h5 style="margin: 0; font-size: 13.5px; font-weight: 700; color: #1e293b;">Client Payment History</h5>
+                            <span id="income-modal-history-count-badge" class="badge" style="background: rgba(13,148,136,0.12); color: #0f766e; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 12px;">0 Records</span>
+                        </div>
+                    </div>
+                    
+                    <div id="income-modal-history-table-wrapper" style="overflow-x: auto; max-height: 240px; overflow-y: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 11.5px;">
+                            <thead>
+                                <tr style="background: #f8fafc; color: #475569; font-weight: 700; border-bottom: 1.5px solid #cbd5e1; position: sticky; top: 0; z-index: 1;">
+                                    <th style="padding: 6px 8px; text-align: left;">Receipt No</th>
+                                    <th style="padding: 6px 8px; text-align: left;">Date</th>
+                                    <th style="padding: 6px 8px; text-align: left;">Account</th>
+                                    <th style="padding: 6px 8px; text-align: right;">Amount</th>
+                                    <th style="padding: 6px 8px; text-align: right;">Discount</th>
+                                    <th style="padding: 6px 8px; text-align: left;">Remark</th>
+                                    <th style="padding: 6px 8px; text-align: center; width: 170px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="income-modal-history-tbody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                <div class="form-group-row">
-                    <div class="form-group">
-                        <label for="income-date">Received Date *</label>
-                        <input type="date" id="income-date" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="income-account-select">Destination Account *</label>
-                        <select id="income-account-select" required>
-                            <!-- Populated dynamically with dynamic accounts -->
-                        </select>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="income-remark">Remark / Notes (Optional)</label>
-                    <input type="text" id="income-remark" placeholder="e.g. Early payment discount / Cheque #12345 / Online transfer">
-                </div>
-                <!-- Dynamic income custom fields container -->
-                <div id="income-modal-custom-fields-container"></div>
-                
-                <div class="modal-footer-actions">
-                    <button type="button" class="btn btn-outline" id="btn-cancel-income">Cancel</button>
-                    <button type="submit" class="btn btn-success">Save Transaction</button>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
 

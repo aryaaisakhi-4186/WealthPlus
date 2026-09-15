@@ -1700,16 +1700,7 @@ window.togglePartyCard = function(id) {
 };
 
 window.quickReceiveForParty = function(clientId) {
-    openIncomeModal();
-    const select = document.getElementById('income-client-select');
-    const searchInput = document.getElementById('income-client-search-input');
-    const matched = state.clients.find(c => c.id === clientId);
-    if (select) select.value = clientId;
-    if (searchInput && matched) {
-        searchInput.value = matched.name;
-        const clearBtn = document.getElementById('btn-clear-income-client-search');
-        if (clearBtn) clearBtn.style.display = 'block';
-    }
+    openIncomeModal('', clientId);
 };
 
 // PARTIES PAGE RENDERER
@@ -4813,13 +4804,20 @@ function initEventHandlers() {
         btnAddCategory.addEventListener('click', addCategoryPrompt);
     }
 
-    // Initialize Searchable Client Selectors
     setupSearchableClientDropdown({
         inputId: 'income-client-search-input',
         selectId: 'income-client-select',
         menuId: 'income-client-dropdown-menu',
         clearBtnId: 'btn-clear-income-client-search'
     });
+
+    const incomeClientSelect = document.getElementById('income-client-select');
+    if (incomeClientSelect) {
+        incomeClientSelect.addEventListener('change', function() {
+            updateIncomeModalClientView(this.value);
+            resetIncomeFormToNew();
+        });
+    }
 
     setupSearchableClientDropdown({
         inputId: 'loan-client-search-input',
@@ -6306,6 +6304,7 @@ function setupSearchableClientDropdown({ inputId, selectId, menuId, clearBtnId }
                     input.value = name;
                     if (clearBtn) clearBtn.style.display = 'flex';
                     menu.style.display = 'none';
+                    select.dispatchEvent(new Event('change'));
                 });
             });
         }
@@ -6323,9 +6322,15 @@ function setupSearchableClientDropdown({ inputId, selectId, menuId, clearBtnId }
         }
         const exactMatch = state.clients.find(c => c.name.toLowerCase() === this.value.toLowerCase().trim());
         if (exactMatch) {
-            select.value = exactMatch.id;
+            if (select.value !== exactMatch.id) {
+                select.value = exactMatch.id;
+                select.dispatchEvent(new Event('change'));
+            }
         } else {
-            select.value = '';
+            if (select.value !== '') {
+                select.value = '';
+                select.dispatchEvent(new Event('change'));
+            }
         }
     });
 
@@ -6336,6 +6341,7 @@ function setupSearchableClientDropdown({ inputId, selectId, menuId, clearBtnId }
             select.value = '';
             clearBtn.style.display = 'none';
             renderList('');
+            select.dispatchEvent(new Event('change'));
             input.focus();
         });
     }
@@ -6347,9 +6353,213 @@ function setupSearchableClientDropdown({ inputId, selectId, menuId, clearBtnId }
     });
 }
 
-function openIncomeModal(editId = '') {
+function updateIncomeModalClientView(clientId) {
+    const summaryStrip = document.getElementById('income-modal-client-summary-strip');
+    const nameDisplay = document.getElementById('income-modal-client-name-display');
+    const statBilled = document.getElementById('income-modal-stat-billed');
+    const statReceived = document.getElementById('income-modal-stat-received');
+    const statDue = document.getElementById('income-modal-stat-due');
+    const tbody = document.getElementById('income-modal-history-tbody');
+    const countBadge = document.getElementById('income-modal-history-count-badge');
+
+    if (!clientId) {
+        if (summaryStrip) summaryStrip.style.display = 'none';
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#94a3b8; padding:16px;">Please select a client above to view past payment history.</td></tr>`;
+        }
+        if (countBadge) countBadge.innerText = '0 Records';
+        return;
+    }
+
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    const stats = getClientReportStats(clientId);
+    const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
+
+    // Update Quick Stats Strip
+    if (summaryStrip) {
+        summaryStrip.style.display = 'block';
+        if (nameDisplay) nameDisplay.innerText = client.name;
+        if (statBilled) statBilled.innerText = fC(stats.totalReceivable);
+        if (statReceived) statReceived.innerText = fC(stats.totalReceived);
+        if (statDue) {
+            statDue.innerText = stats.balanceReceivable <= 0 ? '₹0 (Settled)' : fC(stats.balanceReceivable);
+            statDue.style.color = stats.balanceReceivable <= 0 ? '#16a34a' : '#e11d48';
+        }
+    }
+
+    // Update History Table
+    const clientLogs = (state.incomeLogs || [])
+        .filter(l => l.clientId === clientId)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || (b.id || '').localeCompare(a.id || ''));
+
+    if (countBadge) countBadge.innerText = `${clientLogs.length} Record${clientLogs.length === 1 ? '' : 's'}`;
+
+    if (!tbody) return;
+
+    if (clientLogs.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align:center; color:#94a3b8; padding:20px;">
+                    <i data-lucide="inbox" style="width:20px; height:20px; display:block; margin:0 auto 6px auto; opacity:0.6;"></i>
+                    No previous payments received from <strong>${client.name}</strong> yet.
+                </td>
+            </tr>
+        `;
+    } else {
+        tbody.innerHTML = clientLogs.map(log => {
+            const receiptNo = getReceiptNumber(log, client);
+            const formattedDate = formatDbDate(log.date);
+            const discountVal = Number(log.discount) > 0 ? `₹${Number(log.discount).toLocaleString('en-IN')}` : '-';
+            const remarkVal = log.remark || '-';
+
+            return `
+                <tr id="income-modal-row-${log.id}" style="border-bottom: 1px solid #f1f5f9; transition: background 0.2s;">
+                    <td style="padding: 6px 8px; font-weight: 700; color: #0f766e; font-family: monospace;">${receiptNo}</td>
+                    <td style="padding: 6px 8px; color: #475569;">${formattedDate}</td>
+                    <td style="padding: 6px 8px;"><span class="badge-acctype" style="font-size:10.5px; padding:1px 6px;">${log.mode || 'Cash / Bank'}</span></td>
+                    <td style="padding: 6px 8px; text-align: right; font-weight: 700; color: #16a34a;">+₹${Number(log.amount).toLocaleString('en-IN')}</td>
+                    <td style="padding: 6px 8px; text-align: right; color: #d97706;">${discountVal}</td>
+                    <td style="padding: 6px 8px; color: #64748b; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${log.remark || ''}">${remarkVal}</td>
+                    <td style="padding: 6px 8px; text-align: center;">
+                        <div style="display: inline-flex; align-items: center; gap: 3px;">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="loadIncomeRecordForEdit('${log.id}')" title="Edit this payment" style="font-size: 10px; padding: 2px 6px; display: inline-flex; align-items: center; gap: 2px;">
+                                <i data-lucide="edit-3" style="width: 11px; height: 11px;"></i> Edit
+                            </button>
+                            <button type="button" class="btn btn-sm btn-whatsapp" onclick="shareReceiptWhatsApp('${log.id}')" title="WhatsApp Receipt Note" style="font-size: 10px; padding: 2px 6px; display: inline-flex; align-items: center;">
+                                <i data-lucide="send" style="width: 11px; height: 11px;"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline btn-sm" onclick="generateReceiptPDF('${log.id}')" title="PDF Receipt Note" style="font-size: 10px; padding: 2px 6px; display: inline-flex; align-items: center;">
+                                <i data-lucide="file-text" style="width: 11px; height: 11px;"></i>
+                            </button>
+                            <button type="button" class="btn-icon-only delete-btn" onclick="deleteIncomeFromModal('${log.id}', '${clientId}')" title="Delete payment" style="padding: 2px; width: 22px; height: 22px;">
+                                <i data-lucide="trash-2" style="width: 11px; height: 11px;"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    if (window.lucide) lucide.createIcons();
+}
+window.updateIncomeModalClientView = updateIncomeModalClientView;
+
+function resetIncomeFormToNew() {
+    const editIdInput = document.getElementById('edit-income-id');
+    if (editIdInput) editIdInput.value = '';
+
+    const amtInput = document.getElementById('income-amount');
+    if (amtInput) amtInput.value = '';
+
+    const discInput = document.getElementById('income-discount');
+    if (discInput) discInput.value = '';
+
+    const remInput = document.getElementById('income-remark');
+    if (remInput) remInput.value = '';
+
+    const dateInput = document.getElementById('income-date');
+    if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+
+    const modeBadge = document.getElementById('form-income-mode-badge');
+    if (modeBadge) {
+        modeBadge.innerHTML = `<i data-lucide="plus-circle" style="width:14px; height:14px;"></i> Log New Received Amount`;
+        modeBadge.style.color = '#0d9488';
+    }
+
+    const cancelBtn = document.getElementById('btn-cancel-edit-income-mode');
+    if (cancelBtn) cancelBtn.style.display = 'none';
+
+    const submitBtn = document.getElementById('btn-submit-income');
+    if (submitBtn) {
+        submitBtn.innerHTML = `<i data-lucide="check" style="width:14px; height:14px;"></i> Save Received Payment`;
+        submitBtn.className = 'btn btn-success';
+    }
+
+    // Unhighlight all table rows
+    document.querySelectorAll('#income-modal-history-tbody tr').forEach(tr => tr.style.background = '');
+    if (window.lucide) lucide.createIcons();
+}
+window.resetIncomeFormToNew = resetIncomeFormToNew;
+
+function loadIncomeRecordForEdit(logId) {
+    const log = state.incomeLogs.find(l => l.id === logId);
+    if (!log) return;
+
+    const client = state.clients.find(c => c.id === log.clientId);
+    const receiptNo = getReceiptNumber(log, client);
+
+    const editIdInput = document.getElementById('edit-income-id');
+    if (editIdInput) editIdInput.value = log.id;
+
+    const amtInput = document.getElementById('income-amount');
+    if (amtInput) amtInput.value = log.amount;
+
+    const discInput = document.getElementById('income-discount');
+    if (discInput) discInput.value = (log.discount !== undefined && log.discount !== null && log.discount !== 0) ? log.discount : '';
+
+    const dateInput = document.getElementById('income-date');
+    if (dateInput) dateInput.value = log.date;
+
+    const accSelect = document.getElementById('income-account-select');
+    if (accSelect && log.mode) {
+        accSelect.value = log.mode;
+    }
+
+    const remInput = document.getElementById('income-remark');
+    if (remInput) remInput.value = log.remark || '';
+
+    state.customClientFields.forEach(f => {
+        const input = document.getElementById(`custom-income-${f.name}`);
+        if (input) input.value = log[f.name] || '';
+    });
+
+    const modeBadge = document.getElementById('form-income-mode-badge');
+    if (modeBadge) {
+        modeBadge.innerHTML = `<i data-lucide="edit-3" style="width:14px; height:14px; color:#d97706;"></i> <strong style="color:#d97706;">Editing Payment (Receipt: ${receiptNo})</strong>`;
+    }
+
+    const cancelBtn = document.getElementById('btn-cancel-edit-income-mode');
+    if (cancelBtn) cancelBtn.style.display = 'inline-block';
+
+    const submitBtn = document.getElementById('btn-submit-income');
+    if (submitBtn) {
+        submitBtn.innerHTML = `<i data-lucide="check" style="width:14px; height:14px;"></i> Update Payment Record`;
+        submitBtn.className = 'btn btn-primary';
+    }
+
+    // Highlight active row in history
+    document.querySelectorAll('#income-modal-history-tbody tr').forEach(tr => tr.style.background = '');
+    const activeRow = document.getElementById(`income-modal-row-${log.id}`);
+    if (activeRow) activeRow.style.background = '#fef3c7';
+
+    // Focus amount input
+    if (amtInput) {
+        amtInput.focus();
+        amtInput.select();
+    }
+
+    if (window.lucide) lucide.createIcons();
+}
+window.loadIncomeRecordForEdit = loadIncomeRecordForEdit;
+
+function deleteIncomeFromModal(logId, clientId) {
+    if (confirm("Are you sure you want to delete this received payment entry?")) {
+        deleteIncomeDirect(logId);
+        updateIncomeModalClientView(clientId);
+        renderPage(state.activePage);
+        const editIdInput = document.getElementById('edit-income-id');
+        if (editIdInput && editIdInput.value === logId) {
+            resetIncomeFormToNew();
+        }
+    }
+}
+window.deleteIncomeFromModal = deleteIncomeFromModal;
+
+function openIncomeModal(editId = '', presetClientId = '') {
     const modal = document.getElementById('modal-income');
-    const title = document.getElementById('modal-income-title');
     const form = document.getElementById('form-income');
     const clientSelect = document.getElementById('income-client-select');
     const clientSearchInput = document.getElementById('income-client-search-input');
@@ -6375,11 +6585,14 @@ function openIncomeModal(editId = '') {
     const customContainer = document.getElementById('income-modal-custom-fields-container');
     customContainer.innerHTML = '';
 
+    resetIncomeFormToNew();
+
+    let targetClientId = presetClientId;
+
     if (editId) {
         const log = state.incomeLogs.find(l => l.id === editId);
         if (log) {
-            title.innerText = 'Edit Income Record';
-            document.getElementById('edit-income-id').value = log.id;
+            targetClientId = log.clientId;
             clientSelect.value = log.clientId;
             const matchedClient = state.clients.find(c => c.id === log.clientId);
             if (clientSearchInput) {
@@ -6388,41 +6601,34 @@ function openIncomeModal(editId = '') {
             if (clientClearBtn) {
                 clientClearBtn.style.display = matchedClient ? 'flex' : 'none';
             }
-            document.getElementById('income-amount').value = log.amount;
-            document.getElementById('income-discount').value = log.discount !== undefined ? log.discount : '';
-            document.getElementById('income-date').value = log.date;
-            document.getElementById('income-account-select').value = log.mode;
-            document.getElementById('income-remark').value = log.remark || '';
-
-            state.customClientFields.forEach(f => {
-                const val = log[f.name] || '';
-                customContainer.innerHTML += `
-                    <div class="form-group">
-                        <label for="custom-income-${f.name}">${f.name}</label>
-                        <input type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" id="custom-income-${f.name}" name="${f.name}" value="${val}" placeholder="Enter ${f.name}...">
-                    </div>
-                `;
-            });
+            loadIncomeRecordForEdit(editId);
+        }
+    } else if (presetClientId) {
+        clientSelect.value = presetClientId;
+        const matchedClient = state.clients.find(c => c.id === presetClientId);
+        if (clientSearchInput) {
+            clientSearchInput.value = matchedClient ? matchedClient.name : '';
+        }
+        if (clientClearBtn) {
+            clientClearBtn.style.display = matchedClient ? 'flex' : 'none';
         }
     } else {
-        title.innerText = 'Log Received Amount';
-        document.getElementById('edit-income-id').value = '';
         if (clientSearchInput) clientSearchInput.value = '';
         if (clientClearBtn) clientClearBtn.style.display = 'none';
         clientSelect.value = '';
-        document.getElementById('income-amount').value = '';
-        document.getElementById('income-discount').value = '';
-        document.getElementById('income-remark').value = '';
-
-        state.customClientFields.forEach(f => {
-            customContainer.innerHTML += `
-                <div class="form-group">
-                    <label for="custom-income-${f.name}">${f.name}</label>
-                    <input type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" id="custom-income-${f.name}" name="${f.name}" placeholder="Enter ${f.name}...">
-                </div>
-            `;
-        });
     }
+
+    state.customClientFields.forEach(f => {
+        customContainer.innerHTML += `
+            <div class="form-group">
+                <label for="custom-income-${f.name}">${f.name}</label>
+                <input type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" id="custom-income-${f.name}" name="${f.name}" placeholder="Enter ${f.name}...">
+            </div>
+        `;
+    });
+
+    updateIncomeModalClientView(targetClientId || clientSelect.value);
+
     modal.classList.add('active');
     lucide.createIcons();
 }
@@ -6450,9 +6656,13 @@ function handleIncomeSubmit(e) {
     let logObj = { clientId, amount, discount, date, mode, remark };
 
     state.customClientFields.forEach(f => {
-        const val = document.getElementById(`custom-income-${f.name}`).value;
-        logObj[f.name] = f.type === 'number' ? Number(val) : val;
+        const input = document.getElementById(`custom-income-${f.name}`);
+        if (input) {
+            logObj[f.name] = f.type === 'number' ? Number(input.value) : input.value;
+        }
     });
+
+    const isEdit = Boolean(id);
 
     if (id) {
         logObj.id = id;
@@ -6467,10 +6677,13 @@ function handleIncomeSubmit(e) {
     }
 
     addIncomeDirect(logObj);
-    closeIncomeModal();
     renderPage(state.activePage);
 
-    if (!id) {
+    // Refresh modal history & financial stats in real-time
+    updateIncomeModalClientView(clientId);
+    resetIncomeFormToNew();
+
+    if (!isEdit) {
         setTimeout(() => {
             previewReceiptModal(logObj.id);
         }, 150);
