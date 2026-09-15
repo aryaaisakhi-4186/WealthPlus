@@ -6002,7 +6002,6 @@ function buildPaymentReceiptElement(log, client, stats) {
     const amountNum = Number(log.amount) || 0;
     const discountNum = Number(log.discount) || 0;
     const words = numberToWordsINR(amountNum);
-    const duesBal = stats.balanceReceivable;
 
     const div = document.createElement('div');
     div.className = 'payment-receipt-voucher';
@@ -6069,7 +6068,7 @@ function buildPaymentReceiptElement(log, client, stats) {
         </div>
 
         <!-- Highlighted Amount & Discount Box -->
-        <div style="display: flex; justify-content: space-between; align-items: center; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 8px; padding: 14px 18px; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
             <div>
                 <span style="font-size: 11px; font-weight: 700; color: #15803d; text-transform: uppercase; letter-spacing: 0.5px;">Amount Received (जमा राशि):</span>
                 <div style="font-size: 24px; font-weight: 800; color: #166534; letter-spacing: -0.5px;">
@@ -6082,6 +6081,16 @@ function buildPaymentReceiptElement(log, client, stats) {
                     <div style="font-size: 14px; font-weight: 700; color: #b45309;">₹ ${discountNum.toLocaleString('en-IN')}</div>
                 </div>
             ` : ''}
+        </div>
+
+        <!-- Appreciation & Thank You Note -->
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #0d9488; border-radius: 6px; padding: 10px 14px; margin-bottom: 20px;">
+            <div style="font-size: 11.5px; font-weight: 700; color: #0f766e; margin-bottom: 2px;">
+                ✨ Thank You for Your Valued Business & Timely Payment!
+            </div>
+            <div style="font-size: 10.5px; color: #475569; line-height: 1.45;">
+                We sincerely appreciate your prompt payment and valuable association with <strong>Arya Associates</strong>. We are committed to providing you with the highest standard of professional services and look forward to our continued partnership.
+            </div>
         </div>
 
         <!-- Footer / Signatures -->
@@ -6276,7 +6285,8 @@ We gratefully confirm the receipt of your payment. Below are the official receip
 📝 *In Words:* ${amtWords}
 🏦 *Payment Mode / Account:* ${log.mode || 'Direct Account'}
 ${log.discount > 0 ? `🎁 *Discount Allowed:* ₹${Number(log.discount).toLocaleString('en-IN')}\n` : ''}${log.remark ? `📌 *Remarks / Purpose:* ${log.remark}\n` : ''}
-Thank you for your payment and valuable association!
+------------------------------------------------
+✨ *Thank you for your valued business and timely payment!* We sincerely appreciate your trust and look forward to our continued partnership.
 
 Warm regards,
 *ARYA ASSOCIATES*
