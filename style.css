@@ -3731,4 +3731,17 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 10px;
 }
 
+.btn-whatsapp {
+    background: #25D366 !important;
+    border-color: #25D366 !important;
+    color: #ffffff !important;
+    font-weight: 600;
+}
+
+.btn-whatsapp:hover {
+    background: #1eb954 !important;
+    border-color: #1eb954 !important;
+    color: #ffffff !important;
+}
+
 

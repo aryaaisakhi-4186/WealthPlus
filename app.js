@@ -2031,9 +2031,11 @@ function renderIncomeLogsTable() {
             <td>${remarkVal}</td>
             ${customCells}
             <td class="actions-col" style="display: var(--staff-access-display, table-cell);">
-                <div class="actions-wrapper">
-                    <button class="btn-icon-only edit-btn" onclick="openEditIncome('${log.id}')"><i data-lucide="edit-3"></i></button>
-                    <button class="btn-icon-only delete-btn" onclick="deleteIncome('${log.id}')"><i data-lucide="trash-2"></i></button>
+                <div class="actions-wrapper" style="gap:4px;">
+                    <button class="btn btn-sm btn-whatsapp" onclick="shareReceiptWhatsApp('${log.id}')" title="Send Receipt Note on WhatsApp" style="font-size:10px; padding:2px 7px; display:inline-flex; align-items:center; gap:2px;"><i data-lucide="send" style="width:11px; height:11px;"></i> WhatsApp</button>
+                    <button class="btn btn-outline-primary btn-sm" onclick="generateReceiptPDF('${log.id}')" title="Download PDF Receipt" style="font-size:10px; padding:2px 7px; display:inline-flex; align-items:center; gap:2px;"><i data-lucide="file-text" style="width:11px; height:11px;"></i> PDF</button>
+                    <button class="btn-icon-only edit-btn" onclick="openEditIncome('${log.id}')" title="Edit"><i data-lucide="edit-3"></i></button>
+                    <button class="btn-icon-only delete-btn" onclick="deleteIncome('${log.id}')" title="Delete"><i data-lucide="trash-2"></i></button>
                 </div>
             </td>
         `;
@@ -3607,6 +3609,46 @@ function renderClientReportDetails(clientId) {
             if (contractTotalDisplay) contractTotalDisplay.innerText = fC(stats.yearlyContract);
         } else {
             contractBox.style.display = 'none';
+        }
+    }
+
+    // Render Client Payments Received & Receipt Notes Section
+    const receiptsBox = document.getElementById('client-receipts-report-box');
+    const receiptsTbody = document.getElementById('client-receipts-tbody');
+    const receiptsCountBadge = document.getElementById('client-receipts-count-badge');
+
+    if (receiptsBox && receiptsTbody) {
+        const clientReceipts = state.incomeLogs
+            .filter(log => log.clientId === clientId)
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        if (receiptsCountBadge) {
+            receiptsCountBadge.innerText = `${clientReceipts.length} Receipt${clientReceipts.length === 1 ? '' : 's'}`;
+        }
+
+        receiptsTbody.innerHTML = '';
+        if (clientReceipts.length === 0) {
+            receiptsTbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No payments received yet for this client.</td></tr>`;
+        } else {
+            clientReceipts.forEach(log => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${formatDbDate(log.date)}</td>
+                    <td style="font-weight:600;">${log.remark || 'Payment Received'}</td>
+                    <td><span class="badge" style="background:rgba(13,148,136,0.1); color:#0f766e; font-size:11px;">${log.mode}</span></td>
+                    <td class="text-right" style="font-weight:700; color:#16a34a;">+₹${Number(log.amount).toLocaleString('en-IN')}</td>
+                    <td class="text-right">${log.discount ? '₹' + Number(log.discount).toLocaleString('en-IN') : '-'}</td>
+                    <td class="actions-col" style="text-align:center;">
+                        <div class="actions-wrapper" style="justify-content:center; gap:4px;">
+                            <button class="btn btn-sm btn-whatsapp" onclick="shareReceiptWhatsApp('${log.id}')" title="Send Receipt Note on WhatsApp" style="font-size:11px; padding:2px 8px; display:inline-flex; align-items:center; gap:3px;"><i data-lucide="send" style="width:12px; height:12px;"></i> WhatsApp</button>
+                            <button class="btn btn-outline-primary btn-sm" onclick="generateReceiptPDF('${log.id}')" title="Download PDF Receipt Note" style="font-size:11px; padding:2px 8px; display:inline-flex; align-items:center; gap:3px;"><i data-lucide="file-text" style="width:12px; height:12px;"></i> PDF</button>
+                            <button class="btn btn-outline btn-sm" onclick="previewReceiptModal('${log.id}')" title="View Printable Receipt Voucher" style="font-size:11px; padding:2px 8px; display:inline-flex; align-items:center; gap:3px;"><i data-lucide="receipt" style="width:12px; height:12px;"></i> View</button>
+                        </div>
+                    </td>
+                `;
+                receiptsTbody.appendChild(tr);
+            });
+            lucide.createIcons();
         }
     }
 }
@@ -5739,6 +5781,380 @@ window.exportSelectedClientExcel = function() {
     exportClientStatementExcel(sel.value);
 };
 
+// ==========================================
+// PAYMENT RECEIPT NOTE GENERATION & ACTIONS
+// ==========================================
+
+function numberToWordsINR(amount) {
+    let num = Math.round(Number(amount) || 0);
+    if (num === 0) return 'Zero Rupees Only';
+    if (num < 0) return 'Negative ' + numberToWordsINR(-num);
+
+    const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 
+               'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    function convertTwoDigits(n) {
+        if (n < 20) return a[n];
+        const tens = b[Math.floor(n / 10)];
+        const units = a[n % 10];
+        return (tens + (units ? ' ' + units : '')).trim();
+    }
+
+    function convertThreeDigits(n) {
+        const hundred = Math.floor(n / 100);
+        const rest = n % 100;
+        let str = '';
+        if (hundred > 0) {
+            str += a[hundred] + ' Hundred';
+            if (rest > 0) str += ' ';
+        }
+        if (rest > 0) {
+            str += convertTwoDigits(rest);
+        }
+        return str.trim();
+    }
+
+    let words = '';
+    const crore = Math.floor(num / 10000000);
+    num %= 10000000;
+    const lakh = Math.floor(num / 100000);
+    num %= 100000;
+    const thousand = Math.floor(num / 1000);
+    num %= 1000;
+    const hundredGroup = num;
+
+    if (crore > 0) {
+        words += convertThreeDigits(crore) + ' Crore ';
+    }
+    if (lakh > 0) {
+        words += convertThreeDigits(lakh) + ' Lakh ';
+    }
+    if (thousand > 0) {
+        words += convertThreeDigits(thousand) + ' Thousand ';
+    }
+    if (hundredGroup > 0) {
+        words += convertThreeDigits(hundredGroup) + ' ';
+    }
+
+    return (words.trim() + ' Rupees Only');
+}
+window.numberToWordsINR = numberToWordsINR;
+
+function buildPaymentReceiptElement(log, client, stats) {
+    if (!client) client = state.clients.find(c => c.id === log.clientId) || { name: 'Valued Client' };
+    if (!stats) stats = getClientReportStats(client.id);
+
+    const fy = client.pendingYear || '2026-2027';
+    const receiptNum = (log.id || '').replace('i_', '').slice(-6).toUpperCase();
+    const receiptIdFull = `REC-${fy.split('-')[0]}-${receiptNum}`;
+    const formattedDate = formatDbDate(log.date);
+    const amountNum = Number(log.amount) || 0;
+    const discountNum = Number(log.discount) || 0;
+    const words = numberToWordsINR(amountNum);
+    const duesBal = stats.balanceReceivable;
+
+    const div = document.createElement('div');
+    div.className = 'payment-receipt-voucher';
+    div.style.cssText = `
+        font-family: 'Plus Jakarta Sans', 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        color: #1e293b;
+        background: #ffffff;
+        padding: 24px 28px;
+        border: 2px solid #0d9488;
+        border-radius: 12px;
+        box-sizing: border-box;
+        line-height: 1.5;
+        position: relative;
+    `;
+
+    div.innerHTML = `
+        <!-- Top Accent Bar -->
+        <div style="height: 6px; background: linear-gradient(90deg, #0d9488, #10b981, #3b82f6); margin: -24px -28px 20px -28px; border-radius: 10px 10px 0 0;"></div>
+
+        <!-- Header Section -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px dashed #cbd5e1; padding-bottom: 16px; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
+            <div style="max-width: 60%;">
+                <div style="font-size: 22px; font-weight: 800; color: #0f766e; letter-spacing: 0.5px; text-transform: uppercase;">ARYA ASSOCIATES</div>
+                <div style="font-size: 11px; color: #475569; font-weight: 600; margin-top: 2px;">Taxation, Accounting & Corporate Advisory Services</div>
+                <div style="font-size: 11px; color: #64748b; margin-top: 4px;">
+                    <strong>Ravi Katara</strong> | 📞 8815052555, 8982147763
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <div style="display: inline-block; background: #0d9488; color: #ffffff; font-size: 11px; font-weight: 800; letter-spacing: 1px; padding: 4px 10px; border-radius: 4px; text-transform: uppercase;">
+                    PAYMENT RECEIPT (रसीद)
+                </div>
+                <div style="font-size: 13px; font-weight: 700; color: #0f766e; margin-top: 6px;">
+                    Receipt No: <span style="font-family: monospace; color: #1e293b;">${receiptIdFull}</span>
+                </div>
+                <div style="font-size: 12px; font-weight: 600; color: #475569; margin-top: 2px;">
+                    Date: <span style="color: #0f172a;">${formattedDate}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Receipt Body Details -->
+        <div style="margin-bottom: 20px;">
+            <div style="display: flex; align-items: baseline; margin-bottom: 10px; border-bottom: 1px dotted #cbd5e1; padding-bottom: 6px;">
+                <span style="font-size: 13px; color: #64748b; width: 170px; flex-shrink: 0;">Received with thanks from:</span>
+                <span style="font-size: 15px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.3px;">${client.name}</span>
+            </div>
+
+            <div style="display: flex; align-items: baseline; margin-bottom: 10px; border-bottom: 1px dotted #cbd5e1; padding-bottom: 6px;">
+                <span style="font-size: 13px; color: #64748b; width: 170px; flex-shrink: 0;">The sum of Rupees (in words):</span>
+                <span style="font-size: 13px; font-weight: 700; color: #0f766e; font-style: italic;">${words}</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; background: #f8fafc; padding: 12px 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <div>
+                    <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Payment Mode / Account</span>
+                    <div style="font-size: 13px; font-weight: 700; color: #1e293b; margin-top: 2px;">${log.mode || 'Cash / Bank'}</div>
+                </div>
+                <div>
+                    <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Particulars / Remarks</span>
+                    <div style="font-size: 13px; font-weight: 600; color: #1e293b; margin-top: 2px;">${log.remark || 'Professional Retainership / Services'}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Highlighted Amount & Discount Box -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 8px; padding: 12px 18px; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <span style="font-size: 11px; font-weight: 700; color: #15803d; text-transform: uppercase; letter-spacing: 0.5px;">Amount Received (जमा राशि):</span>
+                <div style="font-size: 24px; font-weight: 800; color: #166534; letter-spacing: -0.5px;">
+                    ₹ ${amountNum.toLocaleString('en-IN')}
+                </div>
+            </div>
+            ${discountNum > 0 ? `
+                <div style="text-align: right;">
+                    <span style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase;">Discount Allowed:</span>
+                    <div style="font-size: 14px; font-weight: 700; color: #b45309;">₹ ${discountNum.toLocaleString('en-IN')}</div>
+                </div>
+            ` : ''}
+        </div>
+
+        <!-- Account Position / Dues Summary Table -->
+        <div style="margin-bottom: 22px;">
+            <div style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                Account Status Summary (FY ${fy}):
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
+                <thead>
+                    <tr style="background: #f1f5f9; color: #475569; font-weight: 700; text-align: left;">
+                        <th style="padding: 6px 10px; border: 1px solid #e2e8f0;">Total Billed</th>
+                        <th style="padding: 6px 10px; border: 1px solid #e2e8f0;">Total Received to Date</th>
+                        <th style="padding: 6px 10px; border: 1px solid #e2e8f0;">Total Discount</th>
+                        <th style="padding: 6px 10px; border: 1px solid #e2e8f0; text-align: right;">Current Balance Due</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 6px 10px; border: 1px solid #e2e8f0; font-weight: 600;">₹ ${Math.round(stats.totalReceivable).toLocaleString('en-IN')}</td>
+                        <td style="padding: 6px 10px; border: 1px solid #e2e8f0; font-weight: 700; color: #16a34a;">₹ ${Math.round(stats.totalReceived).toLocaleString('en-IN')}</td>
+                        <td style="padding: 6px 10px; border: 1px solid #e2e8f0;">₹ ${Math.round(stats.totalDiscount || 0).toLocaleString('en-IN')}</td>
+                        <td style="padding: 6px 10px; border: 1px solid #e2e8f0; text-align: right; font-weight: 800; ${duesBal <= 0 ? 'color: #16a34a;' : 'color: #e11d48;'}">
+                            ${duesBal <= 0 ? '₹ 0 (Fully Settled)' : '₹ ' + Math.round(duesBal).toLocaleString('en-IN')}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Footer / Signatures -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-top: 14px; border-top: 1px dashed #cbd5e1;">
+            <div style="font-size: 10px; color: #94a3b8; font-style: italic;">
+                * This is a computer-generated receipt note acknowledged by Arya Associates.
+            </div>
+            <div style="text-align: center; min-width: 170px;">
+                <div style="font-size: 12px; font-weight: 800; color: #0f766e; margin-bottom: 28px;">For ARYA ASSOCIATES</div>
+                <div style="font-size: 11px; font-weight: 700; color: #334155; border-top: 1px solid #94a3b8; padding-top: 4px;">
+                    Authorized Signatory
+                </div>
+            </div>
+        </div>
+    `;
+
+    return div;
+}
+window.buildPaymentReceiptElement = buildPaymentReceiptElement;
+
+window.previewReceiptModal = function(logId) {
+    const log = state.incomeLogs.find(l => l.id === logId);
+    if (!log) {
+        alert("Receipt record not found.");
+        return;
+    }
+    const client = state.clients.find(c => c.id === log.clientId) || { name: 'Valued Client' };
+    const stats = getClientReportStats(client.id);
+
+    const container = document.getElementById('receipt-preview-content');
+    if (!container) return;
+
+    container.innerHTML = '';
+    const receiptElem = buildPaymentReceiptElement(log, client, stats);
+    container.appendChild(receiptElem);
+
+    const titleElem = document.getElementById('modal-receipt-preview-title');
+    if (titleElem) {
+        titleElem.innerHTML = `<i data-lucide="receipt" style="width:20px; height:20px; color:#0d9488;"></i> Payment Receipt Note &mdash; ${client.name}`;
+    }
+
+    const btnPdf = document.getElementById('btn-modal-receipt-pdf');
+    if (btnPdf) {
+        btnPdf.onclick = () => generateReceiptPDF(logId);
+    }
+    const btnWa = document.getElementById('btn-modal-receipt-whatsapp');
+    if (btnWa) {
+        btnWa.onclick = () => shareReceiptWhatsApp(logId);
+    }
+
+    const modal = document.getElementById('modal-receipt-preview');
+    if (modal) modal.classList.add('active');
+    lucide.createIcons();
+};
+
+window.closeReceiptPreviewModal = function() {
+    const modal = document.getElementById('modal-receipt-preview');
+    if (modal) modal.classList.remove('active');
+};
+
+window.generateReceiptPDF = function(logId) {
+    const log = state.incomeLogs.find(l => l.id === logId);
+    if (!log) {
+        alert("Receipt record not found.");
+        return;
+    }
+    const client = state.clients.find(c => c.id === log.clientId) || { name: 'Client' };
+    const stats = getClientReportStats(client.id);
+    const fy = client.pendingYear || '2026-2027';
+    const receiptNum = (log.id || '').replace('i_', '').slice(-6).toUpperCase();
+    const receiptIdFull = `REC-${fy.split('-')[0]}-${receiptNum}`;
+
+    const receiptElem = buildPaymentReceiptElement(log, client, stats);
+    receiptElem.style.position = 'fixed';
+    receiptElem.style.left = '-9999px';
+    receiptElem.style.top = '0';
+    receiptElem.style.width = '750px';
+    receiptElem.style.background = '#ffffff';
+    document.body.appendChild(receiptElem);
+
+    const opt = {
+        margin: [8, 8, 8, 8],
+        filename: `Receipt_${receiptIdFull}_${client.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    if (typeof html2pdf !== 'undefined') {
+        html2pdf().set(opt).from(receiptElem).save().then(() => {
+            if (receiptElem.parentNode) {
+                receiptElem.parentNode.removeChild(receiptElem);
+            }
+        }).catch(err => {
+            console.error("PDF generation error:", err);
+            alert("Could not generate PDF directly. You can view the receipt and print to PDF from browser.");
+            if (receiptElem.parentNode) {
+                receiptElem.parentNode.removeChild(receiptElem);
+            }
+        });
+    } else {
+        alert("PDF export library not loaded. Please ensure you are connected to internet or use browser print.");
+        if (receiptElem.parentNode) {
+            receiptElem.parentNode.removeChild(receiptElem);
+        }
+    }
+};
+
+window.shareReceiptWhatsApp = async function(logId) {
+    const log = state.incomeLogs.find(l => l.id === logId);
+    if (!log) {
+        alert("Receipt record not found.");
+        return;
+    }
+    const client = state.clients.find(c => c.id === log.clientId) || { name: 'Valued Client' };
+    const stats = getClientReportStats(client.id);
+    const fy = client.pendingYear || '2026-2027';
+    const receiptNum = (log.id || '').replace('i_', '').slice(-6).toUpperCase();
+    const receiptIdFull = `REC-${fy.split('-')[0]}-${receiptNum}`;
+    const amtWords = numberToWordsINR(log.amount);
+
+    const text = `*PAYMENT RECEIPT ACKNOWLEDGMENT*
+*ARYA ASSOCIATES*
+Taxation, Accounting & Advisory Services
+------------------------------------------------
+Dear *${client.name}*,
+
+Greetings!
+
+We gratefully confirm the receipt of your payment. Below are the official receipt details for your record:
+
+📄 *Receipt No:* ${receiptIdFull}
+📅 *Receipt Date:* ${formatDbDate(log.date)}
+💰 *Amount Received:* ₹${Number(log.amount).toLocaleString('en-IN')}
+📝 *In Words:* ${amtWords}
+🏦 *Payment Mode / Account:* ${log.mode || 'Direct Account'}
+${log.discount > 0 ? `🎁 *Discount Allowed:* ₹${Number(log.discount).toLocaleString('en-IN')}\n` : ''}${log.remark ? `📌 *Remarks / Purpose:* ${log.remark}\n` : ''}
+📊 *Account Status Summary (FY ${fy}):*
+• Total Contract / Billed: ₹${Math.round(stats.totalReceivable).toLocaleString('en-IN')}
+• Total Paid to Date: ₹${Math.round(stats.totalReceived).toLocaleString('en-IN')}
+• *Current Outstanding Balance Due: ${stats.balanceReceivable <= 0 ? 'Nil (₹0 - Fully Settled & Closed)' : '₹' + Math.round(stats.balanceReceivable).toLocaleString('en-IN')}*
+
+Thank you for your prompt payment and valuable association!
+
+Warm regards,
+*ARYA ASSOCIATES*
+RAVI KATARA
+📞 Mobile: +91 88150 52555, +91 89821 47763`;
+
+    let clientMobile = client.mobile || client.Mobile || client.phone || client.Phone || client.contact || client.Contact || '';
+    if (!clientMobile) {
+        state.customClientFields.forEach(f => {
+            if (/mobile|phone|contact|whatsapp/i.test(f.name) && client[f.name]) {
+                clientMobile = String(client[f.name]);
+            }
+        });
+    }
+
+    let cleanPhone = (clientMobile || '').replace(/\D/g, '');
+    if (cleanPhone.length === 10) {
+        cleanPhone = '91' + cleanPhone;
+    }
+
+    // Try Web Share API with PDF on supported mobile browsers
+    if (navigator.share && navigator.canShare && typeof html2pdf !== 'undefined') {
+        try {
+            const receiptElem = buildPaymentReceiptElement(log, client, stats);
+            receiptElem.style.position = 'fixed';
+            receiptElem.style.left = '-9999px';
+            document.body.appendChild(receiptElem);
+            const pdfBlob = await html2pdf().from(receiptElem).output('blob');
+            if (receiptElem.parentNode) receiptElem.parentNode.removeChild(receiptElem);
+
+            const file = new File([pdfBlob], `Receipt_${receiptIdFull}_${client.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`, { type: 'application/pdf' });
+            if (navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    title: `Receipt ${receiptIdFull} - ${client.name}`,
+                    text: text,
+                    files: [file]
+                });
+                return;
+            }
+        } catch (err) {
+            console.log("Web Share API fallback:", err);
+        }
+    }
+
+    let waUrl = '';
+    if (cleanPhone && cleanPhone.length >= 10) {
+        waUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`;
+    } else {
+        waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    }
+    window.open(waUrl, '_blank');
+};
+
 // Income logs
 // Searchable Client Dropdown Component
 function setupSearchableClientDropdown({ inputId, selectId, menuId, clearBtnId }) {
@@ -5929,6 +6345,12 @@ function handleIncomeSubmit(e) {
     addIncomeDirect(logObj);
     closeIncomeModal();
     renderPage(state.activePage);
+
+    if (!id) {
+        setTimeout(() => {
+            previewReceiptModal(logObj.id);
+        }, 150);
+    }
 }
 
 window.openEditIncome = function(id) {
