@@ -6012,7 +6012,7 @@ function buildPaymentReceiptElement(log, client, stats) {
         </div>
 
         <!-- Highlighted Amount & Discount Box -->
-        <div style="display: flex; justify-content: space-between; align-items: center; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 8px; padding: 12px 18px; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; flex-wrap: wrap; gap: 10px;">
             <div>
                 <span style="font-size: 11px; font-weight: 700; color: #15803d; text-transform: uppercase; letter-spacing: 0.5px;">Amount Received (जमा राशि):</span>
                 <div style="font-size: 24px; font-weight: 800; color: #166534; letter-spacing: -0.5px;">
@@ -6027,40 +6027,13 @@ function buildPaymentReceiptElement(log, client, stats) {
             ` : ''}
         </div>
 
-        <!-- Account Position / Dues Summary Table -->
-        <div style="margin-bottom: 22px;">
-            <div style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
-                Account Status Summary (FY ${fy}):
-            </div>
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
-                <thead>
-                    <tr style="background: #f1f5f9; color: #475569; font-weight: 700; text-align: left;">
-                        <th style="padding: 6px 10px; border: 1px solid #e2e8f0;">Total Billed</th>
-                        <th style="padding: 6px 10px; border: 1px solid #e2e8f0;">Total Received to Date</th>
-                        <th style="padding: 6px 10px; border: 1px solid #e2e8f0;">Total Discount</th>
-                        <th style="padding: 6px 10px; border: 1px solid #e2e8f0; text-align: right;">Current Balance Due</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td style="padding: 6px 10px; border: 1px solid #e2e8f0; font-weight: 600;">₹ ${Math.round(stats.totalReceivable).toLocaleString('en-IN')}</td>
-                        <td style="padding: 6px 10px; border: 1px solid #e2e8f0; font-weight: 700; color: #16a34a;">₹ ${Math.round(stats.totalReceived).toLocaleString('en-IN')}</td>
-                        <td style="padding: 6px 10px; border: 1px solid #e2e8f0;">₹ ${Math.round(stats.totalDiscount || 0).toLocaleString('en-IN')}</td>
-                        <td style="padding: 6px 10px; border: 1px solid #e2e8f0; text-align: right; font-weight: 800; ${duesBal <= 0 ? 'color: #16a34a;' : 'color: #e11d48;'}">
-                            ${duesBal <= 0 ? '₹ 0 (Fully Settled)' : '₹ ' + Math.round(duesBal).toLocaleString('en-IN')}
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
         <!-- Footer / Signatures -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-top: 14px; border-top: 1px dashed #cbd5e1;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-top: 18px; border-top: 1px dashed #cbd5e1; margin-top: 10px;">
             <div style="font-size: 10px; color: #94a3b8; font-style: italic;">
                 * This is a computer-generated receipt note acknowledged by Arya Associates.
             </div>
             <div style="text-align: center; min-width: 170px;">
-                <div style="font-size: 12px; font-weight: 800; color: #0f766e; margin-bottom: 28px;">For ARYA ASSOCIATES</div>
+                <div style="font-size: 12px; font-weight: 800; color: #0f766e; margin-bottom: 30px;">For ARYA ASSOCIATES</div>
                 <div style="font-size: 11px; font-weight: 700; color: #334155; border-top: 1px solid #94a3b8; padding-top: 4px;">
                     Authorized Signatory
                 </div>
@@ -6189,12 +6162,7 @@ We gratefully confirm the receipt of your payment. Below are the official receip
 📝 *In Words:* ${amtWords}
 🏦 *Payment Mode / Account:* ${log.mode || 'Direct Account'}
 ${log.discount > 0 ? `🎁 *Discount Allowed:* ₹${Number(log.discount).toLocaleString('en-IN')}\n` : ''}${log.remark ? `📌 *Remarks / Purpose:* ${log.remark}\n` : ''}
-📊 *Account Status Summary (FY ${fy}):*
-• Total Contract / Billed: ₹${Math.round(stats.totalReceivable).toLocaleString('en-IN')}
-• Total Paid to Date: ₹${Math.round(stats.totalReceived).toLocaleString('en-IN')}
-• *Current Outstanding Balance Due: ${stats.balanceReceivable <= 0 ? 'Nil (₹0 - Fully Settled & Closed)' : '₹' + Math.round(stats.balanceReceivable).toLocaleString('en-IN')}*
-
-Thank you for your prompt payment and valuable association!
+Thank you for your payment and valuable association!
 
 Warm regards,
 *ARYA ASSOCIATES*
