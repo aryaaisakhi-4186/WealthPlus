@@ -97,7 +97,7 @@
                 </a>
                 <a href="#" class="menu-item" data-page="petty-cash" id="nav-petty-cash">
                     <i data-lucide="home"></i>
-                    <span>Petty Cash (घरेलू)</span>
+                    <span>Petty Cash</span>
                 </a>
                 <a href="#" class="menu-item" data-page="reports" id="nav-reports">
                     <i data-lucide="file-bar-chart"></i>
@@ -677,7 +677,7 @@
                             <span style="font-size: 20px;">🛡️</span>
                             <div>
                                 <strong style="font-size: 13px; color: var(--text-primary);">Independent Cash Separation:</strong>
-                                <span style="font-size: 12px; color: var(--text-secondary); display: block;">Main Cash (व्यावसायिक रोकड़) and Household Petty Cash (घरेलू खर्च रोकड़) are strictly separated.</span>
+                                <span style="font-size: 12px; color: var(--text-secondary); display: block;">Main Cash and Household Petty Cash are strictly separated.</span>
                             </div>
                         </div>
                         <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
@@ -853,7 +853,7 @@
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
                                     <h5 style="margin:0; display:flex; align-items:center; gap:6px; color:#16a34a;">
                                         <i data-lucide="receipt" style="width:16px; height:16px; color:#16a34a;"></i>
-                                        Payments Received & Receipt Notes (जमा राशि एवं रसीदें)
+                                        Payments Received & Receipt Notes
                                     </h5>
                                     <span id="client-receipts-count-badge" class="badge" style="background:rgba(22,163,74,0.12); color:#16a34a; font-weight:700;">0 Receipts</span>
                                 </div>
@@ -1799,7 +1799,7 @@
         <div class="modal-box" style="max-width: 680px; width: 95%;">
             <div class="modal-header" style="background: linear-gradient(135deg, rgba(13,148,136,0.1), rgba(16,185,129,0.1)); border-bottom: 1.5px solid rgba(13,148,136,0.2);">
                 <h4 id="modal-receipt-preview-title" style="display:flex; align-items:center; gap:8px; color:#0f766e; margin:0; font-size:16px;">
-                    <i data-lucide="receipt" style="width:20px; height:20px; color:#0d9488;"></i> Payment Receipt Note (पावती / रसीद)
+                    <i data-lucide="receipt" style="width:20px; height:20px; color:#0d9488;"></i> Payment Receipt Note
                 </h4>
                 <button class="btn-close-modal" onclick="closeReceiptPreviewModal()"><i data-lucide="x"></i></button>
             </div>
@@ -1868,7 +1868,7 @@
                     </div>
                 </div>
                 <div class="form-group" id="expense-spent-by-group">
-                    <label for="expense-spent-by">Spent By Member (खर्च करने वाला सदस्य)</label>
+                    <label for="expense-spent-by">Spent By Member</label>
                     <select id="expense-spent-by">
                         <option value="">-- Select Member / Staff --</option>
                         <!-- Populated dynamically with state.members -->
@@ -2208,7 +2208,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="investment-fund-source">Fund Origin / Allocated From (आया हुआ पैसा / फंड सोर्स) *</label>
+                    <label for="investment-fund-source">Fund Origin / Allocated From *</label>
                     <select id="investment-fund-source">
                         <!-- Populated dynamically with General Surplus, Opening Balances, and Party Receipts -->
                     </select>
@@ -2224,29 +2224,29 @@
                 <div class="modal-footer-actions">
                     <button type="button" class="btn btn-outline" id="btn-cancel-investment" onclick="closeInvestmentModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="btn-submit-investment" style="display:inline-flex; align-items:center; gap:6px;">
-                        <i data-lucide="check-circle" style="width:14px; height:14px;"></i> Save Investment
+                        <i data-lucide="check" style="width:14px; height:14px;"></i> Save Investment
                     </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Modal 8: Record Investment Withdrawal / Return -->
-    <div id="modal-investment-withdraw" class="modal-overlay">
+    <!-- Modal 7: Withdraw / Redeem Investment -->
+    <div id="modal-withdraw" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header">
-                <h4>Withdraw / Redeem Investment</h4>
+                <h4 id="modal-withdraw-title">Redeem / Withdraw Investment</h4>
                 <button class="btn-close-modal" id="btn-close-withdraw-modal" onclick="closeWithdrawModal()"><i data-lucide="x"></i></button>
             </div>
-            <form id="form-investment-withdraw" class="modal-form">
+            <form id="form-withdraw" class="modal-form">
                 <input type="hidden" id="withdraw-investment-id">
                 
                 <div class="form-group">
                     <label>Investment Name</label>
-                    <input type="text" id="withdraw-investment-name" readonly style="background:var(--bg-secondary); font-weight:700; color:var(--text-primary);">
+                    <input type="text" id="withdraw-investment-name" readonly style="background:var(--bg-secondary); cursor:not-allowed;">
                 </div>
 
-                <div style="background:var(--bg-primary); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+                <div style="background:var(--bg-secondary); padding:10px 14px; border-radius:var(--radius-sm); margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
                     <span style="font-size:12px; color:var(--text-secondary);">Available Active Balance:</span>
                     <strong id="withdraw-available-balance-display" style="font-size:14px; color:var(--primary);">₹0</strong>
                 </div>
@@ -2289,9 +2289,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.8.0"></script>
-    <script src="app.js?v=6.8.0"></script>
-    <script src="sindhu_v1.js?v=6.8.0"></script>
+    <script src="firebase-config.js?v=6.8.1"></script>
+    <script src="app.js?v=6.8.1"></script>
+    <script src="sindhu_v1.js?v=6.8.1"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

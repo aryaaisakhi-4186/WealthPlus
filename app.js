@@ -6135,7 +6135,7 @@ function buildPaymentReceiptElement(log, client, stats) {
             </div>
             <div style="text-align: right;">
                 <div style="display: inline-block; background: #0d9488; color: #ffffff; font-size: 11px; font-weight: 800; letter-spacing: 1px; padding: 4px 10px; border-radius: 4px; text-transform: uppercase;">
-                    PAYMENT RECEIPT (रसीद)
+                    PAYMENT RECEIPT
                 </div>
                 <div style="font-size: 13px; font-weight: 700; color: #0f766e; margin-top: 6px;">
                     Receipt No: <span style="font-family: monospace; color: #1e293b;">${receiptIdFull}</span>
@@ -6173,7 +6173,7 @@ function buildPaymentReceiptElement(log, client, stats) {
         <!-- Highlighted Amount & Discount Box -->
         <div style="display: flex; justify-content: space-between; align-items: center; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 8px; padding: 14px 18px; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
             <div>
-                <span style="font-size: 11px; font-weight: 700; color: #15803d; text-transform: uppercase; letter-spacing: 0.5px;">Amount Received (जमा राशि):</span>
+                <span style="font-size: 11px; font-weight: 700; color: #15803d; text-transform: uppercase; letter-spacing: 0.5px;">Amount Received:</span>
                 <div style="font-size: 24px; font-weight: 800; color: #166534; letter-spacing: -0.5px;">
                     ₹ ${amountNum.toLocaleString('en-IN')}
                 </div>
@@ -7384,9 +7384,9 @@ window.openTransferModal = function(preset = 'cash-to-bank', editId = '') {
     state.accounts.forEach(a => {
         let label = `${a.name} (${a.type})`;
         if (a.name.toLowerCase().includes('household petty cash') || a.id === 'acc_petty_cash') {
-            label = `🏠 Household Petty Cash (घरेलू रोकड़ Wallet)`;
+            label = `🏠 Household Petty Cash Wallet`;
         } else if (a.name === 'Main Cash' || a.id === 'acc_1') {
-            label = `💵 Main Cash (मुख्य व्यावसायिक रोकड़)`;
+            label = `💵 Main Cash`;
         } else if (a.type === 'Bank') {
             label = `🏦 ${a.name} (Bank Account)`;
         } else if (a.type === 'Credit Card') {
