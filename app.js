@@ -1178,7 +1178,7 @@ function getGlobalStats() {
 
 function getClientReportStats(clientId) {
     const client = state.clients.find(c => c.id === clientId);
-    if (!client) return { totalReceived: 0, totalDiscount: 0, totalSpent: 0, balance: 0, yearlyContract: 0, balanceReceivable: 0, openingBalance: 0, totalReceivable: 0, creditAmount: 0, loansGiven: 0, loansTaken: 0, loansList: [] };
+    if (!client) return { totalReceived: 0, totalDiscount: 0, totalSpent: 0, balance: 0, regularRetainer: 0, contractBreakdownTotal: 0, yearlyContract: 0, balanceReceivable: 0, openingBalance: 0, totalReceivable: 0, creditAmount: 0, loansGiven: 0, loansTaken: 0, loansList: [] };
 
     const clientLoans = (state.loans || []).filter(l => l.clientId === clientId);
     let loansGiven = clientLoans.filter(l => l.type === 'given').reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
@@ -1190,7 +1190,9 @@ function getClientReportStats(clientId) {
     }
 
     const monthlyPay = Number(client.monthlyPay) || 0;
-    const yearlyContract = Number(client.yearlyPay) || (monthlyPay * 12);
+    const regularRetainer = Number(client.yearlyPay) || (monthlyPay * 12);
+    const contractBreakdownTotal = (client.contractItems || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    const yearlyContract = regularRetainer + contractBreakdownTotal;
     const openingBalance = Number(client.openingBalance) || 0;
     const totalReceivable = loansGiven + yearlyContract + openingBalance;
 
@@ -1213,6 +1215,9 @@ function getClientReportStats(clientId) {
         creditAmount: loansGiven, 
         loansGiven, 
         loansTaken, 
+        monthlyPay,
+        regularRetainer,
+        contractBreakdownTotal,
         yearlyContract, 
         openingBalance, 
         totalReceivable, 
@@ -1826,14 +1831,17 @@ function renderClientsPage() {
             let contractItemsBreakdownHTML = '';
             if (client.contractItems && client.contractItems.length > 0) {
                 contractItemsBreakdownHTML = `
-                    <div style="background:var(--bg-primary); border:1px solid var(--border-color); border-radius:4px; padding:6px 8px; margin:4px 0;">
-                        <div style="font-size:11px; font-weight:700; color:var(--text-secondary); margin-bottom:4px; display:flex; align-items:center; gap:4px;">
-                            <i data-lucide="layers" style="width:12px; height:12px; color:var(--primary);"></i>
-                            Services & Retainer Breakdown:
+                    <div style="background: rgba(13, 148, 136, 0.04); border: 1px dashed rgba(13, 148, 136, 0.25); border-radius: 6px; padding: 6px 8px; margin: 4px 0;">
+                        <div style="font-size:11px; font-weight:700; color:var(--text-secondary); margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="display:flex; align-items:center; gap:4px;">
+                                <i data-lucide="layers" style="width:12px; height:12px; color:var(--primary);"></i>
+                                Additional Services:
+                            </span>
+                            <span style="font-weight:700; color:var(--primary);">${fC(stats.contractBreakdownTotal)}</span>
                         </div>
                         ${client.contractItems.map(ci => `
                             <div class="c-stat-row" style="font-size:11px; padding:2px 0;">
-                                <span>• ${ci.particulars || 'Service'} (${ci.months} mo @ ₹${Number(ci.rate || 0).toLocaleString('en-IN')}):</span>
+                                <span>• ${ci.particulars || 'Service'} (${ci.months ? ci.months + ' mo' : ''}${ci.rate ? ' @ ₹' + Number(ci.rate).toLocaleString('en-IN') : ''}):</span>
                                 <span style="font-weight:600;">₹${Number(ci.amount || 0).toLocaleString('en-IN')}</span>
                             </div>
                         `).join('')}
@@ -1841,17 +1849,31 @@ function renderClientsPage() {
                 `;
             }
 
-            if (Number(client.monthlyPay) > 0 || stats.yearlyContract > 0) {
+            if (Number(client.monthlyPay) > 0 || stats.regularRetainer > 0 || stats.contractBreakdownTotal > 0) {
                 contractInfoHTML += `
-                    <div class="c-stat-row">
-                        <span class="c-stat-label">Monthly Retainer:</span>
-                        <span class="c-stat-val">${fC(client.monthlyPay || 0)}</span>
-                    </div>
-                    <div class="c-stat-row">
-                        <span class="c-stat-label">Yearly Retainer:</span>
-                        <span class="c-stat-val">${fC(stats.yearlyContract)}</span>
-                    </div>
+                    ${stats.regularRetainer > 0 ? `
+                        <div class="c-stat-row">
+                            <span class="c-stat-label">Monthly Retainer:</span>
+                            <span class="c-stat-val">${fC(client.monthlyPay || 0)}</span>
+                        </div>
+                        <div class="c-stat-row">
+                            <span class="c-stat-label">Regular Yearly Retainer:</span>
+                            <span class="c-stat-val">${fC(stats.regularRetainer)}</span>
+                        </div>
+                    ` : ''}
                     ${contractItemsBreakdownHTML}
+                    ${stats.contractBreakdownTotal > 0 && stats.regularRetainer > 0 ? `
+                        <div class="c-stat-row" style="font-weight:700; border-top:1px dashed var(--border-color); padding-top:4px; margin-top:2px;">
+                            <span class="c-stat-label" style="color:var(--primary);">Total Yearly Contract:</span>
+                            <span class="c-stat-val" style="color:var(--primary);">${fC(stats.yearlyContract)}</span>
+                        </div>
+                    ` : ''}
+                    ${stats.contractBreakdownTotal > 0 && stats.regularRetainer === 0 ? `
+                        <div class="c-stat-row">
+                            <span class="c-stat-label">Total Yearly Contract:</span>
+                            <span class="c-stat-val">${fC(stats.yearlyContract)}</span>
+                        </div>
+                    ` : ''}
                 `;
             }
 
@@ -3443,6 +3465,16 @@ function renderClientReportDetails(clientId) {
     const client = state.clients.find(c => c.id === clientId);
     const pendingYear = client ? (client.pendingYear || '2026-2027') : '2026-2027';
 
+    let breakdownKpiHTML = '';
+    if (stats.contractBreakdownTotal > 0) {
+        breakdownKpiHTML = `
+            <div class="report-stat-card val-primary" style="border-left: 4px solid #0d9488;">
+                <h5>Services Breakdown</h5>
+                <span class="val" style="color:#0f766e; font-weight:700;">${fC(stats.contractBreakdownTotal)}</span>
+            </div>
+        `;
+    }
+
     statsContainer.innerHTML = `
         <div class="report-stat-card val-primary" style="border-left: 4px solid #6366f1;">
             <h5>Financial Year</h5>
@@ -3450,8 +3482,14 @@ function renderClientReportDetails(clientId) {
         </div>
         ${creditCardHTML}
         <div class="report-stat-card val-primary">
-            <h5>Yearly Retainer</h5>
-            <span class="val">${fC(stats.yearlyContract)}</span>
+            <h5>Regular Retainer</h5>
+            <span class="val">${fC(stats.regularRetainer)}</span>
+            ${client && client.monthlyPay ? `<span style="font-size:11px; color:var(--text-secondary); display:block; margin-top:2px;">(${fC(client.monthlyPay)}/mo)</span>` : ''}
+        </div>
+        ${breakdownKpiHTML}
+        <div class="report-stat-card val-primary">
+            <h5>Total Yearly Contract</h5>
+            <span class="val" style="color:var(--primary); font-weight:700;">${fC(stats.yearlyContract)}</span>
         </div>
         <div class="report-stat-card val-primary">
             <h5>Opening Balance</h5>
@@ -3528,20 +3566,41 @@ function renderClientReportDetails(clientId) {
     const contractTotalDisplay = document.getElementById('client-report-contracts-total');
 
     if (contractBox && contractTbody) {
-        if (client && client.contractItems && client.contractItems.length > 0) {
+        if (client && (stats.regularRetainer > 0 || (client.contractItems && client.contractItems.length > 0))) {
             contractBox.style.display = 'block';
             contractTbody.innerHTML = '';
-            client.contractItems.forEach(ci => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td style="font-weight:600;">${ci.particulars || 'Service'}</td>
-                    <td>${ci.period || ('FY ' + (client.pendingYear || '2026-2027'))}</td>
-                    <td class="text-right">${ci.months || 12}</td>
-                    <td class="text-right">${ci.rate ? fC(ci.rate) : '-'}</td>
-                    <td class="text-right" style="font-weight:700; color:var(--primary);">${fC(ci.amount || 0)}</td>
+            
+            // 1. Regular Retainer row (if applicable)
+            if (stats.regularRetainer > 0) {
+                const trReg = document.createElement('tr');
+                trReg.style.background = 'rgba(13, 148, 136, 0.04)';
+                trReg.innerHTML = `
+                    <td style="font-weight:600;">
+                        <span>Regular Retainer Contract</span>
+                        <span class="cat-pill" style="font-size:9px; padding:1px 5px; margin-left:4px; background:var(--primary); color:#fff;">Retainer</span>
+                    </td>
+                    <td>FY ${client.pendingYear || '2026-2027'}</td>
+                    <td class="text-right">12</td>
+                    <td class="text-right">${client.monthlyPay ? fC(client.monthlyPay) : fC(Math.round(stats.regularRetainer / 12))}</td>
+                    <td class="text-right" style="font-weight:700; color:var(--primary);">${fC(stats.regularRetainer)}</td>
                 `;
-                contractTbody.appendChild(tr);
-            });
+                contractTbody.appendChild(trReg);
+            }
+
+            // 2. Additional service breakdown items
+            if (client.contractItems && client.contractItems.length > 0) {
+                client.contractItems.forEach(ci => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="font-weight:600;">${ci.particulars || 'Service'}</td>
+                        <td>${ci.period || ('FY ' + (client.pendingYear || '2026-2027'))}</td>
+                        <td class="text-right">${ci.months || 12}</td>
+                        <td class="text-right">${ci.rate ? fC(ci.rate) : '-'}</td>
+                        <td class="text-right" style="font-weight:700; color:var(--primary);">${fC(ci.amount || 0)}</td>
+                    `;
+                    contractTbody.appendChild(tr);
+                });
+            }
             if (contractTotalDisplay) contractTotalDisplay.innerText = fC(stats.yearlyContract);
         } else {
             contractBox.style.display = 'none';
@@ -4055,7 +4114,12 @@ function renderMasterClients() {
             </td>
             <td style="font-weight:600; color: ${creditAmt > 0 ? 'var(--primary)' : 'var(--text-muted)'};">${fC(creditAmt)}</td>
             <td>${fC(client.monthlyPay || 0)}</td>
-            <td style="font-weight:500;">${fC(stats.yearlyContract)}</td>
+            <td style="font-weight:600;">
+                <div>${fC(stats.yearlyContract)}</div>
+                ${stats.contractBreakdownTotal > 0 ? `
+                    <div style="font-size:10px; color:var(--text-secondary); font-weight:400;">Reg: ${fC(stats.regularRetainer)} + Serv: ${fC(stats.contractBreakdownTotal)}</div>
+                ` : ''}
+            </td>
             <td style="color:var(--text-secondary); font-weight:500;">${fC(stats.openingBalance)}</td>
             <td style="font-weight:700; color:var(--primary);">${fC(stats.totalReceivable)}</td>
             <td class="actions-col">
@@ -4792,7 +4856,7 @@ window.renderContractItemsTable = function() {
     tbody.innerHTML = '';
 
     if (!activeContractItems || activeContractItems.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:10px;">No service breakdown added. Click "+ Add Row" or enter retainer below.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:10px;">No additional services added. Click "+ Add Row" to itemize extra services.</td></tr>`;
         recalculateContractTotals();
         return;
     }
@@ -4802,7 +4866,7 @@ window.renderContractItemsTable = function() {
         tr.dataset.index = idx;
         tr.innerHTML = `
             <td>
-                <input type="text" class="contract-item-input ci-particulars" placeholder="e.g. Monthly Retainer, GST" value="${item.particulars || ''}">
+                <input type="text" class="contract-item-input ci-particulars" placeholder="e.g. Tax Audit, ROC Filing, ITR" value="${item.particulars || ''}">
             </td>
             <td>
                 <input type="text" class="contract-item-input ci-period" placeholder="e.g. FY 2026-2027" value="${item.period || ''}">
@@ -4886,26 +4950,39 @@ window.removeContractItemRow = function(index) {
 };
 
 window.recalculateContractTotals = function() {
-    let totalYearly = 0;
-    activeContractItems.forEach(item => {
-        totalYearly += Number(item.amount) || 0;
+    let breakdownTotal = 0;
+    (activeContractItems || []).forEach(item => {
+        breakdownTotal += Number(item.amount) || 0;
     });
 
     const elTotalDisplay = document.getElementById('contract-items-total-display');
     if (elTotalDisplay) {
-        elTotalDisplay.innerText = '₹' + Math.round(totalYearly).toLocaleString('en-IN');
+        elTotalDisplay.innerText = '₹' + Math.round(breakdownTotal).toLocaleString('en-IN');
     }
 
     const yearlyInp = document.getElementById('client-yearly-pay');
     const monthlyInp = document.getElementById('client-monthly-pay');
 
-    if (activeContractItems.length > 0 && totalYearly > 0) {
-        if (yearlyInp) yearlyInp.value = totalYearly || '';
-        if (monthlyInp) monthlyInp.value = Math.round(totalYearly / 12) || '';
+    const monthlyVal = Number(monthlyInp?.value) || 0;
+    let regularYearly = Number(yearlyInp?.value) || (monthlyVal > 0 ? monthlyVal * 12 : 0);
+
+    const totalYearlyContract = regularYearly + breakdownTotal;
+
+    const elCombinedDisplay = document.getElementById('client-combined-contract-display');
+    if (elCombinedDisplay) {
+        elCombinedDisplay.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <div style="font-size:12px; color:var(--text-secondary);">
+                    Regular Retainer: <strong style="color:var(--text-primary);">₹${Math.round(regularYearly).toLocaleString('en-IN')}</strong> (${monthlyVal > 0 ? `₹${Math.round(monthlyVal).toLocaleString('en-IN')}/mo` : 'Annual'})
+                    ${breakdownTotal > 0 ? ` + Additional Services: <strong style="color:var(--text-primary);">₹${Math.round(breakdownTotal).toLocaleString('en-IN')}</strong>` : ''}
+                </div>
+                <div style="font-size:13px; font-weight:700; color:var(--primary);">
+                    Total Yearly Contract (Payable): <span style="font-size:15px; font-weight:800; color:var(--primary);">₹${Math.round(totalYearlyContract).toLocaleString('en-IN')}</span>
+                </div>
+            </div>
+        `;
     }
 };
-
-
 
 window.closeClientModal = function() {
     const modal = document.getElementById('modal-client');
@@ -4980,22 +5057,11 @@ window.openClientModal = function(editId = '') {
                 }
             });
 
-            // Contract breakdown items
+            // Contract breakdown items (only additional items, without overwriting monthly retainer)
             if (client.contractItems && client.contractItems.length > 0) {
                 activeContractItems = JSON.parse(JSON.stringify(client.contractItems));
             } else {
                 activeContractItems = [];
-                // If yearly/monthly exists without contract items, add default single row
-                if (client.yearlyPay > 0 || client.monthlyPay > 0) {
-                    activeContractItems.push({
-                        id: 'ci_' + Date.now(),
-                        particulars: 'Professional Services Retainer',
-                        period: 'FY ' + (client.pendingYear || '2026-2027'),
-                        months: 12,
-                        rate: client.monthlyPay || Math.round((client.yearlyPay || 0) / 12),
-                        amount: client.yearlyPay || (client.monthlyPay * 12)
-                    });
-                }
             }
         }
     } else {
@@ -5005,6 +5071,20 @@ window.openClientModal = function(editId = '') {
         const cardLimitInput = document.getElementById('client-card-limit');
         if (cardLimitInput) cardLimitInput.value = '0';
         activeContractItems = [];
+    }
+
+    // Attach input listeners for live total calculation on retainer changes
+    if (monthlyInput) {
+        monthlyInput.oninput = () => {
+            const m = Number(monthlyInput.value) || 0;
+            if (yearlyInput) yearlyInput.value = m > 0 ? m * 12 : '';
+            recalculateContractTotals();
+        };
+    }
+    if (yearlyInput) {
+        yearlyInput.oninput = () => {
+            recalculateContractTotals();
+        };
     }
 
     // Toggle loan date group visibility
@@ -5105,11 +5185,32 @@ function buildClientStatementElement(client, stats, fy) {
     const isVendor = isVendorParty(client);
     const dateStr = formatDateString(new Date());
 
-    // 1. Contract items rows
+    // 1. Contract items rows (Regular Retainer + Additional Services Breakdown)
     let contractRowsHTML = '';
-    const contractList = client.contractItems && client.contractItems.length > 0 ? client.contractItems : [
-        { particulars: 'Annual Retainer Contract', period: 'FY ' + fy, months: 12, rate: client.monthlyPay || 0, amount: stats.yearlyContract }
-    ];
+    let contractList = [];
+    if (stats.regularRetainer > 0) {
+        contractList.push({
+            particulars: 'Annual Retainer Contract',
+            period: 'FY ' + fy,
+            months: 12,
+            rate: client.monthlyPay || Math.round(stats.regularRetainer / 12),
+            amount: stats.regularRetainer
+        });
+    }
+    if (client.contractItems && client.contractItems.length > 0) {
+        client.contractItems.forEach(ci => {
+            contractList.push(ci);
+        });
+    }
+    if (contractList.length === 0 && stats.yearlyContract > 0) {
+        contractList.push({
+            particulars: 'Annual Retainer Contract',
+            period: 'FY ' + fy,
+            months: 12,
+            rate: client.monthlyPay || 0,
+            amount: stats.yearlyContract
+        });
+    }
 
     contractList.forEach((ci, idx) => {
         contractRowsHTML += `
@@ -5373,6 +5474,14 @@ window.shareClientLedgerWhatsApp = async function(clientId) {
     const fy = client.pendingYear || '2026-2027';
     const isSettled = stats.balanceReceivable <= 0;
 
+    // Contract details description
+    let contractBreakdownText = `• Total Contract / Services: ${fAmt(stats.yearlyContract)}`;
+    if (stats.regularRetainer > 0 && stats.contractBreakdownTotal > 0) {
+        contractBreakdownText = `• Regular Retainer: ${fAmt(stats.regularRetainer)} (${fAmt(client.monthlyPay)}/mo)\n• Additional Services: ${fAmt(stats.contractBreakdownTotal)}\n• Total Contract / Services: ${fAmt(stats.yearlyContract)}`;
+    } else if (stats.regularRetainer > 0) {
+        contractBreakdownText = `• Regular Retainer Contract: ${fAmt(stats.yearlyContract)} (${fAmt(client.monthlyPay)}/mo)`;
+    }
+
     // Humble WhatsApp message (formatted without raw rupee symbols to prevent WhatsApp Pay auto-link)
     let msg = '';
     if (isSettled) {
@@ -5384,7 +5493,7 @@ Greetings!
 Please find attached your *Final Settled Statement of Account* for *FY ${fy}*.
 
 ✅ *Account Status: Fully Settled & Closed*
-• Total Contract / Services: ${fAmt(stats.yearlyContract)}
+${contractBreakdownText}
 ${stats.openingBalance !== 0 ? `• Opening Balance / Past Due: ${fAmt(stats.openingBalance)}\n` : ''}• Total Dues Billed: ${fAmt(stats.totalReceivable)}
 • Total Amount Received: ${fAmt(stats.totalReceived)}
 ${stats.totalDiscount > 0 ? `• Total Discount Allowed: ${fAmt(stats.totalDiscount)}\n` : ''}• *Balance Due: Nil (Rs. 0)*
@@ -5404,7 +5513,7 @@ Greetings!
 Please find attached your detailed Statement of Account for *FY ${fy}*.
 
 📋 *Account Summary:*
-• Services / Contract Amount: ${fAmt(stats.yearlyContract)}
+${contractBreakdownText}
 ${stats.openingBalance !== 0 ? `• Opening Balance / Past Due: ${fAmt(stats.openingBalance)}\n` : ''}${stats.loansGiven > 0 ? `• Loans / Credit Given: ${fAmt(stats.loansGiven)}\n` : ''}• *TOTAL DUES BILLED: ${fAmt(stats.totalReceivable)}*
 • Total Amount Received: ${fAmt(stats.totalReceived)}
 ${stats.totalDiscount > 0 ? `• Discount Given: ${fAmt(stats.totalDiscount)}\n` : ''}• *NET PENDING BALANCE DUE: ${fAmt(stats.balanceReceivable)}*
@@ -5532,6 +5641,9 @@ window.exportClientStatementExcel = function(clientId) {
         "Financial Year": "FY " + fy,
         "Statement Date": formatDateString(new Date()),
         "Opening Balance (INR)": stats.openingBalance,
+        "Monthly Retainer (INR)": client.monthlyPay || 0,
+        "Regular Yearly Retainer (INR)": stats.regularRetainer,
+        "Additional Services Breakdown (INR)": stats.contractBreakdownTotal,
         "Total Services Retainer (INR)": stats.yearlyContract,
         "Total Loans Given (INR)": stats.loansGiven,
         "Total Billed / Receivable (INR)": stats.totalReceivable,
@@ -5543,9 +5655,31 @@ window.exportClientStatementExcel = function(clientId) {
 
     // 2. Services / Contract Breakdown Sheet
     const contractData = [];
-    const contractList = (client.contractItems && client.contractItems.length > 0) ? client.contractItems : [
-        { particulars: 'Annual Retainer Contract', period: 'FY ' + fy, months: 12, rate: client.monthlyPay || 0, amount: stats.yearlyContract }
-    ];
+    let contractList = [];
+    if (stats.regularRetainer > 0) {
+        contractList.push({
+            particulars: 'Annual Retainer Contract',
+            period: 'FY ' + fy,
+            months: 12,
+            rate: client.monthlyPay || Math.round(stats.regularRetainer / 12),
+            amount: stats.regularRetainer
+        });
+    }
+    if (client.contractItems && client.contractItems.length > 0) {
+        client.contractItems.forEach(ci => {
+            contractList.push(ci);
+        });
+    }
+    if (contractList.length === 0 && stats.yearlyContract > 0) {
+        contractList.push({
+            particulars: 'Annual Retainer Contract',
+            period: 'FY ' + fy,
+            months: 12,
+            rate: client.monthlyPay || 0,
+            amount: stats.yearlyContract
+        });
+    }
+
     contractList.forEach((ci, idx) => {
         contractData.push({
             "S.No": idx + 1,
@@ -6928,7 +7062,9 @@ function exportToExcel() {
             "Payment / Financial Year": client.pendingYear || '2026-2027',
             "Credit / Loan Amount (INR)": client.creditAmount || 0,
             "Monthly Retainer (INR)": client.monthlyPay || 0,
-            "Yearly Retainer (INR)": stats.yearlyContract,
+            "Regular Yearly Retainer (INR)": stats.regularRetainer,
+            "Additional Services Breakdown (INR)": stats.contractBreakdownTotal,
+            "Total Yearly Contract (INR)": stats.yearlyContract,
             "Opening Balance (INR)": stats.openingBalance,
             "Total Receivable (INR)": stats.totalReceivable,
             "Total Received (INR)": stats.totalReceived,
