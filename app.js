@@ -1842,12 +1842,20 @@ function renderClientsPage() {
                             </span>
                             <span style="font-weight:700; color:var(--primary);">${fC(stats.contractBreakdownTotal)}</span>
                         </div>
-                        ${client.contractItems.map(ci => `
-                            <div class="c-stat-row" style="font-size:11px; padding:2px 0;">
-                                <span>• ${ci.particulars || 'Service'} (${ci.months ? ci.months + ' mo' : ''}${ci.rate ? ' @ ₹' + Number(ci.rate).toLocaleString('en-IN') : ''}):</span>
-                                <span style="font-weight:600;">₹${Number(ci.amount || 0).toLocaleString('en-IN')}</span>
-                            </div>
-                        `).join('')}
+                        ${client.contractItems.map(ci => {
+                            const m = Number(ci.months) || 0;
+                            const r = Number(ci.rate) || 0;
+                            let meta = '';
+                            if (m > 0 && r > 0) meta = ` (${m} mo @ ₹${r.toLocaleString('en-IN')})`;
+                            else if (m > 0) meta = ` (${m} mo)`;
+                            else if (r > 0) meta = ` (@ ₹${r.toLocaleString('en-IN')})`;
+                            return `
+                                <div class="c-stat-row" style="font-size:11px; padding:2px 0;">
+                                    <span>• ${ci.particulars || 'Service'}${meta}:</span>
+                                    <span style="font-weight:600;">₹${Number(ci.amount || 0).toLocaleString('en-IN')}</span>
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
                 `;
             }
@@ -3596,11 +3604,13 @@ function renderClientReportDetails(clientId) {
             if (client.contractItems && client.contractItems.length > 0) {
                 client.contractItems.forEach(ci => {
                     const tr = document.createElement('tr');
+                    const mVal = (ci.months !== undefined && ci.months !== null && ci.months !== '') ? ci.months : 0;
+                    const rVal = (Number(ci.rate) > 0) ? fC(ci.rate) : (ci.rate === 0 || ci.rate === '0' ? '₹0' : '-');
                     tr.innerHTML = `
                         <td style="font-weight:600;">${ci.particulars || 'Service'}</td>
                         <td>${ci.period || ('FY ' + (client.pendingYear || '2026-2027'))}</td>
-                        <td class="text-right">${ci.months || 12}</td>
-                        <td class="text-right">${ci.rate ? fC(ci.rate) : '-'}</td>
+                        <td class="text-right">${mVal}</td>
+                        <td class="text-right">${rVal}</td>
                         <td class="text-right" style="font-weight:700; color:var(--primary);">${fC(ci.amount || 0)}</td>
                     `;
                     contractTbody.appendChild(tr);
@@ -4909,6 +4919,11 @@ window.renderContractItemsTable = function() {
     activeContractItems.forEach((item, idx) => {
         const tr = document.createElement('tr');
         tr.dataset.index = idx;
+
+        const monthsVal = (item.months !== undefined && item.months !== null && item.months !== '') ? item.months : '';
+        const rateVal = (item.rate !== undefined && item.rate !== null && item.rate !== '') ? item.rate : '';
+        const amountVal = (item.amount !== undefined && item.amount !== null && item.amount !== '') ? item.amount : '';
+
         tr.innerHTML = `
             <td>
                 <input type="text" class="contract-item-input ci-particulars" placeholder="e.g. Tax Audit, ROC Filing, ITR" value="${item.particulars || ''}">
@@ -4917,13 +4932,13 @@ window.renderContractItemsTable = function() {
                 <input type="text" class="contract-item-input ci-period" placeholder="e.g. FY 2026-2027" value="${item.period || ''}">
             </td>
             <td>
-                <input type="number" min="1" step="1" class="contract-item-input ci-months" placeholder="12" value="${item.months !== undefined ? item.months : 12}">
+                <input type="number" min="0" step="1" class="contract-item-input ci-months" placeholder="0" value="${monthsVal !== '' ? monthsVal : ''}">
             </td>
             <td>
-                <input type="number" min="0" step="any" class="contract-item-input ci-rate" placeholder="2500" value="${item.rate !== undefined ? item.rate : ''}">
+                <input type="number" min="0" step="any" class="contract-item-input ci-rate" placeholder="0" value="${rateVal !== '' ? rateVal : ''}">
             </td>
             <td>
-                <input type="number" min="0" step="any" class="contract-item-input ci-amount" placeholder="30000" value="${item.amount !== undefined ? item.amount : ''}">
+                <input type="number" min="0" step="any" class="contract-item-input ci-amount" placeholder="0" value="${amountVal !== '' ? amountVal : ''}">
             </td>
             <td style="text-align:center;">
                 <button type="button" class="btn-del-contract-row" onclick="removeContractItemRow(${idx})" title="Delete Row">
@@ -4940,23 +4955,35 @@ window.renderContractItemsTable = function() {
         const inpAmount = tr.querySelector('.ci-amount');
 
         const updateRowMath = (isManualAmount = false) => {
-            const months = Number(inpMonths.value) || 0;
-            const rate = Number(inpRate.value) || 0;
-            let amount = Number(inpAmount.value) || 0;
+            const monthsRaw = inpMonths.value.trim();
+            const rateRaw = inpRate.value.trim();
+            const amountRaw = inpAmount.value.trim();
 
-            if (!isManualAmount && months > 0 && rate > 0) {
-                amount = months * rate;
-                inpAmount.value = amount;
-            } else if (isManualAmount && months > 0 && amount > 0 && rate === 0) {
-                inpRate.value = Math.round(amount / months);
+            const months = monthsRaw !== '' ? Number(monthsRaw) : 0;
+            const rate = rateRaw !== '' ? Number(rateRaw) : 0;
+            let amount = amountRaw !== '' ? Number(amountRaw) : 0;
+
+            if (!isManualAmount) {
+                if (months > 0 && rate > 0) {
+                    amount = months * rate;
+                    inpAmount.value = amount;
+                } else if (months === 0 || rate === 0) {
+                    if (amountRaw !== '' && !isNaN(Number(amountRaw))) {
+                        amount = Number(amountRaw);
+                    }
+                }
+            } else {
+                if (months > 0 && amount > 0 && (rate === 0 || rateRaw === '')) {
+                    inpRate.value = Math.round(amount / months);
+                }
             }
 
             activeContractItems[idx] = {
                 id: item.id || ('ci_' + Date.now() + '_' + idx),
                 particulars: inpPart.value.trim(),
                 period: inpPeriod.value.trim(),
-                months: months,
-                rate: rate,
+                months: monthsRaw !== '' ? months : 0,
+                rate: rateRaw !== '' ? rate : 0,
                 amount: amount
             };
             recalculateContractTotals();
@@ -4981,7 +5008,7 @@ window.addContractItemRow = function(item = null) {
         id: 'ci_' + Date.now(),
         particulars: '',
         period: 'FY ' + currentFY,
-        months: 12,
+        months: '',
         rate: '',
         amount: ''
     };
@@ -5170,8 +5197,19 @@ function handleClientSubmit(e) {
     const pendingYear = document.getElementById('client-pending-year')?.value || '2026-2027';
     const openingBalance = Number(document.getElementById('client-opening-balance').value) || 0;
 
-    // Filter valid contract items
-    const validContractItems = (activeContractItems || []).filter(ci => ci.particulars || ci.amount > 0 || ci.rate > 0);
+    // Filter and sanitize valid contract items (allow 0 months/rate)
+    const validContractItems = (activeContractItems || []).filter(ci => {
+        const hasPart = ci.particulars && ci.particulars.trim().length > 0;
+        const hasAmt = Number(ci.amount) > 0 || Number(ci.rate) > 0;
+        return hasPart || hasAmt;
+    }).map(ci => ({
+        id: ci.id || ('ci_' + Date.now()),
+        particulars: (ci.particulars || '').trim(),
+        period: (ci.period || '').trim(),
+        months: (ci.months !== undefined && ci.months !== null && ci.months !== '') ? Number(ci.months) : 0,
+        rate: (ci.rate !== undefined && ci.rate !== null && ci.rate !== '') ? Number(ci.rate) : 0,
+        amount: (ci.amount !== undefined && ci.amount !== null && ci.amount !== '') ? Number(ci.amount) : 0
+    }));
 
     let clientObj = { name, group, cardLimit, creditAmount, loanSourceAccount, loanDate, monthlyPay, yearlyPay, pendingYear, openingBalance, contractItems: validContractItems };
 
@@ -5258,13 +5296,15 @@ function buildClientStatementElement(client, stats, fy) {
     }
 
     contractList.forEach((ci, idx) => {
+        const mVal = (ci.months !== undefined && ci.months !== null && ci.months !== '') ? ci.months : (ci.months === 0 ? 0 : '-');
+        const rVal = (Number(ci.rate) > 0) ? fC(ci.rate) : (ci.rate === 0 || ci.rate === '0' ? '₹0' : '-');
         contractRowsHTML += `
             <tr>
                 <td style="text-align:center;">${idx + 1}</td>
                 <td><strong>${ci.particulars || 'Service / Retainer'}</strong></td>
                 <td>${ci.period || ('FY ' + fy)}</td>
-                <td style="text-align:center;">${ci.months || 12}</td>
-                <td style="text-align:right;">${ci.rate ? fC(ci.rate) : '-'}</td>
+                <td style="text-align:center;">${mVal}</td>
+                <td style="text-align:right;">${rVal}</td>
                 <td style="text-align:right; font-weight:700;">${fC(ci.amount || 0)}</td>
             </tr>
         `;
@@ -5730,9 +5770,9 @@ window.exportClientStatementExcel = function(clientId) {
             "S.No": idx + 1,
             "Service Particulars": ci.particulars || 'Service',
             "Period": ci.period || ('FY ' + fy),
-            "Months": ci.months || 12,
-            "Monthly Rate (INR)": ci.rate || 0,
-            "Total Amount (INR)": ci.amount || 0
+            "Months": (ci.months !== undefined && ci.months !== null && ci.months !== '') ? Number(ci.months) : 0,
+            "Monthly Rate (INR)": Number(ci.rate) || 0,
+            "Total Amount (INR)": Number(ci.amount) || 0
         });
     });
 
@@ -7607,9 +7647,9 @@ function exportToExcel() {
                     "Financial Year": fy,
                     "Service Particulars": ci.particulars || 'Service',
                     "Period": ci.period || ('FY ' + fy),
-                    "Months": ci.months || 12,
-                    "Rate (INR)": ci.rate || 0,
-                    "Amount (INR)": ci.amount || 0
+                    "Months": (ci.months !== undefined && ci.months !== null && ci.months !== '') ? Number(ci.months) : 0,
+                    "Rate (INR)": Number(ci.rate) || 0,
+                    "Amount (INR)": Number(ci.amount) || 0
                 });
             });
         }
