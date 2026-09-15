@@ -5934,13 +5934,71 @@ function numberToWordsINR(amount) {
 }
 window.numberToWordsINR = numberToWordsINR;
 
+function getReceiptNumber(log, client) {
+    if (!log) return '2026-27/001';
+
+    // If log already has a valid formatted receiptNo (e.g. 2026-27/001), use it
+    if (log.receiptNo && /^\d{4}-\d{2}\/\d+$/.test(log.receiptNo)) {
+        return log.receiptNo;
+    }
+
+    // Determine Financial Year code (e.g., '2026-27')
+    let fyCode = '2026-27';
+    if (log.date) {
+        const parts = String(log.date).split('-');
+        if (parts.length >= 2) {
+            const y = parseInt(parts[0], 10);
+            const m = parseInt(parts[1], 10);
+            if (!isNaN(y) && !isNaN(m)) {
+                const startYear = m >= 4 ? y : y - 1;
+                const endYear = (startYear + 1).toString().slice(-2);
+                fyCode = `${startYear}-${endYear}`;
+            }
+        }
+    } else if (client && client.pendingYear) {
+        const parts = String(client.pendingYear).split('-');
+        const start = parts[0] || '2026';
+        const end = (parts[1] && parts[1].length >= 2) ? parts[1].slice(-2) : (Number(start) + 1).toString().slice(-2);
+        fyCode = `${start}-${end}`;
+    }
+
+    // Sort all income logs belonging to this FY by date, then id
+    const allLogsInFY = (state.incomeLogs || []).filter(l => {
+        if (!l) return false;
+        let lFy = '2026-27';
+        if (l.date) {
+            const p = String(l.date).split('-');
+            if (p.length >= 2) {
+                const y = parseInt(p[0], 10);
+                const m = parseInt(p[1], 10);
+                if (!isNaN(y) && !isNaN(m)) {
+                    const startYear = m >= 4 ? y : y - 1;
+                    const endYear = (startYear + 1).toString().slice(-2);
+                    lFy = `${startYear}-${endYear}`;
+                }
+            }
+        }
+        return lFy === fyCode;
+    }).sort((a, b) => {
+        const da = (a.date || '');
+        const db = (b.date || '');
+        if (da !== db) return da.localeCompare(db);
+        return (a.id || '').localeCompare(b.id || '');
+    });
+
+    const index = allLogsInFY.findIndex(l => l.id === log.id);
+    const seq = index >= 0 ? (index + 1) : (allLogsInFY.length + 1);
+    const seqFormatted = String(seq).padStart(3, '0');
+
+    return `${fyCode}/${seqFormatted}`;
+}
+window.getReceiptNumber = getReceiptNumber;
+
 function buildPaymentReceiptElement(log, client, stats) {
     if (!client) client = state.clients.find(c => c.id === log.clientId) || { name: 'Valued Client' };
     if (!stats) stats = getClientReportStats(client.id);
 
-    const fy = client.pendingYear || '2026-2027';
-    const receiptNum = (log.id || '').replace('i_', '').slice(-6).toUpperCase();
-    const receiptIdFull = `REC-${fy.split('-')[0]}-${receiptNum}`;
+    const receiptIdFull = getReceiptNumber(log, client);
     const formattedDate = formatDbDate(log.date);
     const amountNum = Number(log.amount) || 0;
     const discountNum = Number(log.discount) || 0;
@@ -6093,9 +6151,8 @@ window.generateReceiptPDF = function(logId) {
     }
     const client = state.clients.find(c => c.id === log.clientId) || { name: 'Client' };
     const stats = getClientReportStats(client.id);
-    const fy = client.pendingYear || '2026-2027';
-    const receiptNum = (log.id || '').replace('i_', '').slice(-6).toUpperCase();
-    const receiptIdFull = `REC-${fy.split('-')[0]}-${receiptNum}`;
+    const receiptIdFull = getReceiptNumber(log, client);
+    const safeFileReceipt = receiptIdFull.replace('/', '_');
 
     const receiptElem = buildPaymentReceiptElement(log, client, stats);
     receiptElem.style.position = 'fixed';
@@ -6107,7 +6164,7 @@ window.generateReceiptPDF = function(logId) {
 
     const opt = {
         margin: [8, 8, 8, 8],
-        filename: `Receipt_${receiptIdFull}_${client.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+        filename: `Receipt_${safeFileReceipt}_${client.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -6141,9 +6198,8 @@ window.shareReceiptWhatsApp = async function(logId) {
     }
     const client = state.clients.find(c => c.id === log.clientId) || { name: 'Valued Client' };
     const stats = getClientReportStats(client.id);
-    const fy = client.pendingYear || '2026-2027';
-    const receiptNum = (log.id || '').replace('i_', '').slice(-6).toUpperCase();
-    const receiptIdFull = `REC-${fy.split('-')[0]}-${receiptNum}`;
+    const receiptIdFull = getReceiptNumber(log, client);
+    const safeFileReceipt = receiptIdFull.replace('/', '_');
     const amtWords = numberToWordsINR(log.amount);
 
     const text = `*PAYMENT RECEIPT ACKNOWLEDGMENT*
@@ -6193,7 +6249,7 @@ RAVI KATARA
             const pdfBlob = await html2pdf().from(receiptElem).output('blob');
             if (receiptElem.parentNode) receiptElem.parentNode.removeChild(receiptElem);
 
-            const file = new File([pdfBlob], `Receipt_${receiptIdFull}_${client.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`, { type: 'application/pdf' });
+            const file = new File([pdfBlob], `Receipt_${safeFileReceipt}_${client.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`, { type: 'application/pdf' });
             if (navigator.canShare({ files: [file] })) {
                 await navigator.share({
                     title: `Receipt ${receiptIdFull} - ${client.name}`,
@@ -6213,6 +6269,7 @@ RAVI KATARA
     } else {
         waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     }
+
     window.open(waUrl, '_blank');
 };
 
@@ -6399,8 +6456,14 @@ function handleIncomeSubmit(e) {
 
     if (id) {
         logObj.id = id;
+        const existing = state.incomeLogs.find(i => i.id === id);
+        if (existing && existing.receiptNo) {
+            logObj.receiptNo = existing.receiptNo;
+        }
     } else {
         logObj.id = 'i_' + Date.now();
+        const client = state.clients.find(c => c.id === clientId);
+        logObj.receiptNo = getReceiptNumber(logObj, client);
     }
 
     addIncomeDirect(logObj);
