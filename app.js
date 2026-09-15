@@ -6006,7 +6006,7 @@ function buildPaymentReceiptElement(log, client, stats) {
                 </div>
                 <div>
                     <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Particulars / Remarks</span>
-                    <div style="font-size: 13px; font-weight: 600; color: #1e293b; margin-top: 2px;">${log.remark || 'Professional Retainership / Services'}</div>
+                    <div style="font-size: 13px; font-weight: 600; color: #1e293b; margin-top: 2px;">${log.remark || ''}</div>
                 </div>
             </div>
         </div>
