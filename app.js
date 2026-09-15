@@ -2498,6 +2498,58 @@ function renderInvestmentsPage() {
     if (window.lucide) lucide.createIcons();
 }
 
+function updateInvestmentFundHelperBadge() {
+    const fundSelect = document.getElementById('investment-fund-source');
+    const badge = document.getElementById('investment-fund-balance-badge');
+    const amtInput = document.getElementById('investment-amount');
+    const editIdInput = document.getElementById('edit-investment-id');
+    if (!fundSelect || !badge) return;
+
+    const val = fundSelect.value;
+    const editId = editIdInput ? editIdInput.value : '';
+    const currentAmt = amtInput ? (Number(amtInput.value) || 0) : 0;
+    const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
+
+    if (!val || val.startsWith('opening_')) {
+        badge.style.display = 'none';
+        return;
+    }
+
+    const client = (state.clients || []).find(c => c.id === val);
+    if (!client) {
+        badge.style.display = 'none';
+        return;
+    }
+
+    const fundInfo = getClientAvailableFund(client.id, '', editId);
+    const isOverLimit = currentAmt > 0 && currentAmt > fundInfo.availableFund;
+
+    badge.style.display = 'block';
+    if (isOverLimit) {
+        badge.style.background = '#fff1f2';
+        badge.style.borderColor = '#fecdd3';
+        badge.style.color = '#e11d48';
+        badge.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;">
+                <span><strong>👤 ${client.name}</strong> &bull; Total Received: <strong>${fC(fundInfo.totalReceived)}</strong> | Already Allocated: <strong>${fC(fundInfo.totalAllocated)}</strong></span>
+                <span>Available Fund: <strong style="font-size:12.5px;">${fC(fundInfo.availableFund)}</strong></span>
+            </div>
+            <div style="margin-top:3px; font-weight:700;">⚠️ Invested amount (${fC(currentAmt)}) exceeds available received fund balance (${fC(fundInfo.availableFund)}) by ${fC(currentAmt - fundInfo.availableFund)}.</div>
+        `;
+    } else {
+        badge.style.background = '#f0fdfa';
+        badge.style.borderColor = '#99f6e4';
+        badge.style.color = '#0f766e';
+        badge.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;">
+                <span><strong>👤 ${client.name}</strong> &bull; Total Received: <strong>${fC(fundInfo.totalReceived)}</strong> | Already Allocated: <strong>${fC(fundInfo.totalAllocated)}</strong></span>
+                <span>Remaining Available Fund: <strong style="font-size:12.5px; color:#16a34a;">${fC(fundInfo.availableFund)}</strong></span>
+            </div>
+        `;
+    }
+}
+window.updateInvestmentFundHelperBadge = updateInvestmentFundHelperBadge;
+
 function openInvestmentModal(id = null) {
     window.openInvestmentModal = openInvestmentModal;
     window.openEditInvestment = openInvestmentModal;
@@ -2520,6 +2572,12 @@ function openInvestmentModal(id = null) {
         });
     }
 
+    let currentInvFundSource = '';
+    if (id) {
+        const inv = (state.investments || []).find(i => i.id === id);
+        if (inv) currentInvFundSource = inv.fundSource || '';
+    }
+
     // Populate Fund Origin / Inflow Source Select
     if (fundSelect) {
         let capitalOptions = `
@@ -2533,13 +2591,38 @@ function openInvestmentModal(id = null) {
                 capitalOptions += `<option value="opening_acc_${a.id}">${icon} ${a.name} Opening${balStr}</option>`;
             });
         }
+
+        const availableClientFunds = [];
+        (state.clients || []).forEach(c => {
+            const fundInfo = getClientAvailableFund(c.id, '', id);
+            if (fundInfo.availableFund > 0 || (currentInvFundSource && currentInvFundSource === c.id)) {
+                availableClientFunds.push({
+                    client: c,
+                    ...fundInfo
+                });
+            }
+        });
+
+        availableClientFunds.sort((a, b) => b.availableFund - a.availableFund || a.client.name.localeCompare(b.client.name));
+
+        let partyFundsHTML = '';
+        if (availableClientFunds.length === 0) {
+            partyFundsHTML = `<option value="" disabled>No clients with available received funds</option>`;
+        } else {
+            partyFundsHTML = availableClientFunds.map(item => {
+                const availText = fC(item.availableFund);
+                const recText = fC(item.totalReceived);
+                return `<option value="${item.client.id}">👤 ${item.client.name} — Available: ${availText} (Rec: ${recText})</option>`;
+            }).join('');
+        }
+
         fundSelect.innerHTML = `
             <option value="">General Surplus / Direct Account Book</option>
             <optgroup label="Capital / Opening Funds">
                 ${capitalOptions}
             </optgroup>
-            <optgroup label="Party / Client Inflow">
-                ${(state.clients || []).map(c => `<option value="${c.id}">👤 ${c.name} (${c.group || 'Client'})</option>`).join('')}
+            <optgroup label="Party / Client Inflow (${availableClientFunds.length} with available balance)">
+                ${partyFundsHTML}
             </optgroup>
         `;
     }
@@ -2566,6 +2649,7 @@ function openInvestmentModal(id = null) {
         editIdInput.value = '';
     }
 
+    updateInvestmentFundHelperBadge();
     modal.classList.add('active');
 }
 
@@ -4826,6 +4910,25 @@ function initEventHandlers() {
         menuId: 'loan-client-dropdown-menu',
         clearBtnId: 'btn-clear-loan-client-search'
     });
+
+    // Live Fund Allocation Helper Listeners
+    const expClientSelect = document.getElementById('expense-client-source');
+    const expAmtInput = document.getElementById('expense-amount');
+    if (expClientSelect) {
+        expClientSelect.addEventListener('change', updateExpenseFundHelperBadge);
+    }
+    if (expAmtInput) {
+        expAmtInput.addEventListener('input', updateExpenseFundHelperBadge);
+    }
+
+    const invFundSelect = document.getElementById('investment-fund-source');
+    const invAmtInput = document.getElementById('investment-amount');
+    if (invFundSelect) {
+        invFundSelect.addEventListener('change', updateInvestmentFundHelperBadge);
+    }
+    if (invAmtInput) {
+        invAmtInput.addEventListener('input', updateInvestmentFundHelperBadge);
+    }
 }
 
 // --- 8. MODALS CRUD LOGIC (MEMBERS SETUP & DYNAMIC COLUMNS) ---
@@ -6818,6 +6921,86 @@ window.deleteIncome = function(id) {
     }
 };
 
+function getClientAvailableFund(clientId, excludeTxId = '', excludeInvId = '') {
+    if (!clientId) return { totalReceived: 0, totalSpent: 0, totalInv: 0, totalAllocated: 0, availableFund: 0 };
+
+    const totalReceived = (state.incomeLogs || [])
+        .filter(l => l.clientId === clientId)
+        .reduce((sum, l) => sum + Number(l.amount || 0), 0);
+
+    const totalSpent = (state.transactions || [])
+        .filter(tx => tx.clientId === clientId && tx.id !== excludeTxId && !tx.isLoanDisbursement && !tx.id.startsWith('t_loan_') && tx.category !== 'Loan Given')
+        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+
+    const totalInv = (state.investments || [])
+        .filter(inv => inv.fundSource === clientId && inv.id !== excludeInvId)
+        .reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
+
+    const totalAllocated = totalSpent + totalInv;
+    const availableFund = totalReceived - totalAllocated;
+
+    return {
+        totalReceived,
+        totalSpent,
+        totalInv,
+        totalAllocated,
+        availableFund
+    };
+}
+window.getClientAvailableFund = getClientAvailableFund;
+
+function updateExpenseFundHelperBadge() {
+    const clientSelect = document.getElementById('expense-client-source');
+    const badge = document.getElementById('expense-fund-balance-badge');
+    const amtInput = document.getElementById('expense-amount');
+    const editIdInput = document.getElementById('edit-expense-id');
+    if (!clientSelect || !badge) return;
+
+    const val = clientSelect.value;
+    const editId = editIdInput ? editIdInput.value : '';
+    const currentAmt = amtInput ? (Number(amtInput.value) || 0) : 0;
+    const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
+
+    if (!val || val.startsWith('opening_')) {
+        badge.style.display = 'none';
+        return;
+    }
+
+    const client = (state.clients || []).find(c => c.id === val);
+    if (!client) {
+        badge.style.display = 'none';
+        return;
+    }
+
+    const fundInfo = getClientAvailableFund(client.id, editId);
+    const isOverLimit = currentAmt > 0 && currentAmt > fundInfo.availableFund;
+
+    badge.style.display = 'block';
+    if (isOverLimit) {
+        badge.style.background = '#fff1f2';
+        badge.style.borderColor = '#fecdd3';
+        badge.style.color = '#e11d48';
+        badge.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;">
+                <span><strong>👤 ${client.name}</strong> &bull; Total Received: <strong>${fC(fundInfo.totalReceived)}</strong> | Already Allocated: <strong>${fC(fundInfo.totalAllocated)}</strong></span>
+                <span>Available Fund: <strong style="font-size:12.5px;">${fC(fundInfo.availableFund)}</strong></span>
+            </div>
+            <div style="margin-top:3px; font-weight:700;">⚠️ Entered expense amount (${fC(currentAmt)}) exceeds available received fund balance (${fC(fundInfo.availableFund)}) by ${fC(currentAmt - fundInfo.availableFund)}.</div>
+        `;
+    } else {
+        badge.style.background = '#f0fdfa';
+        badge.style.borderColor = '#99f6e4';
+        badge.style.color = '#0f766e';
+        badge.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;">
+                <span><strong>👤 ${client.name}</strong> &bull; Total Received: <strong>${fC(fundInfo.totalReceived)}</strong> | Already Allocated: <strong>${fC(fundInfo.totalAllocated)}</strong></span>
+                <span>Remaining Available Fund: <strong style="font-size:12.5px; color:#16a34a;">${fC(fundInfo.availableFund)}</strong></span>
+            </div>
+        `;
+    }
+}
+window.updateExpenseFundHelperBadge = updateExpenseFundHelperBadge;
+
 // Expense
 function openExpenseModal(editId = '', presetCategory = '', presetAccount = '', presetSpentBy = '') {
     const modal = document.getElementById('modal-expense');
@@ -6845,13 +7028,44 @@ function openExpenseModal(editId = '', presetCategory = '', presetAccount = '', 
         });
     }
 
+    let currentTxClientId = '';
+    if (editId) {
+        const tx = state.transactions.find(t => t.id === editId);
+        if (tx) currentTxClientId = tx.clientId || '';
+    }
+
+    // Filter and build Party / Client Funds options with available balances
+    const availableClientFunds = [];
+    (state.clients || []).forEach(c => {
+        const fundInfo = getClientAvailableFund(c.id, editId);
+        if (fundInfo.availableFund > 0 || (currentTxClientId && currentTxClientId === c.id)) {
+            availableClientFunds.push({
+                client: c,
+                ...fundInfo
+            });
+        }
+    });
+
+    availableClientFunds.sort((a, b) => b.availableFund - a.availableFund || a.client.name.localeCompare(b.client.name));
+
+    let partyFundsHTML = '';
+    if (availableClientFunds.length === 0) {
+        partyFundsHTML = `<option value="" disabled>No clients with available received funds</option>`;
+    } else {
+        partyFundsHTML = availableClientFunds.map(item => {
+            const availText = fC(item.availableFund);
+            const recText = fC(item.totalReceived);
+            return `<option value="${item.client.id}">👤 ${item.client.name} — Available: ${availText} (Rec: ${recText})</option>`;
+        }).join('');
+    }
+
     clientSelect.innerHTML = `
         <option value="">None / General Expense</option>
         <optgroup label="Capital / Opening Funds">
             ${capitalOptions}
         </optgroup>
-        <optgroup label="Party / Client Funds">
-            ${state.clients.map(c => `<option value="${c.id}">👤 ${c.name} (${c.group || 'Client'})</option>`).join('')}
+        <optgroup label="Party / Client Funds (${availableClientFunds.length} with available balance)">
+            ${partyFundsHTML}
         </optgroup>
     `;
 
@@ -6899,7 +7113,7 @@ function openExpenseModal(editId = '', presetCategory = '', presetAccount = '', 
             document.getElementById('expense-amount').value = tx.amount;
             document.getElementById('expense-date').value = tx.date;
             accSelect.value = tx.mode;
-            clientSelect.value = tx.clientId;
+            clientSelect.value = tx.clientId || '';
             if (spentBySelect && tx.spentBy) spentBySelect.value = tx.spentBy;
 
             state.customTxFields.forEach(f => {
@@ -6947,6 +7161,8 @@ function openExpenseModal(editId = '', presetCategory = '', presetAccount = '', 
             `;
         });
     }
+
+    updateExpenseFundHelperBadge();
     modal.classList.add('active');
     if (window.lucide) lucide.createIcons();
 }

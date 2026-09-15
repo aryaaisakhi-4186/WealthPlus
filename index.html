@@ -25,7 +25,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=6.7.9">
+    <link rel="stylesheet" href="style.css?v=6.8.0">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -1887,6 +1887,7 @@
                             <!-- Populated dynamically -->
                         </optgroup>
                     </select>
+                    <div id="expense-fund-balance-badge" style="display: none; margin-top: 6px; font-size: 11.5px; padding: 6px 10px; border-radius: 6px; background: #f0fdfa; border: 1px solid #99f6e4; color: #0f766e;"></div>
                     <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Select Bank or Cash Opening Balance or Client whose revenue funded this expense.</span>
                 </div>
                 <!-- Dynamic expense custom fields container -->
@@ -2211,6 +2212,7 @@
                     <select id="investment-fund-source">
                         <!-- Populated dynamically with General Surplus, Opening Balances, and Party Receipts -->
                     </select>
+                    <div id="investment-fund-balance-badge" style="display: none; margin-top: 6px; font-size: 11.5px; padding: 6px 10px; border-radius: 6px; background: #f0fdfa; border: 1px solid #99f6e4; color: #0f766e;"></div>
                     <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Select which party inflow, account surplus, or opening balance funded this investment.</span>
                 </div>
 
@@ -2287,9 +2289,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.7.9"></script>
-    <script src="app.js?v=6.7.9"></script>
-    <script src="sindhu_v1.js?v=6.7.9"></script>
+    <script src="firebase-config.js?v=6.8.0"></script>
+    <script src="app.js?v=6.8.0"></script>
+    <script src="sindhu_v1.js?v=6.8.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">
