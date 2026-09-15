@@ -692,85 +692,6 @@
                         </div>
                     </div>
 
-                    <!-- 4-KPI Petty Cash Wallet Stats Grid -->
-                    <div class="stats-grid" style="margin-bottom: 20px;">
-                        <div class="stat-card" style="border-left: 4px solid #0d9488;">
-                            <div class="stat-icon" style="background: rgba(13,148,136,0.12); color: #0d9488;">
-                                <i data-lucide="wallet"></i>
-                            </div>
-                            <div class="stat-info">
-                                <h3>Available Petty Balance</h3>
-                                <span class="amount" id="stat-petty-balance" style="color: #0d9488;">₹0</span>
-                                <span class="helper-text">Ready for Member Expenses</span>
-                            </div>
-                        </div>
-                        <div class="stat-card" style="border-left: 4px solid var(--success);">
-                            <div class="stat-icon" style="background: rgba(16,185,129,0.12); color: var(--success);">
-                                <i data-lucide="arrow-down-left"></i>
-                            </div>
-                            <div class="stat-info">
-                                <h3>Disbursed by Admin</h3>
-                                <span class="amount" id="stat-petty-inflow" style="color: var(--success);">+₹0</span>
-                                <span class="helper-text" id="stat-petty-inflow-sub">0 Contra Transfers</span>
-                            </div>
-                        </div>
-                        <div class="stat-card" style="border-left: 4px solid var(--danger);">
-                            <div class="stat-icon" style="background: rgba(225,29,72,0.12); color: var(--danger);">
-                                <i data-lucide="arrow-up-right"></i>
-                            </div>
-                            <div class="stat-info">
-                                <h3>Spent by Members</h3>
-                                <span class="amount" id="stat-petty-outflow" style="color: var(--danger);">-₹0</span>
-                                <span class="helper-text" id="stat-petty-outflow-sub">0 Expenses logged</span>
-                            </div>
-                        </div>
-                        <div class="stat-card" style="border-left: 4px solid #6366f1;">
-                            <div class="stat-icon" style="background: rgba(99,102,241,0.12); color: #6366f1;">
-                                <i data-lucide="tags"></i>
-                            </div>
-                            <div class="stat-info">
-                                <h3>Active Expense Heads</h3>
-                                <span class="amount" id="stat-petty-heads-count" style="color: #6366f1;">10 Heads</span>
-                                <span class="helper-text">Subcategories Configured</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Expense Head Breakdown Section ("Kis Head me Kitna Kharcha Hua") -->
-                    <div class="dashboard-box" style="margin-bottom: 20px;">
-                        <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="font-size: 18px;">📊</span>
-                                <div>
-                                    <h4 style="margin: 0;">Kis Head me Kitna Kharcha Hua (Expense Head Breakdown)</h4>
-                                    <span style="font-size: 11px; color: var(--text-secondary);">Click on any head to record an expense for it</span>
-                                </div>
-                            </div>
-                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="openAddExpenseForCategory('Household Petty Cash')" style="font-size: 11px; padding: 4px 10px;">
-                                <i data-lucide="plus" style="width: 12px; height: 12px;"></i> + Add Expense
-                            </button>
-                        </div>
-                        <div class="petty-heads-grid" id="petty-page-heads-grid" style="margin-top: 14px; margin-bottom: 0;">
-                            <!-- Populated dynamically -->
-                        </div>
-                    </div>
-
-                    <!-- Member Spending Breakdown Section ("Kis Member ne Kitna Kharcha Kiya") -->
-                    <div class="dashboard-box" style="margin-bottom: 20px;">
-                        <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="font-size: 18px;">👥</span>
-                                <div>
-                                    <h4 style="margin: 0;">Kis Member ne Kitna Kharcha Kiya (Member Spending Breakdown)</h4>
-                                    <span style="font-size: 11px; color: var(--text-secondary);">Member-wise petty cash expenditure distribution</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="petty-members-wrapper" id="petty-page-members-grid" style="margin-top: 14px; margin-bottom: 0;">
-                            <!-- Populated dynamically -->
-                        </div>
-                    </div>
-
                     <!-- Petty Cash Filter & Search Bar -->
                     <div class="party-filter-dropdown-wrapper" style="margin-bottom: 14px; padding: 10px 12px;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
@@ -779,19 +700,13 @@
                             </label>
                             <span id="petty-table-total-badge" class="badge" style="font-size: 11px; padding: 2px 8px; background: rgba(13,148,136,0.12); color: #0d9488;">Total: ₹0 (0 Entries)</span>
                         </div>
-                        <div class="filter-controls-grid-2" style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; width: 100%;">
+                        <div class="filter-controls-grid-2" style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px; width: 100%;">
                             <div class="searchable-input-wrapper" style="position: relative; width: 100%;">
                                 <i data-lucide="search" class="search-input-icon" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-muted); pointer-events: none;"></i>
-                                <input type="text" id="petty-search-input" class="searchable-input" placeholder="🔍 Search description, head, member, amount..." autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 0 28px 0 30px !important; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 12px; height: 34px; outline: none; margin: 0;">
+                                <input type="text" id="petty-search-input" class="searchable-input" placeholder="🔍 Search description, member, amount..." autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 0 28px 0 30px !important; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 12px; height: 34px; outline: none; margin: 0;">
                                 <button type="button" class="btn-clear-search" id="btn-clear-petty-search" style="display: none; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;" title="Clear search">
                                     <i data-lucide="x" style="width: 12px; height: 12px;"></i>
                                 </button>
-                            </div>
-                            <div>
-                                <select id="petty-head-filter-select" style="width: 100%; box-sizing: border-box; padding: 0 8px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-weight: 600; font-size: 12px; height: 34px; outline: none; margin: 0;">
-                                    <option value="all">🏷️ All Heads</option>
-                                    <!-- Populated dynamically -->
-                                </select>
                             </div>
                             <div>
                                 <select id="petty-member-filter-select" style="width: 100%; box-sizing: border-box; padding: 0 8px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-weight: 600; font-size: 12px; height: 34px; outline: none; margin: 0;">
@@ -820,7 +735,7 @@
                             <thead>
                                 <tr>
                                     <th>Date</th>
-                                    <th>Particulars & Head</th>
+                                    <th>Particulars</th>
                                     <th>Spent By Member</th>
                                     <th>Type / Account</th>
                                     <th style="text-align: right; color: var(--success);">Inflow / Admin (₹)</th>
@@ -1808,30 +1723,12 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group-row" id="expense-household-fields-row">
-                    <div class="form-group" id="expense-household-head-group">
-                        <label for="expense-household-head">Expense Head (मद / Subcategory)</label>
-                        <select id="expense-household-head">
-                            <option value="">-- General / No Specific Head --</option>
-                            <option value="Grocery & Ration">🛒 Grocery & Ration (किराना / राशन)</option>
-                            <option value="Vegetables & Fruits">🥦 Vegetables & Fruits (सब्जी / फल)</option>
-                            <option value="Milk & Dairy">🥛 Milk & Dairy (दूध / डेयरी)</option>
-                            <option value="Maid & Cook Salary">🧹 Maid & Cook Salary (कामवाली / कुक)</option>
-                            <option value="House Maintenance & Repairs">🔧 House Maintenance & Repairs (घर मरम्मत)</option>
-                            <option value="Electricity, Gas & Water">⚡ Electricity, Gas & Water (बिजली / गैस / पानी)</option>
-                            <option value="Children & Education">📚 Children & Education (बच्चे / पढ़ाई)</option>
-                            <option value="Medical & Medicines">💊 Medical & Medicines (दवाई / इलाज)</option>
-                            <option value="Transport & Fuel">🚗 Transport & Fuel (पेट्रोल / किराया)</option>
-                            <option value="Misc Household Expenses">📦 Misc Household Expenses (अन्य घरेलू खर्च)</option>
-                        </select>
-                    </div>
-                    <div class="form-group" id="expense-spent-by-group">
-                        <label for="expense-spent-by">Spent By Member (खर्च करने वाला सदस्य)</label>
-                        <select id="expense-spent-by">
-                            <option value="">-- Select Member / Staff --</option>
-                            <!-- Populated dynamically with state.members -->
-                        </select>
-                    </div>
+                <div class="form-group" id="expense-spent-by-group">
+                    <label for="expense-spent-by">Spent By Member (खर्च करने वाला सदस्य)</label>
+                    <select id="expense-spent-by">
+                        <option value="">-- Select Member / Staff --</option>
+                        <!-- Populated dynamically with state.members -->
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="expense-client-source">Allocate to Fund / Client (Optional)</label>
