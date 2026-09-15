@@ -1616,6 +1616,31 @@
                         </select>
                     </div>
                 </div>
+                <div class="form-group-row" id="expense-household-fields-row">
+                    <div class="form-group" id="expense-household-head-group">
+                        <label for="expense-household-head">Expense Head (मद / Subcategory)</label>
+                        <select id="expense-household-head">
+                            <option value="">-- General / No Specific Head --</option>
+                            <option value="Grocery & Ration">🛒 Grocery & Ration (किराना / राशन)</option>
+                            <option value="Vegetables & Fruits">🥦 Vegetables & Fruits (सब्जी / फल)</option>
+                            <option value="Milk & Dairy">🥛 Milk & Dairy (दूध / डेयरी)</option>
+                            <option value="Maid & Cook Salary">🧹 Maid & Cook Salary (कामवाली / कुक)</option>
+                            <option value="House Maintenance & Repairs">🔧 House Maintenance & Repairs (घर मरम्मत)</option>
+                            <option value="Electricity, Gas & Water">⚡ Electricity, Gas & Water (बिजली / गैस / पानी)</option>
+                            <option value="Children & Education">📚 Children & Education (बच्चे / पढ़ाई)</option>
+                            <option value="Medical & Medicines">💊 Medical & Medicines (दवाई / इलाज)</option>
+                            <option value="Transport & Fuel">🚗 Transport & Fuel (पेट्रोल / किराया)</option>
+                            <option value="Misc Household Expenses">📦 Misc Household Expenses (अन्य घरेलू खर्च)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="expense-spent-by-group">
+                        <label for="expense-spent-by">Spent By Member (खर्च करने वाला सदस्य)</label>
+                        <select id="expense-spent-by">
+                            <option value="">-- Select Member / Staff --</option>
+                            <!-- Populated dynamically with state.members -->
+                        </select>
+                    </div>
+                </div>
                 <div class="form-group">
                     <label for="expense-client-source">Allocate to Fund / Client (Optional)</label>
                     <select id="expense-client-source">
@@ -1707,6 +1732,9 @@
                         </button>
                         <button type="button" class="btn btn-outline btn-sm transfer-type-pill" id="pill-bank-to-bank" onclick="setTransferPreset('bank-to-bank')" style="padding: 8px 4px; font-size: 11px; font-weight: 600; text-align: center;">
                             🏦 ➔ 🏦 Bank to Bank
+                        </button>
+                        <button type="button" class="btn btn-outline btn-sm transfer-type-pill" id="pill-admin-to-petty" onclick="setTransferPreset('admin-to-petty')" style="padding: 8px 4px; font-size: 11px; font-weight: 600; text-align: center; color: #0d9488; border-color: rgba(13,148,136,0.3);">
+                            🏠 ➔ 💵 Admin ➔ Petty Cash
                         </button>
                         <button type="button" class="btn btn-outline btn-sm transfer-type-pill" id="pill-custom-transfer" onclick="setTransferPreset('custom')" style="padding: 8px 4px; font-size: 11px; font-weight: 600; text-align: center;">
                             🔁 Custom Transfer

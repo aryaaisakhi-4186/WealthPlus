@@ -3401,4 +3401,251 @@ h1, h2, h3, h4, h5, h6 {
     gap: 6px;
 }
 
+/* ==========================================
+   HOUSEHOLD PETTY CASH & EXPENSE HEADS STYLES
+   ========================================== */
+.badge-head {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(13, 148, 136, 0.1);
+    color: #0d9488;
+    border: 1px solid rgba(13, 148, 136, 0.25);
+    margin-right: 5px;
+}
+
+.badge-spent-by {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(99, 102, 241, 0.1);
+    color: #6366f1;
+    border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+.badge-transfer-type.admin-to-petty {
+    background: rgba(13, 148, 136, 0.12);
+    color: #0d9488;
+    border: 1px solid rgba(13, 148, 136, 0.3);
+}
+
+.petty-cash-card-theme {
+    border-color: rgba(13, 148, 136, 0.35) !important;
+}
+
+.petty-wallet-summary-box {
+    background: linear-gradient(135deg, rgba(13, 148, 136, 0.08) 0%, rgba(13, 148, 136, 0.02) 100%);
+    border: 1.5px solid rgba(13, 148, 136, 0.25);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    margin-bottom: 16px;
+}
+
+.petty-wallet-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.petty-wallet-kpi-col {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.petty-wallet-kpi-col.balance-col {
+    border-color: rgba(13, 148, 136, 0.4);
+    background: rgba(13, 148, 136, 0.04);
+}
+
+.petty-kpi-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.petty-kpi-val {
+    font-size: 18px;
+    font-weight: 800;
+    font-family: inherit;
+    color: var(--text-primary);
+}
+
+.petty-kpi-val.pos {
+    color: #0d9488;
+}
+
+.petty-kpi-val.neg {
+    color: var(--danger);
+}
+
+.petty-kpi-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.petty-wallet-actions-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.petty-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.petty-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.petty-heads-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.petty-head-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.petty-head-card:hover {
+    border-color: #0d9488;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.12);
+}
+
+.petty-head-card.active {
+    border-color: rgba(13, 148, 136, 0.35);
+}
+
+.petty-head-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.petty-head-icon {
+    font-size: 14px;
+}
+
+.petty-head-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.petty-head-amount-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.petty-head-amount {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--danger);
+}
+
+.petty-head-count {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.petty-head-progress-bg {
+    width: 100%;
+    height: 4px;
+    background: rgba(15, 23, 42, 0.08);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.petty-head-progress-fill {
+    height: 100%;
+    background: #0d9488;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.petty-head-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.petty-head-add-link {
+    color: #0d9488;
+    font-weight: 700;
+    font-size: 11px;
+}
+
+.petty-members-wrapper {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.petty-member-chip {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.petty-member-chip:hover {
+    border-color: #6366f1;
+    background: rgba(99, 102, 241, 0.05);
+}
+
+.petty-member-amount {
+    color: var(--danger);
+    font-weight: 700;
+}
+
+.petty-member-pct {
+    color: var(--text-muted);
+    font-size: 10px;
+}
+
 

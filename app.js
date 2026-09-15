@@ -54,7 +54,8 @@ const defaultClients = [
 const defaultAccounts = [
     { id: "acc_1", name: "Main Cash", type: "Cash", openingBalance: 0 },
     { id: "acc_2", name: "HDFC Bank", type: "Bank", openingBalance: 0 },
-    { id: "acc_sbi_cc", name: "SBI Credit Card", type: "Credit Card", limit: 24000, openingBalance: 0 }
+    { id: "acc_sbi_cc", name: "SBI Credit Card", type: "Credit Card", limit: 24000, openingBalance: 0 },
+    { id: "acc_petty_cash", name: "Household Petty Cash", type: "Cash", openingBalance: 0 }
 ];
 
 const defaultBudgets = {
@@ -63,8 +64,22 @@ const defaultBudgets = {
     Bills: 10000,
     Transport: 4000,
     Rent: 15000,
+    'Household Petty Cash': 10000,
     Others: 3000
 };
+
+const defaultHouseholdHeads = [
+    "Grocery & Ration",
+    "Vegetables & Fruits",
+    "Milk & Dairy",
+    "Maid & Cook Salary",
+    "House Maintenance & Repairs",
+    "Electricity, Gas & Water",
+    "Children & Education",
+    "Medical & Medicines",
+    "Transport & Fuel",
+    "Misc Household Expenses"
+];
 
 const defaultMembers = [
     { id: "m_1", name: "Admin Manager", mobile: "9999999999", pin: "1234", role: "Admin" },
@@ -92,6 +107,7 @@ const defaultCategoriesConfig = {
     Bills: { color: '#3b82f6', icon: 'credit-card' },
     Transport: { color: '#06b6d4', icon: 'car' },
     Rent: { color: '#8b5cf6', icon: 'home' },
+    'Household Petty Cash': { color: '#0d9488', icon: 'home' },
     Others: { color: '#64748b', icon: 'more-horizontal' }
 };
 
@@ -236,6 +252,22 @@ function runStateMigrations() {
             sbiAcc.limit = 24000;
             updated = true;
         }
+    }
+
+    // Auto-setup Household Petty Cash Account & Category if missing
+    if (!state.accounts.some(a => a.name.toLowerCase().includes('household petty cash') || a.id === 'acc_petty_cash')) {
+        state.accounts.push({
+            id: 'acc_petty_cash',
+            name: 'Household Petty Cash',
+            type: 'Cash',
+            openingBalance: 0
+        });
+        updated = true;
+    }
+
+    if (!state.categoriesConfig['Household Petty Cash']) {
+        state.categoriesConfig['Household Petty Cash'] = { color: '#0d9488', icon: 'home' };
+        updated = true;
     }
 
     if (!state.selectedLedgerAccountId && state.accounts.length > 0) {
@@ -953,11 +985,13 @@ function getAccountLedger(accountId) {
             } else if (tx.clientId) {
                 fundSuffix = ` [Fund: ${resolveFundSourceText(tx.clientId)}]`;
             }
+            let headSuffix = tx.head ? ` [Head: ${tx.head}]` : '';
+            let spentSuffix = tx.spentBy ? ` (By: ${tx.spentBy})` : '';
             ledger.push({
                 id: tx.id,
                 txId: tx.id,
                 date: tx.date,
-                particulars: `${tx.description}${fundSuffix}`,
+                particulars: `${tx.description}${headSuffix}${spentSuffix}${fundSuffix}`,
                 category: tx.category,
                 credit: 0,
                 debit: Number(tx.amount),
@@ -2736,8 +2770,9 @@ window.toggleExpenseCategoryCard = function(catKey) {
     }
 };
 
-window.openAddExpenseForCategory = function(catName) {
-    openExpenseModal('', catName);
+window.openAddExpenseForCategory = function(catName, head = '') {
+    const defaultAcc = (catName === 'Household Petty Cash') ? 'Household Petty Cash' : '';
+    openExpenseModal('', catName, defaultAcc, head);
 };
 
 window.toggleExpenseFlatTable = function() {
@@ -2823,6 +2858,7 @@ function renderExpensesPage() {
                     if (tr.type === 'Cash to Bank') typeBadgeClass = 'cash-to-bank';
                     else if (tr.type === 'Bank to Cash') typeBadgeClass = 'bank-to-cash';
                     else if (tr.type === 'Bank to Bank') typeBadgeClass = 'bank-to-bank';
+                    else if (tr.type && tr.type.includes('Petty')) typeBadgeClass = 'admin-to-petty';
 
                     rowsHTML += `
                         <div class="exp-entry-row" onclick="openEditTransfer('${tr.id}')" title="Click to edit this contra transfer">
@@ -2863,7 +2899,7 @@ function renderExpensesPage() {
                                     <h4 class="exp-cat-name">Internal Contra Transfers</h4>
                                     <span class="exp-cat-count-badge">${filteredTransfers.length} transfers</span>
                                 </div>
-                                <span class="exp-cat-pct">Cash ↔ Bank ↔ Bank Transfers</span>
+                                <span class="exp-cat-pct">Cash ↔ Bank ↔ Petty Cash Transfers</span>
                             </div>
                         </div>
                         <div class="exp-cat-total-col">
@@ -2907,9 +2943,11 @@ function renderExpensesPage() {
             const catMatch = tx.category && tx.category.toLowerCase().includes(searchQuery);
             const modeMatch = tx.mode && tx.mode.toLowerCase().includes(searchQuery);
             const amountMatch = tx.amount && String(tx.amount).includes(searchQuery);
+            const headMatch = tx.head && tx.head.toLowerCase().includes(searchQuery);
+            const spentMatch = tx.spentBy && tx.spentBy.toLowerCase().includes(searchQuery);
             const fundText = resolveFundSourceText(tx.clientId).toLowerCase();
             const fundMatch = fundText.includes(searchQuery);
-            return descMatch || catMatch || modeMatch || amountMatch || fundMatch;
+            return descMatch || catMatch || modeMatch || amountMatch || headMatch || spentMatch || fundMatch;
         });
     }
 
@@ -2935,6 +2973,7 @@ function renderExpensesPage() {
                 groups[cat].push(tx);
             });
 
+            // Ensure selected category or all categories in config are ready to display
             const catKeys = Object.keys(groups);
 
             catKeys.forEach(cat => {
@@ -2943,11 +2982,14 @@ function renderExpensesPage() {
                 const catMeta = state.categoriesConfig[cat] || { color: '#64748b', icon: 'tag' };
                 const pct = totalAllAmount > 0 ? Math.round((catTotal / totalAllAmount) * 100) : 0;
                 const safeKey = cat.replace(/[^a-zA-Z0-9]/g, '_');
-                const autoExpand = Boolean(searchQuery);
+                const autoExpand = Boolean(searchQuery) || (selectedCat === cat) || (cat === 'Household Petty Cash');
 
                 let rowsHTML = '';
                 txList.forEach(tx => {
                     const clientLabel = resolveFundSourceLabel(tx.clientId);
+                    const headBadge = tx.head ? `<span class="badge-head">🏷️ ${tx.head}</span>` : '';
+                    const memberBadge = tx.spentBy ? `<span class="badge-spent-by">👤 ${tx.spentBy}</span>` : '';
+
                     let customCells = '';
                     state.customTxFields.forEach(f => {
                         const val = tx[f.name] || '-';
@@ -2957,10 +2999,14 @@ function renderExpensesPage() {
                     rowsHTML += `
                         <div class="exp-entry-row" onclick="openEditExpense('${tx.id}')" title="Click to edit this expense entry">
                             <div class="exp-entry-main">
-                                <div class="exp-entry-title">${tx.description}</div>
+                                <div class="exp-entry-title">
+                                    ${headBadge}
+                                    ${tx.description}
+                                </div>
                                 <div class="exp-entry-meta">
                                     <span style="font-weight:600; color:var(--text-secondary);"><i data-lucide="calendar" style="width:11px; height:11px; display:inline-block; vertical-align:middle; margin-right:2px;"></i> ${formatDbDate(tx.date)}</span>
                                     <span class="badge-acctype">${tx.mode}</span>
+                                    ${memberBadge}
                                     ${tx.clientId ? `<span style="color:var(--primary); font-weight:600; font-size:11px;">${clientLabel}</span>` : ''}
                                     ${customCells}
                                 </div>
@@ -2980,8 +3026,142 @@ function renderExpensesPage() {
                     `;
                 });
 
+                // Dedicated Dashboard for Household Petty Cash
+                let pettyCashDashboardHTML = '';
+                if (cat === 'Household Petty Cash') {
+                    const pettyAcc = state.accounts.find(a => a.name.toLowerCase().includes('household petty cash') || a.id === 'acc_petty_cash');
+                    const pettyAccName = pettyAcc ? pettyAcc.name : 'Household Petty Cash';
+                    
+                    const adminTransfers = (state.transfers || []).filter(tr => tr.toAccount && (tr.toAccount === pettyAccName || tr.toAccount.toLowerCase().includes('household petty cash')));
+                    const adminInflowTotal = adminTransfers.reduce((sum, tr) => sum + (Number(tr.amount) || 0), 0) + (Number(pettyAcc?.openingBalance) || 0);
+                    const pettyOutflows = state.transactions.filter(t => t.category === 'Household Petty Cash' || t.mode === pettyAccName);
+                    const pettyOutflowTotal = pettyOutflows.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+                    const availableBalance = adminInflowTotal - pettyOutflowTotal;
+
+                    // Head-wise breakdown
+                    const allHouseholdHeadsList = Array.from(new Set([
+                        ...defaultHouseholdHeads,
+                        ...txList.map(t => t.head).filter(Boolean)
+                    ]));
+
+                    let headsGridHTML = '';
+                    allHouseholdHeadsList.forEach(headName => {
+                        const headTxs = txList.filter(t => (t.head || 'Misc Household Expenses') === headName || (!t.head && headName === 'Misc Household Expenses'));
+                        const headSum = headTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+                        const headPct = catTotal > 0 ? Math.round((headSum / catTotal) * 100) : 0;
+                        
+                        let emoji = '📌';
+                        if (headName.includes('Grocery') || headName.includes('Ration')) emoji = '🛒';
+                        else if (headName.includes('Vegetables') || headName.includes('Fruits')) emoji = '🥦';
+                        else if (headName.includes('Milk') || headName.includes('Dairy')) emoji = '🥛';
+                        else if (headName.includes('Maid') || headName.includes('Cook')) emoji = '🧹';
+                        else if (headName.includes('Maintenance') || headName.includes('Repairs')) emoji = '🔧';
+                        else if (headName.includes('Electricity') || headName.includes('Gas') || headName.includes('Water')) emoji = '⚡';
+                        else if (headName.includes('Children') || headName.includes('Education')) emoji = '📚';
+                        else if (headName.includes('Medical') || headName.includes('Medicines')) emoji = '💊';
+                        else if (headName.includes('Transport') || headName.includes('Fuel')) emoji = '🚗';
+                        else if (headName.includes('Misc')) emoji = '📦';
+
+                        headsGridHTML += `
+                            <div class="petty-head-card ${headSum > 0 ? 'active' : ''}" onclick="event.stopPropagation(); openAddExpenseForCategory('Household Petty Cash', '${headName}')" title="Click to log expense under ${headName}">
+                                <div class="petty-head-header">
+                                    <span class="petty-head-icon">${emoji}</span>
+                                    <span class="petty-head-name">${headName}</span>
+                                </div>
+                                <div class="petty-head-amount-row">
+                                    <span class="petty-head-amount">${fC(headSum)}</span>
+                                    <span class="petty-head-count">${headTxs.length} ${headTxs.length === 1 ? 'entry' : 'entries'}</span>
+                                </div>
+                                <div class="petty-head-progress-bg">
+                                    <div class="petty-head-progress-fill" style="width: ${headPct}%;"></div>
+                                </div>
+                                <div class="petty-head-footer">
+                                    <span class="petty-head-pct">${headPct}% of petty cash</span>
+                                    <span class="petty-head-add-link">+ Add</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    // Member-wise breakdown
+                    const memberSpendMap = {};
+                    txList.forEach(t => {
+                        const memberName = t.spentBy || 'Admin / Unspecified';
+                        memberSpendMap[memberName] = (memberSpendMap[memberName] || 0) + (Number(t.amount) || 0);
+                    });
+
+                    let memberChipsHTML = '';
+                    Object.keys(memberSpendMap).forEach(mName => {
+                        const mSum = memberSpendMap[mName];
+                        const mPct = catTotal > 0 ? Math.round((mSum / catTotal) * 100) : 0;
+                        memberChipsHTML += `
+                            <div class="petty-member-chip" onclick="event.stopPropagation(); openExpenseModal('', 'Household Petty Cash', 'Household Petty Cash', '', '${mName}')" title="Click to add expense for ${mName}">
+                                <span class="petty-member-icon">👤</span>
+                                <strong class="petty-member-name">${mName}:</strong>
+                                <span class="petty-member-amount">${fC(mSum)}</span>
+                                <span class="petty-member-pct">(${mPct}%)</span>
+                            </div>
+                        `;
+                    });
+
+                    pettyCashDashboardHTML = `
+                        <!-- PETTY CASH WALLET KPI BOX -->
+                        <div class="petty-wallet-summary-box" onclick="event.stopPropagation()">
+                            <div class="petty-wallet-kpi-grid">
+                                <div class="petty-wallet-kpi-col balance-col">
+                                    <span class="petty-kpi-label">💵 Available Petty Balance</span>
+                                    <span class="petty-kpi-val ${availableBalance >= 0 ? 'pos' : 'neg'}">${fC(availableBalance)}</span>
+                                    <span class="petty-kpi-sub">Admin Inflows - Member Expenses</span>
+                                </div>
+                                <div class="petty-wallet-kpi-col inflow-col">
+                                    <span class="petty-kpi-label">📥 Disbursed by Admin</span>
+                                    <span class="petty-kpi-val text-success">+${fC(adminInflowTotal)}</span>
+                                    <span class="petty-kpi-sub">${adminTransfers.length} Transfers + Opening</span>
+                                </div>
+                                <div class="petty-wallet-kpi-col outflow-col">
+                                    <span class="petty-kpi-label">📤 Spent by Members</span>
+                                    <span class="petty-kpi-val text-danger">-${fC(pettyOutflowTotal)}</span>
+                                    <span class="petty-kpi-sub">${txList.length} Expenses logged</span>
+                                </div>
+                            </div>
+                            <div class="petty-wallet-actions-row">
+                                <button type="button" class="btn btn-primary btn-sm btn-petty-fund" onclick="openTransferModal('admin-to-petty')" style="background:#0d9488; border-color:#0d9488; font-weight:700;">
+                                    <i data-lucide="arrow-down-left" style="width:13px; height:13px;"></i> ➕ Admin Fund Transfer
+                                </button>
+                                <button type="button" class="btn btn-outline btn-sm btn-petty-exp" onclick="openAddExpenseForCategory('Household Petty Cash')" style="color:#0d9488; border-color:#0d9488; font-weight:700;">
+                                    <i data-lucide="plus" style="width:13px; height:13px;"></i> 💸 Log Member Expense
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- HEAD-WISE BREAKDOWN SECTION -->
+                        <div class="petty-section-header" onclick="event.stopPropagation()">
+                            <span class="petty-section-title">📊 Kis Head me Kitna Kharcha Hua (Expense Head Breakdown)</span>
+                            <span style="font-size:11px; color:var(--text-secondary);">Click any head to add expense</span>
+                        </div>
+                        <div class="petty-heads-grid" onclick="event.stopPropagation()">
+                            ${headsGridHTML}
+                        </div>
+
+                        <!-- MEMBER-WISE BREAKDOWN SECTION -->
+                        ${Object.keys(memberSpendMap).length > 0 ? `
+                        <div class="petty-section-header" style="margin-top:14px;" onclick="event.stopPropagation()">
+                            <span class="petty-section-title">👥 Kis Member ne Kitna Kharcha Kiya (Member Spending Breakdown)</span>
+                        </div>
+                        <div class="petty-members-wrapper" onclick="event.stopPropagation()">
+                            ${memberChipsHTML}
+                        </div>
+                        ` : ''}
+
+                        <div class="petty-section-header" style="margin-top:16px;" onclick="event.stopPropagation()">
+                            <span class="petty-section-title">📋 Household Petty Cash Transactions Log</span>
+                            <span style="font-size:11px; color:var(--text-secondary); font-weight:600;">Total: ${txList.length} entries</span>
+                        </div>
+                    `;
+                }
+
                 const card = document.createElement('div');
-                card.className = `expense-category-card ${autoExpand ? 'expanded' : ''}`;
+                card.className = `expense-category-card ${autoExpand ? 'expanded' : ''} ${cat === 'Household Petty Cash' ? 'petty-cash-card-theme' : ''}`;
                 card.id = `exp-cat-card-${safeKey}`;
                 card.onclick = () => toggleExpenseCategoryCard(safeKey);
 
@@ -2999,7 +3179,7 @@ function renderExpensesPage() {
                         </div>
                         <div class="exp-cat-total-col">
                             <div class="exp-cat-amount">-₹${Math.round(catTotal).toLocaleString('en-IN')}</div>
-                            <button type="button" class="btn btn-primary btn-sm exp-header-add-btn" onclick="event.stopPropagation(); openAddExpenseForCategory('${cat}')" title="Add new expense to ${cat}" style="font-size:11px; padding:3px 9px; display:inline-flex; align-items:center; gap:4px; height:26px; border-radius:4px; font-weight:600; white-space:nowrap;">
+                            <button type="button" class="btn btn-primary btn-sm exp-header-add-btn" onclick="event.stopPropagation(); openAddExpenseForCategory('${cat}')" title="Add new expense to ${cat}" style="font-size:11px; padding:3px 9px; display:inline-flex; align-items:center; gap:4px; height:26px; border-radius:4px; font-weight:600; white-space:nowrap; ${cat === 'Household Petty Cash' ? 'background:#0d9488; border-color:#0d9488;' : ''}">
                                 <i data-lucide="plus" style="width:12px; height:12px;"></i> Add
                             </button>
                             <div class="party-card-toggle-btn" title="Click to view/hide transactions">
@@ -3008,7 +3188,9 @@ function renderExpensesPage() {
                         </div>
                     </div>
                     <div class="exp-cat-body" style="display: ${autoExpand ? 'block' : 'none'};">
-                        <!-- TOP ACTION BAR: ADD BUTTON ABOVE EXPENSES LIST -->
+                        ${pettyCashDashboardHTML}
+                        <!-- TOP ACTION BAR FOR GENERAL CATEGORIES -->
+                        ${cat !== 'Household Petty Cash' ? `
                         <div class="exp-cat-top-bar" onclick="event.stopPropagation()">
                             <span style="font-size:12px; color:var(--text-secondary); font-weight:600;">
                                 Category Total: <strong style="color:var(--danger); font-size:13px;">-₹${Math.round(catTotal).toLocaleString('en-IN')}</strong> (${txList.length} ${txList.length === 1 ? 'entry' : 'entries'})
@@ -3017,6 +3199,7 @@ function renderExpensesPage() {
                                 <i data-lucide="plus" style="width:13px; height:13px;"></i> + Add Expense to ${cat}
                             </button>
                         </div>
+                        ` : ''}
                         <div class="exp-entries-list">
                             ${rowsHTML}
                         </div>
@@ -3038,9 +3221,10 @@ function renderExpensesPage() {
     if (trHeaders) {
         trHeaders.innerHTML = `
             <th>Date</th>
-            <th>Description</th>
+            <th>Description & Head</th>
             <th>Category</th>
             <th>Paid From Account</th>
+            <th>Spent By Member</th>
             <th>Fund Source Client</th>
             <th>Amount</th>
         `;
@@ -3055,10 +3239,12 @@ function renderExpensesPage() {
         tbody.innerHTML = '';
 
         if (sorted.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="${7 + state.customTxFields.length}" style="text-align:center; color:var(--text-muted); padding:32px;">No expense entries logged.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="${8 + state.customTxFields.length}" style="text-align:center; color:var(--text-muted); padding:32px;">No expense entries logged.</td></tr>`;
         } else {
             sorted.forEach(tx => {
                 const clientLabel = resolveFundSourceLabel(tx.clientId);
+                const headBadge = tx.head ? `<span class="badge-head" style="margin-right:4px;">🏷️ ${tx.head}</span>` : '';
+                const memberBadge = tx.spentBy ? `<span class="badge-spent-by">👤 ${tx.spentBy}</span>` : '<span style="color:var(--text-muted); font-size:11px;">-</span>';
                 
                 let customCells = '';
                 state.customTxFields.forEach(f => {
@@ -3069,9 +3255,10 @@ function renderExpensesPage() {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${formatDbDate(tx.date)}</td>
-                    <td style="font-weight:600;">${tx.description}</td>
+                    <td style="font-weight:600;">${headBadge}${tx.description}</td>
                     <td><span class="cat-pill" style="background:${state.categoriesConfig[tx.category]?.color || '#64748b'}">${tx.category}</span></td>
                     <td><span class="badge-acctype">${tx.mode}</span></td>
+                    <td>${memberBadge}</td>
                     <td>${clientLabel}</td>
                     <td style="font-weight:700; color:var(--danger);">-₹${Number(tx.amount).toLocaleString('en-IN')}</td>
                     ${customCells}
@@ -5505,13 +5692,15 @@ window.deleteIncome = function(id) {
 };
 
 // Expense
-function openExpenseModal(editId = '', presetCategory = '') {
+function openExpenseModal(editId = '', presetCategory = '', presetAccount = '', presetHead = '', presetSpentBy = '') {
     const modal = document.getElementById('modal-expense');
     const title = document.getElementById('modal-expense-title');
     const form = document.getElementById('form-expense');
     const clientSelect = document.getElementById('expense-client-source');
     const accSelect = document.getElementById('expense-account-select');
     const catDropdown = document.getElementById('expense-category');
+    const spentBySelect = document.getElementById('expense-spent-by');
+    const headSelect = document.getElementById('expense-household-head');
     form.reset();
 
     // Populate category dropdown
@@ -5545,6 +5734,40 @@ function openExpenseModal(editId = '', presetCategory = '') {
         accSelect.innerHTML += `<option value="${a.name}">${a.name} (${a.type})</option>`;
     });
 
+    if (spentBySelect) {
+        spentBySelect.innerHTML = `<option value="">-- Select Member / Staff --</option>`;
+        if (state.members && state.members.length > 0) {
+            state.members.forEach(m => {
+                spentBySelect.innerHTML += `<option value="${m.name}">${m.name} (${m.role || 'Member'})</option>`;
+            });
+        }
+        if (state.currentUser && !editId) {
+            spentBySelect.value = state.currentUser.name;
+        }
+    }
+
+    if (headSelect) {
+        const existingHeads = Array.from(new Set([
+            ...defaultHouseholdHeads,
+            ...state.transactions.map(t => t.head).filter(Boolean)
+        ]));
+        headSelect.innerHTML = `<option value="">-- General / No Specific Head --</option>`;
+        existingHeads.forEach(h => {
+            let emoji = '📌';
+            if (h.includes('Grocery') || h.includes('Ration')) emoji = '🛒';
+            else if (h.includes('Vegetables') || h.includes('Fruits')) emoji = '🥦';
+            else if (h.includes('Milk') || h.includes('Dairy')) emoji = '🥛';
+            else if (h.includes('Maid') || h.includes('Cook')) emoji = '🧹';
+            else if (h.includes('Maintenance') || h.includes('Repairs')) emoji = '🔧';
+            else if (h.includes('Electricity') || h.includes('Gas') || h.includes('Water')) emoji = '⚡';
+            else if (h.includes('Children') || h.includes('Education')) emoji = '📚';
+            else if (h.includes('Medical') || h.includes('Medicines')) emoji = '💊';
+            else if (h.includes('Transport') || h.includes('Fuel')) emoji = '🚗';
+            else if (h.includes('Misc')) emoji = '📦';
+            headSelect.innerHTML += `<option value="${h}">${emoji} ${h}</option>`;
+        });
+    }
+
     document.getElementById('expense-date').value = new Date().toISOString().split('T')[0];
 
     const customContainer = document.getElementById('expense-modal-custom-fields-container');
@@ -5573,6 +5796,8 @@ function openExpenseModal(editId = '', presetCategory = '') {
             document.getElementById('expense-date').value = tx.date;
             accSelect.value = tx.mode;
             clientSelect.value = tx.clientId;
+            if (spentBySelect && tx.spentBy) spentBySelect.value = tx.spentBy;
+            if (headSelect && tx.head) headSelect.value = tx.head;
 
             state.customTxFields.forEach(f => {
                 const val = tx[f.name] || '';
@@ -5597,6 +5822,20 @@ function openExpenseModal(editId = '', presetCategory = '') {
                 catDropdown.appendChild(opt);
             }
             catDropdown.value = presetCategory;
+        }
+
+        if (presetAccount && accSelect) {
+            accSelect.value = presetAccount;
+        } else if (presetCategory === 'Household Petty Cash' && accSelect) {
+            const pettyAcc = state.accounts.find(a => a.name.toLowerCase().includes('household petty cash') || a.id === 'acc_petty_cash');
+            if (pettyAcc) accSelect.value = pettyAcc.name;
+        }
+
+        if (presetHead && headSelect) {
+            headSelect.value = presetHead;
+        }
+        if (presetSpentBy && spentBySelect) {
+            spentBySelect.value = presetSpentBy;
         }
 
         state.customTxFields.forEach(f => {
@@ -5625,8 +5864,10 @@ function handleExpenseSubmit(e) {
     const date = document.getElementById('expense-date').value;
     const mode = document.getElementById('expense-account-select').value;
     const clientId = document.getElementById('expense-client-source').value;
+    const spentBy = document.getElementById('expense-spent-by') ? document.getElementById('expense-spent-by').value : '';
+    const head = document.getElementById('expense-household-head') ? document.getElementById('expense-household-head').value : '';
 
-    let txObj = { description, category, amount, date, mode, clientId };
+    let txObj = { description, category, amount, date, mode, clientId, spentBy, head };
 
     state.customTxFields.forEach(f => {
         const val = document.getElementById(`custom-expense-${f.name}`).value;
@@ -5750,7 +5991,7 @@ window.setTransferPreset = function(preset, updateValues = true) {
         if (updateValues) {
             if (cashAccounts.length > 0) fromSel.value = cashAccounts[0].name;
             if (bankAccounts.length > 0) toSel.value = bankAccounts[0].name;
-            if (!remarkInput.value || remarkInput.value.includes('withdrawal') || remarkInput.value.includes('deposit') || remarkInput.value.includes('transfer') || remarkInput.value.includes('Transfer')) {
+            if (!remarkInput.value || remarkInput.value.includes('withdrawal') || remarkInput.value.includes('deposit') || remarkInput.value.includes('transfer') || remarkInput.value.includes('Transfer') || remarkInput.value.includes('Disbursed')) {
                 remarkInput.value = 'Cash deposit in Bank';
             }
         }
@@ -5760,7 +6001,7 @@ window.setTransferPreset = function(preset, updateValues = true) {
         if (updateValues) {
             if (bankAccounts.length > 0) fromSel.value = bankAccounts[0].name;
             if (cashAccounts.length > 0) toSel.value = cashAccounts[0].name;
-            if (!remarkInput.value || remarkInput.value.includes('withdrawal') || remarkInput.value.includes('deposit') || remarkInput.value.includes('transfer') || remarkInput.value.includes('Transfer')) {
+            if (!remarkInput.value || remarkInput.value.includes('withdrawal') || remarkInput.value.includes('deposit') || remarkInput.value.includes('transfer') || remarkInput.value.includes('Transfer') || remarkInput.value.includes('Disbursed')) {
                 remarkInput.value = 'Cash withdrawal from Bank (ATM / Counter)';
             }
         }
@@ -5774,8 +6015,28 @@ window.setTransferPreset = function(preset, updateValues = true) {
             } else {
                 toSel.value = state.accounts.find(a => a.name !== fromSel.value)?.name || (state.accounts[0]?.name || '');
             }
-            if (!remarkInput.value || remarkInput.value.includes('withdrawal') || remarkInput.value.includes('deposit') || remarkInput.value.includes('transfer') || remarkInput.value.includes('Transfer')) {
+            if (!remarkInput.value || remarkInput.value.includes('withdrawal') || remarkInput.value.includes('deposit') || remarkInput.value.includes('transfer') || remarkInput.value.includes('Transfer') || remarkInput.value.includes('Disbursed')) {
                 remarkInput.value = 'Bank to Bank fund transfer';
+            }
+        }
+    } else if (preset === 'admin-to-petty') {
+        const pill = document.getElementById('pill-admin-to-petty');
+        if (pill) pill.classList.add('active');
+        if (updateValues) {
+            const mainCash = state.accounts.find(a => a.name === 'Main Cash' || a.id === 'acc_1');
+            const pettyCash = state.accounts.find(a => a.name.toLowerCase().includes('household petty cash') || a.id === 'acc_petty_cash');
+            if (bankAccounts.length > 0) {
+                fromSel.value = bankAccounts[0].name;
+            } else if (mainCash) {
+                fromSel.value = mainCash.name;
+            } else if (state.accounts.length > 0) {
+                fromSel.value = state.accounts[0].name;
+            }
+            if (pettyCash) {
+                toSel.value = pettyCash.name;
+            }
+            if (!remarkInput.value || remarkInput.value.includes('withdrawal') || remarkInput.value.includes('deposit') || remarkInput.value.includes('transfer') || remarkInput.value.includes('Transfer') || remarkInput.value.includes('Disbursed') || remarkInput.value.includes('Petty')) {
+                remarkInput.value = 'Household Petty Cash Disbursed by Admin';
             }
         }
     } else {
@@ -5823,7 +6084,9 @@ window.openTransferModal = function(preset = 'cash-to-bank', editId = '') {
             
             const fromAcc = state.accounts.find(a => a.name === tr.fromAccount);
             const toAcc = state.accounts.find(a => a.name === tr.toAccount);
-            if (fromAcc && toAcc && fromAcc.type === 'Cash' && toAcc.type === 'Bank') {
+            if (toAcc && (toAcc.name.toLowerCase().includes('household petty cash') || toAcc.id === 'acc_petty_cash')) {
+                setTransferPreset('admin-to-petty', false);
+            } else if (fromAcc && toAcc && fromAcc.type === 'Cash' && toAcc.type === 'Bank') {
                 setTransferPreset('cash-to-bank', false);
             } else if (fromAcc && toAcc && fromAcc.type === 'Bank' && toAcc.type === 'Cash') {
                 setTransferPreset('bank-to-cash', false);
@@ -5871,7 +6134,9 @@ function handleTransferSubmit(e) {
     const toAcc = state.accounts.find(a => a.name === toAccount);
     let type = 'Contra Transfer';
     if (fromAcc && toAcc) {
-        if (fromAcc.type === 'Cash' && toAcc.type === 'Bank') type = 'Cash to Bank';
+        if (toAcc.name.toLowerCase().includes('household petty cash') || toAcc.id === 'acc_petty_cash') {
+            type = fromAcc.type === 'Bank' ? 'Bank to Petty Cash' : 'Cash to Petty Cash';
+        } else if (fromAcc.type === 'Cash' && toAcc.type === 'Bank') type = 'Cash to Bank';
         else if (fromAcc.type === 'Bank' && toAcc.type === 'Cash') type = 'Bank to Cash';
         else if (fromAcc.type === 'Bank' && toAcc.type === 'Bank') type = 'Bank to Bank';
         else if (fromAcc.type === 'Cash' && toAcc.type === 'Cash') type = 'Cash to Cash';
