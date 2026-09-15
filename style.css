@@ -2083,6 +2083,15 @@ h1, h2, h3, h4, h5, h6 {
     width: 95%;
 }
 
+#modal-receipt-preview {
+    z-index: 1200;
+}
+
+#modal-receipt-preview .modal-box {
+    max-width: 720px;
+    width: 95%;
+}
+
 .modal-overlay.active .modal-box { transform: translateY(0); }
 .modal-header {
     display: flex;

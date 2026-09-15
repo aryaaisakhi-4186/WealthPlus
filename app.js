@@ -1955,8 +1955,8 @@ function renderClientsPage() {
                             <button class="btn btn-outline btn-sm" onclick="openLoanModal('given', '${client.id}')" title="Give Loan / Add Debit" style="font-size:11px; padding:3px 8px; display:inline-flex; align-items:center; gap:3px; color:var(--primary); border-color:rgba(13, 148, 136, 0.4); background:rgba(13, 148, 136, 0.06); font-weight:600;">
                                 <i data-lucide="hand-coins" style="width:12px; height:12px;"></i> Give Loan
                             </button>
-                            <button class="btn btn-outline btn-sm" onclick="quickReceiveForParty('${client.id}')" title="Log Received Amount" style="font-size:11px; padding:3px 8px; display:inline-flex; align-items:center; gap:3px; color:var(--success); border-color:rgba(16, 185, 129, 0.4); background:rgba(16, 185, 129, 0.06); font-weight:600;">
-                                <i data-lucide="plus-circle" style="width:12px; height:12px;"></i> Receive
+                            <button class="btn btn-outline btn-sm" onclick="quickReceiveForParty('${client.id}')" title="Log Received Amount & Receipts" style="font-size:11px; padding:3px 8px; display:inline-flex; align-items:center; gap:3px; color:var(--success); border-color:rgba(16, 185, 129, 0.4); background:rgba(16, 185, 129, 0.06); font-weight:600;">
+                                <i data-lucide="plus-circle" style="width:12px; height:12px;"></i> Receive / Receipts
                             </button>
                             <button class="btn btn-outline btn-sm" onclick="generateClientStatementPDF('${client.id}')" title="Download PDF Ledger" style="font-size:11px; padding:3px 8px; display:inline-flex; align-items:center; gap:3px; color:#4f46e5; border-color:rgba(99, 102, 241, 0.4); background:rgba(99, 102, 241, 0.06); font-weight:600;">
                                 <i data-lucide="file-text" style="width:12px; height:12px;"></i> PDF
@@ -2035,8 +2035,9 @@ function renderIncomeLogsTable() {
             ${customCells}
             <td class="actions-col" style="display: var(--staff-access-display, table-cell);">
                 <div class="actions-wrapper" style="gap:4px;">
-                    <button class="btn btn-sm btn-whatsapp" onclick="shareReceiptWhatsApp('${log.id}')" title="Send Receipt Note on WhatsApp" style="font-size:10px; padding:2px 7px; display:inline-flex; align-items:center; gap:2px;"><i data-lucide="send" style="width:11px; height:11px;"></i> WhatsApp</button>
+                    <button class="btn btn-outline btn-sm" onclick="previewReceiptModal('${log.id}')" title="View Printable Receipt Voucher" style="font-size:10px; padding:2px 7px; display:inline-flex; align-items:center; gap:2px; color: #0f766e; border-color: rgba(13,148,136,0.3); background: rgba(13,148,136,0.06); font-weight: 600;"><i data-lucide="receipt" style="width:11px; height:11px;"></i> View</button>
                     <button class="btn btn-outline-primary btn-sm" onclick="generateReceiptPDF('${log.id}')" title="Download PDF Receipt" style="font-size:10px; padding:2px 7px; display:inline-flex; align-items:center; gap:2px;"><i data-lucide="file-text" style="width:11px; height:11px;"></i> PDF</button>
+                    <button class="btn btn-sm btn-whatsapp" onclick="shareReceiptWhatsApp('${log.id}')" title="Send Receipt Note on WhatsApp" style="font-size:10px; padding:2px 7px; display:inline-flex; align-items:center; gap:2px;"><i data-lucide="send" style="width:11px; height:11px;"></i> WhatsApp</button>
                     <button class="btn-icon-only edit-btn" onclick="openEditIncome('${log.id}')" title="Edit"><i data-lucide="edit-3"></i></button>
                     <button class="btn-icon-only delete-btn" onclick="deleteIncome('${log.id}')" title="Delete"><i data-lucide="trash-2"></i></button>
                 </div>
@@ -6122,6 +6123,10 @@ window.previewReceiptModal = function(logId) {
         titleElem.innerHTML = `<i data-lucide="receipt" style="width:20px; height:20px; color:#0d9488;"></i> Payment Receipt Note &mdash; ${client.name}`;
     }
 
+    const btnPrint = document.getElementById('btn-modal-receipt-print');
+    if (btnPrint) {
+        btnPrint.onclick = () => printReceiptVoucher(logId);
+    }
     const btnPdf = document.getElementById('btn-modal-receipt-pdf');
     if (btnPdf) {
         btnPdf.onclick = () => generateReceiptPDF(logId);
@@ -6141,6 +6146,49 @@ window.closeReceiptPreviewModal = function() {
     if (modal) modal.classList.remove('active');
 };
 
+window.printReceiptVoucher = function(logId) {
+    const log = state.incomeLogs.find(l => l.id === logId);
+    if (!log) return;
+    const client = state.clients.find(c => c.id === log.clientId) || { name: 'Client' };
+    const stats = getClientReportStats(client.id);
+    const receiptElem = buildPaymentReceiptElement(log, client, stats);
+
+    const printWin = window.open('', '_blank', 'width=850,height=700');
+    if (!printWin) {
+        window.print();
+        return;
+    }
+    printWin.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Receipt - ${client.name}</title>
+            <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+            <style>
+                body { margin: 20px; background: #fff; font-family: 'Plus Jakarta Sans', sans-serif; display: flex; justify-content: center; }
+                .payment-receipt-voucher { width: 750px; max-width: 100%; box-shadow: none !important; }
+                @media print {
+                    body { margin: 0; padding: 0; }
+                    .payment-receipt-voucher { width: 100%; border: 1.5px solid #0d9488 !important; }
+                }
+            </style>
+        </head>
+        <body>
+            ${receiptElem.outerHTML}
+            <script>
+                window.onload = function() {
+                    setTimeout(() => {
+                        window.print();
+                    }, 200);
+                };
+            </script>
+        </body>
+        </html>
+    `);
+    printWin.document.close();
+};
+
 window.generateReceiptPDF = function(logId) {
     const log = state.incomeLogs.find(l => l.id === logId);
     if (!log) {
@@ -6152,38 +6200,50 @@ window.generateReceiptPDF = function(logId) {
     const receiptIdFull = getReceiptNumber(log, client);
     const safeFileReceipt = receiptIdFull.replace('/', '_');
 
+    // Create a hidden container at top:0 left:0 so html2canvas captures cleanly
+    const printWrapper = document.createElement('div');
+    printWrapper.className = 'receipt-pdf-print-wrapper';
+    printWrapper.style.position = 'fixed';
+    printWrapper.style.left = '0';
+    printWrapper.style.top = '0';
+    printWrapper.style.width = '750px';
+    printWrapper.style.zIndex = '-9999';
+    printWrapper.style.opacity = '0';
+    printWrapper.style.pointerEvents = 'none';
+
     const receiptElem = buildPaymentReceiptElement(log, client, stats);
-    receiptElem.style.position = 'fixed';
-    receiptElem.style.left = '-9999px';
-    receiptElem.style.top = '0';
     receiptElem.style.width = '750px';
-    receiptElem.style.background = '#ffffff';
-    document.body.appendChild(receiptElem);
+    receiptElem.style.boxSizing = 'border-box';
+    printWrapper.appendChild(receiptElem);
+    document.body.appendChild(printWrapper);
+
+    const safeClientName = client.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `Receipt_${safeFileReceipt}_${safeClientName}.pdf`;
 
     const opt = {
         margin: [8, 8, 8, 8],
-        filename: `Receipt_${safeFileReceipt}_${client.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+        filename: fileName,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false, scrollY: 0, scrollX: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
     if (typeof html2pdf !== 'undefined') {
         html2pdf().set(opt).from(receiptElem).save().then(() => {
-            if (receiptElem.parentNode) {
-                receiptElem.parentNode.removeChild(receiptElem);
+            if (printWrapper.parentNode) {
+                printWrapper.parentNode.removeChild(printWrapper);
             }
         }).catch(err => {
             console.error("PDF generation error:", err);
-            alert("Could not generate PDF directly. You can view the receipt and print to PDF from browser.");
-            if (receiptElem.parentNode) {
-                receiptElem.parentNode.removeChild(receiptElem);
+            alert("Could not generate PDF directly. You can view the receipt and print to PDF from your browser.");
+            if (printWrapper.parentNode) {
+                printWrapper.parentNode.removeChild(printWrapper);
             }
         });
     } else {
-        alert("PDF export library not loaded. Please ensure you are connected to internet or use browser print.");
-        if (receiptElem.parentNode) {
-            receiptElem.parentNode.removeChild(receiptElem);
+        alert("PDF export library not loaded. Please check your internet connection or use browser print.");
+        if (printWrapper.parentNode) {
+            printWrapper.parentNode.removeChild(printWrapper);
         }
     }
 };
@@ -6237,27 +6297,71 @@ RAVI KATARA
         cleanPhone = '91' + cleanPhone;
     }
 
-    // Try Web Share API with PDF on supported mobile browsers
-    if (navigator.share && navigator.canShare && typeof html2pdf !== 'undefined') {
-        try {
-            const receiptElem = buildPaymentReceiptElement(log, client, stats);
-            receiptElem.style.position = 'fixed';
-            receiptElem.style.left = '-9999px';
-            document.body.appendChild(receiptElem);
-            const pdfBlob = await html2pdf().from(receiptElem).output('blob');
-            if (receiptElem.parentNode) receiptElem.parentNode.removeChild(receiptElem);
+    const safeClientName = client.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `Receipt_${safeFileReceipt}_${safeClientName}.pdf`;
 
-            const file = new File([pdfBlob], `Receipt_${safeFileReceipt}_${client.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`, { type: 'application/pdf' });
-            if (navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    title: `Receipt ${receiptIdFull} - ${client.name}`,
-                    text: text,
-                    files: [file]
-                });
-                return;
+    // Try Web Share API with PDF on supported mobile browsers, or download PDF directly
+    if (typeof html2pdf !== 'undefined') {
+        const printWrapper = document.createElement('div');
+        printWrapper.className = 'receipt-pdf-print-wrapper';
+        printWrapper.style.position = 'fixed';
+        printWrapper.style.left = '0';
+        printWrapper.style.top = '0';
+        printWrapper.style.width = '750px';
+        printWrapper.style.zIndex = '-9999';
+        printWrapper.style.opacity = '0';
+        printWrapper.style.pointerEvents = 'none';
+
+        const receiptElem = buildPaymentReceiptElement(log, client, stats);
+        receiptElem.style.width = '750px';
+        receiptElem.style.boxSizing = 'border-box';
+        printWrapper.appendChild(receiptElem);
+        document.body.appendChild(printWrapper);
+
+        const opt = {
+            margin: [8, 8, 8, 8],
+            filename: fileName,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false, scrollY: 0, scrollX: 0 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        try {
+            const pdfBlob = await html2pdf().set(opt).from(receiptElem).output('blob');
+            if (printWrapper.parentNode) printWrapper.parentNode.removeChild(printWrapper);
+
+            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        title: `Receipt ${receiptIdFull} - ${client.name}`,
+                        text: text,
+                        files: [file]
+                    });
+                    return;
+                } catch (shareErr) {
+                    if (shareErr.name === 'AbortError') return;
+                    console.warn("Native share error:", shareErr);
+                }
             }
+
+            // Fallback for Desktop/browsers without file sharing:
+            // Auto download the PDF receipt so user has it immediately
+            const fileUrl = URL.createObjectURL(pdfBlob);
+            const a = document.createElement('a');
+            a.href = fileUrl;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                if (document.body.contains(a)) document.body.removeChild(a);
+                URL.revokeObjectURL(fileUrl);
+            }, 1000);
+
         } catch (err) {
-            console.log("Web Share API fallback:", err);
+            console.error("PDF generation in WhatsApp share failed:", err);
+            if (printWrapper.parentNode) printWrapper.parentNode.removeChild(printWrapper);
         }
     }
 
@@ -6423,15 +6527,18 @@ function updateIncomeModalClientView(clientId) {
                     <td style="padding: 6px 8px; text-align: right; color: #d97706;">${discountVal}</td>
                     <td style="padding: 6px 8px; color: #64748b; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${log.remark || ''}">${remarkVal}</td>
                     <td style="padding: 6px 8px; text-align: center;">
-                        <div style="display: inline-flex; align-items: center; gap: 3px;">
+                        <div style="display: inline-flex; align-items: center; gap: 3px; flex-wrap: nowrap;">
+                            <button type="button" class="btn btn-outline btn-sm" onclick="previewReceiptModal('${log.id}')" title="View Printable Receipt Voucher" style="font-size: 10px; padding: 2px 6px; display: inline-flex; align-items: center; gap: 2px; color: #0f766e; border-color: rgba(13,148,136,0.3); background: rgba(13,148,136,0.06); font-weight: 600;">
+                                <i data-lucide="receipt" style="width: 11px; height: 11px;"></i> View
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="generateReceiptPDF('${log.id}')" title="Download PDF Receipt" style="font-size: 10px; padding: 2px 6px; display: inline-flex; align-items: center; gap: 2px;">
+                                <i data-lucide="file-text" style="width: 11px; height: 11px;"></i> PDF
+                            </button>
+                            <button type="button" class="btn btn-sm btn-whatsapp" onclick="shareReceiptWhatsApp('${log.id}')" title="WhatsApp Receipt Note" style="font-size: 10px; padding: 2px 6px; display: inline-flex; align-items: center; gap: 2px;">
+                                <i data-lucide="send" style="width: 11px; height: 11px;"></i> WhatsApp
+                            </button>
                             <button type="button" class="btn btn-outline-primary btn-sm" onclick="loadIncomeRecordForEdit('${log.id}')" title="Edit this payment" style="font-size: 10px; padding: 2px 6px; display: inline-flex; align-items: center; gap: 2px;">
                                 <i data-lucide="edit-3" style="width: 11px; height: 11px;"></i> Edit
-                            </button>
-                            <button type="button" class="btn btn-sm btn-whatsapp" onclick="shareReceiptWhatsApp('${log.id}')" title="WhatsApp Receipt Note" style="font-size: 10px; padding: 2px 6px; display: inline-flex; align-items: center;">
-                                <i data-lucide="send" style="width: 11px; height: 11px;"></i>
-                            </button>
-                            <button type="button" class="btn btn-outline btn-sm" onclick="generateReceiptPDF('${log.id}')" title="PDF Receipt Note" style="font-size: 10px; padding: 2px 6px; display: inline-flex; align-items: center;">
-                                <i data-lucide="file-text" style="width: 11px; height: 11px;"></i>
                             </button>
                             <button type="button" class="btn-icon-only delete-btn" onclick="deleteIncomeFromModal('${log.id}', '${clientId}')" title="Delete payment" style="padding: 2px; width: 22px; height: 22px;">
                                 <i data-lucide="trash-2" style="width: 11px; height: 11px;"></i>

@@ -25,7 +25,7 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="stylesheet" href="style.css?v=6.7.7">
+    <link rel="stylesheet" href="style.css?v=6.7.8">
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
@@ -1781,7 +1781,7 @@
                                     <th style="padding: 6px 8px; text-align: right;">Amount</th>
                                     <th style="padding: 6px 8px; text-align: right;">Discount</th>
                                     <th style="padding: 6px 8px; text-align: left;">Remark</th>
-                                    <th style="padding: 6px 8px; text-align: center; width: 170px;">Actions</th>
+                                    <th style="padding: 6px 8px; text-align: center; width: 230px;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="income-modal-history-tbody">
@@ -1810,6 +1810,9 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--border-color); padding-top: 12px;">
                     <button type="button" class="btn btn-outline" onclick="closeReceiptPreviewModal()">Done / Close</button>
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-outline btn-sm" id="btn-modal-receipt-print" style="display:inline-flex; align-items:center; gap:5px; font-weight:600; padding:6px 12px;">
+                            <i data-lucide="printer" style="width:14px; height:14px;"></i> Print
+                        </button>
                         <button type="button" class="btn btn-outline-primary btn-sm" id="btn-modal-receipt-pdf" style="display:inline-flex; align-items:center; gap:5px; font-weight:600; padding:6px 12px;">
                             <i data-lucide="file-text" style="width:14px; height:14px;"></i> Download PDF
                         </button>
@@ -2284,9 +2287,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.7.7"></script>
-    <script src="app.js?v=6.7.7"></script>
-    <script src="sindhu_v1.js?v=6.7.7"></script>
+    <script src="firebase-config.js?v=6.7.8"></script>
+    <script src="app.js?v=6.7.8"></script>
+    <script src="sindhu_v1.js?v=6.7.8"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">
