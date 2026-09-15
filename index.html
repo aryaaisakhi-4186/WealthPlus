@@ -1110,14 +1110,68 @@
 
                         <!-- Panel B: Parties Setup -->
                         <div id="master-panel-clients-config" class="master-sub-panel">
-                            <div class="panel-action-header" style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
+                            <div class="panel-action-header" style="display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:12px;">
                                 <div>
                                     <h4>Parties Settings (Clients & Vendors)</h4>
-                                    <p style="font-size:12px; color:var(--text-secondary);">Manage debtors, creditors, credit amounts and retainers.</p>
+                                    <p style="font-size:12px; color:var(--text-secondary); margin:0;">Manage debtors, creditors, credit amounts and retainers.</p>
                                 </div>
                                 <button type="button" class="btn btn-primary btn-sm" id="btn-master-add-party" onclick="openClientModal()" style="display:inline-flex; align-items:center; gap:6px;">
                                     <i data-lucide="user-plus" style="width:14px; height:14px;"></i> + Add Party
                                 </button>
+                            </div>
+
+                            <!-- Parties Configuration Search & Category Filter Bar -->
+                            <div class="party-filter-dropdown-wrapper" style="margin-bottom: 14px; padding: 12px 14px;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                                    <label style="font-size: 12px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                        <i data-lucide="filter" style="width: 14px; height: 14px; color: var(--primary);"></i>
+                                        Search & Filter Parties:
+                                    </label>
+                                    <span id="master-party-count-badge" class="badge" style="font-size: 11px; padding: 3px 9px; font-weight: 700; background: rgba(13,148,136,0.12); color: var(--primary);">Showing 0 Parties</span>
+                                </div>
+                                <div class="master-parties-filter-grid" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 10px; align-items: center;">
+                                    <!-- Search Input -->
+                                    <div class="searchable-input-wrapper" style="position: relative; width: 100%;">
+                                        <i data-lucide="search" class="search-input-icon" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-muted);"></i>
+                                        <input type="text" id="master-party-search-input" class="searchable-input" placeholder="Search by name, category, FY, or remark..." autocomplete="off" style="width: 100%; padding: 7px 30px 7px 30px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 12px; height: 34px;">
+                                        <button type="button" class="btn-clear-search" id="btn-clear-master-party-search" style="display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;" title="Clear search">
+                                            <i data-lucide="x" style="width: 12px; height: 12px;"></i>
+                                        </button>
+                                    </div>
+
+                                    <!-- Category Filter -->
+                                    <div style="width: 100%;">
+                                        <select id="master-party-category-filter" class="party-category-select" style="width: 100%; padding: 6px 8px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-weight: 600; font-size: 12px; height: 34px;">
+                                            <option value="all">📁 All Categories</option>
+                                            <option value="client">🏢 Clients (Debtors)</option>
+                                            <option value="vendor">🏭 Vendors (Creditors)</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Pending FY Year Filter -->
+                                    <div style="width: 100%;">
+                                        <select id="master-party-fy-filter" class="party-category-select" style="width: 100%; padding: 6px 8px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-weight: 600; font-size: 12px; height: 34px;">
+                                            <option value="all">📅 All FY Years</option>
+                                            <option value="2026-2027">FY 2026-2027 (Current)</option>
+                                            <option value="2027-2028">FY 2027-2028</option>
+                                            <option value="2028-2029">FY 2028-2029</option>
+                                            <option value="2029-2030">FY 2029-2030</option>
+                                            <option value="2025-2026">FY 2025-2026</option>
+                                            <option value="2024-2025">FY 2024-2025</option>
+                                            <option value="2023-2024">FY 2023-2024</option>
+                                            <option value="Old Past Dues">Old Past Dues</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Status Filter -->
+                                    <div style="width: 100%;">
+                                        <select id="master-party-status-filter" class="party-category-select" style="width: 100%; padding: 6px 8px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-weight: 600; font-size: 12px; height: 34px;">
+                                            <option value="all">⚡ All Statuses</option>
+                                            <option value="pending">⏳ Pending / Due</option>
+                                            <option value="paid">✅ Full Paid</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                             <div class="table-container">
                                 <table class="data-table">
@@ -2289,9 +2343,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.8.1"></script>
-    <script src="app.js?v=6.8.1"></script>
-    <script src="sindhu_v1.js?v=6.8.1"></script>
+    <script src="firebase-config.js?v=6.8.2"></script>
+    <script src="app.js?v=6.8.2"></script>
+    <script src="sindhu_v1.js?v=6.8.2"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">

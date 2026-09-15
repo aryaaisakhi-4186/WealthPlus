@@ -4220,10 +4220,94 @@ function renderMasterAccounts() {
 
 function renderMasterClients() {
     const tbody = document.getElementById('master-clients-tbody');
+    if (!tbody) return;
     tbody.innerHTML = '';
     const fC = v => '₹' + Math.round(v).toLocaleString('en-IN');
 
-    state.clients.forEach(client => {
+    const searchInput = document.getElementById('master-party-search-input');
+    const searchQuery = (searchInput ? searchInput.value : '').trim().toLowerCase();
+
+    const catFilterElem = document.getElementById('master-party-category-filter');
+    const catFilter = (catFilterElem ? catFilterElem.value : 'all').toLowerCase();
+
+    const fyFilterElem = document.getElementById('master-party-fy-filter');
+    const fyFilter = fyFilterElem ? fyFilterElem.value : 'all';
+
+    const statusFilterElem = document.getElementById('master-party-status-filter');
+    const statusFilter = (statusFilterElem ? statusFilterElem.value : 'all').toLowerCase();
+
+    let list = [...state.clients];
+
+    // 1. Category / Group Filter
+    if (catFilter === 'client' || catFilter === 'debtor') {
+        list = list.filter(isClientParty);
+    } else if (catFilter === 'vendor' || catFilter === 'creditor') {
+        list = list.filter(isVendorParty);
+    }
+
+    // 2. Financial Year Filter
+    if (fyFilter && fyFilter !== 'all') {
+        list = list.filter(c => (c.pendingYear || '2026-2027') === fyFilter);
+    }
+
+    // 3. Payment Status Filter
+    if (statusFilter === 'paid') {
+        list = list.filter(c => {
+            const stats = getClientReportStats(c.id);
+            return stats.balanceReceivable <= 0;
+        });
+    } else if (statusFilter === 'pending') {
+        list = list.filter(c => {
+            const stats = getClientReportStats(c.id);
+            return stats.balanceReceivable > 0;
+        });
+    }
+
+    // 4. Live Search Query (Matches Name, Group, Category, FY, Phone, Remarks)
+    if (searchQuery) {
+        list = list.filter(c => {
+            const isVendor = isVendorParty(c);
+            const catLabel = isVendor ? 'vendor creditor' : 'client debtor';
+            const name = (c.name || '').toLowerCase();
+            const group = (c.group || '').toLowerCase();
+            const fy = (c.pendingYear || '2026-2027').toLowerCase();
+            const phone = (c.phone || '').toLowerCase();
+            const remark = (c.remark || c.remarks || '').toLowerCase();
+            return name.includes(searchQuery) ||
+                   group.includes(searchQuery) ||
+                   catLabel.includes(searchQuery) ||
+                   fy.includes(searchQuery) ||
+                   phone.includes(searchQuery) ||
+                   remark.includes(searchQuery);
+        });
+    }
+
+    // Update count badge
+    const countBadge = document.getElementById('master-party-count-badge');
+    if (countBadge) {
+        countBadge.innerText = `Showing ${list.length} of ${state.clients.length} Parties`;
+    }
+
+    if (list.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td colspan="9" style="text-align: center; padding: 32px 16px; color: var(--text-secondary);">
+                <div style="font-size: 26px; margin-bottom: 6px;">🔍</div>
+                <strong style="font-size: 14px; color: var(--text-primary); display: block;">No matching parties found</strong>
+                <span style="font-size: 12px; color: var(--text-muted);">Try adjusting your search keywords or clearing active filters.</span>
+                <div style="margin-top: 12px;">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="clearMasterPartyFilters()" style="padding: 5px 12px; font-weight: 600;">
+                        Clear Filters
+                    </button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        if (window.lucide) lucide.createIcons();
+        return;
+    }
+
+    list.forEach(client => {
         const stats = getClientReportStats(client.id);
         const isCompleted = stats.balanceReceivable <= 0;
         const isVendor = isVendorParty(client);
@@ -4266,8 +4350,24 @@ function renderMasterClients() {
         `;
         tbody.appendChild(tr);
     });
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
+
+window.clearMasterPartyFilters = function() {
+    const sInput = document.getElementById('master-party-search-input');
+    const cFilter = document.getElementById('master-party-category-filter');
+    const fyFilter = document.getElementById('master-party-fy-filter');
+    const statFilter = document.getElementById('master-party-status-filter');
+    const btnClear = document.getElementById('btn-clear-master-party-search');
+
+    if (sInput) sInput.value = '';
+    if (cFilter) cFilter.value = 'all';
+    if (fyFilter) fyFilter.value = 'all';
+    if (statFilter) statFilter.value = 'all';
+    if (btnClear) btnClear.style.display = 'none';
+
+    renderMasterClients();
+};
 
 function renderMasterBudgetsEditor() {
     const container = document.getElementById('budget-inputs-container');
@@ -4699,6 +4799,47 @@ function initEventHandlers() {
             btnClearPartySearch.style.display = 'none';
             partySearchInput.focus();
             renderClientsPage();
+        });
+    }
+
+    // Master Parties Configuration Search & Category Filter Listeners
+    const masterPartySearch = document.getElementById('master-party-search-input');
+    const btnClearMasterPartySearch = document.getElementById('btn-clear-master-party-search');
+    if (masterPartySearch) {
+        masterPartySearch.addEventListener('input', function() {
+            if (btnClearMasterPartySearch) {
+                btnClearMasterPartySearch.style.display = this.value ? 'block' : 'none';
+            }
+            renderMasterClients();
+        });
+    }
+    if (btnClearMasterPartySearch && masterPartySearch) {
+        btnClearMasterPartySearch.addEventListener('click', function() {
+            masterPartySearch.value = '';
+            btnClearMasterPartySearch.style.display = 'none';
+            masterPartySearch.focus();
+            renderMasterClients();
+        });
+    }
+
+    const masterPartyCatFilter = document.getElementById('master-party-category-filter');
+    if (masterPartyCatFilter) {
+        masterPartyCatFilter.addEventListener('change', function() {
+            renderMasterClients();
+        });
+    }
+
+    const masterPartyFyFilter = document.getElementById('master-party-fy-filter');
+    if (masterPartyFyFilter) {
+        masterPartyFyFilter.addEventListener('change', function() {
+            renderMasterClients();
+        });
+    }
+
+    const masterPartyStatusFilter = document.getElementById('master-party-status-filter');
+    if (masterPartyStatusFilter) {
+        masterPartyStatusFilter.addEventListener('change', function() {
+            renderMasterClients();
         });
     }
 
