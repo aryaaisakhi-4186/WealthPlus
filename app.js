@@ -1960,23 +1960,27 @@ function renderClientsPage() {
                         ${customFieldsHTML}
                     </div>
                     <div class="client-card-footer" onclick="event.stopPropagation()">
-                        <button class="btn btn-outline btn-sm" onclick="openLoanModal('given', '${client.id}')" title="Give Loan / Add Debit" style="font-size:11px; padding:4px 9px; display:inline-flex; align-items:center; gap:4px; color:var(--primary); border-color:rgba(13, 148, 136, 0.4); background:rgba(13, 148, 136, 0.06); font-weight:600;">
-                            <i data-lucide="hand-coins" style="width:12px; height:12px;"></i> Give Loan
-                        </button>
-                        <button class="btn btn-outline btn-sm" onclick="quickReceiveForParty('${client.id}')" title="Log Received Amount" style="font-size:11px; padding:4px 9px; display:inline-flex; align-items:center; gap:4px; color:var(--success); border-color:rgba(16, 185, 129, 0.4); background:rgba(16, 185, 129, 0.06); font-weight:600;">
-                            <i data-lucide="plus-circle" style="width:12px; height:12px;"></i> Receive
-                        </button>
-                        <button class="btn btn-outline btn-sm" onclick="generateClientStatementPDF('${client.id}')" title="Download PDF Ledger" style="font-size:11px; padding:4px 8px; display:inline-flex; align-items:center; gap:3px; color:#4f46e5; border-color:rgba(99, 102, 241, 0.4); background:rgba(99, 102, 241, 0.06); font-weight:600;">
-                            <i data-lucide="file-text" style="width:12px; height:12px;"></i> PDF
-                        </button>
-                        <button class="btn btn-outline btn-sm btn-excel" onclick="exportClientStatementExcel('${client.id}')" title="Export Client Excel Statement" style="font-size:11px; padding:4px 8px; display:inline-flex; align-items:center; gap:3px;">
-                            <i data-lucide="file-spreadsheet" style="width:12px; height:12px;"></i> Excel
-                        </button>
-                        <button class="btn btn-sm btn-whatsapp" onclick="shareClientLedgerWhatsApp('${client.id}')" title="Share Ledger Statement on WhatsApp" style="font-size:11px; padding:4px 8px; display:inline-flex; align-items:center; gap:3px;">
-                            <i data-lucide="send" style="width:12px; height:12px;"></i> WhatsApp
-                        </button>
-                        <button class="btn-icon-only edit-btn" onclick="openEditClient('${client.id}')" title="Edit Party"><i data-lucide="edit-3"></i></button>
-                        <button class="btn-icon-only delete-btn" onclick="deleteClient('${client.id}')" title="Delete Party"><i data-lucide="trash-2"></i></button>
+                        <div class="client-card-actions-main">
+                            <button class="btn btn-outline btn-sm" onclick="openLoanModal('given', '${client.id}')" title="Give Loan / Add Debit" style="font-size:11px; padding:3px 8px; display:inline-flex; align-items:center; gap:3px; color:var(--primary); border-color:rgba(13, 148, 136, 0.4); background:rgba(13, 148, 136, 0.06); font-weight:600;">
+                                <i data-lucide="hand-coins" style="width:12px; height:12px;"></i> Give Loan
+                            </button>
+                            <button class="btn btn-outline btn-sm" onclick="quickReceiveForParty('${client.id}')" title="Log Received Amount" style="font-size:11px; padding:3px 8px; display:inline-flex; align-items:center; gap:3px; color:var(--success); border-color:rgba(16, 185, 129, 0.4); background:rgba(16, 185, 129, 0.06); font-weight:600;">
+                                <i data-lucide="plus-circle" style="width:12px; height:12px;"></i> Receive
+                            </button>
+                            <button class="btn btn-outline btn-sm" onclick="generateClientStatementPDF('${client.id}')" title="Download PDF Ledger" style="font-size:11px; padding:3px 8px; display:inline-flex; align-items:center; gap:3px; color:#4f46e5; border-color:rgba(99, 102, 241, 0.4); background:rgba(99, 102, 241, 0.06); font-weight:600;">
+                                <i data-lucide="file-text" style="width:12px; height:12px;"></i> PDF
+                            </button>
+                            <button class="btn btn-outline btn-sm btn-excel" onclick="exportClientStatementExcel('${client.id}')" title="Export Client Excel Statement" style="font-size:11px; padding:3px 8px; display:inline-flex; align-items:center; gap:3px;">
+                                <i data-lucide="file-spreadsheet" style="width:12px; height:12px;"></i> Excel
+                            </button>
+                            <button class="btn btn-sm btn-whatsapp" onclick="shareClientLedgerWhatsApp('${client.id}')" title="Share Ledger Statement on WhatsApp" style="font-size:11px; padding:3px 8px; display:inline-flex; align-items:center; gap:3px;">
+                                <i data-lucide="send" style="width:12px; height:12px;"></i> WhatsApp
+                            </button>
+                        </div>
+                        <div class="client-card-actions-tools">
+                            <button class="btn-icon-only edit-btn" onclick="openEditClient('${client.id}')" title="Edit Party"><i data-lucide="edit-3"></i></button>
+                            <button class="btn-icon-only delete-btn" onclick="deleteClient('${client.id}')" title="Delete Party"><i data-lucide="trash-2"></i></button>
+                        </div>
                     </div>
                 </div>
             `;

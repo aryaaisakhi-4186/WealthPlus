@@ -951,6 +951,10 @@ h1, h2, h3, h4, h5, h6 {
     transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
     cursor: pointer;
     user-select: none;
+    box-sizing: border-box;
+    overflow: hidden;
+    position: relative;
+    max-width: 100%;
 }
 
 .client-card:hover {
@@ -1159,12 +1163,31 @@ h1, h2, h3, h4, h5, h6 {
 
 .client-card-footer {
     display: flex;
-    justify-content: flex-end;
+    flex-wrap: wrap;
+    justify-content: space-between;
     align-items: center;
-    gap: 8px;
-    margin-top: 6px;
+    gap: 6px;
+    margin-top: 8px;
     border-top: 1px solid var(--border-color);
     padding-top: 10px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.client-card-actions-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    flex: 1 1 auto;
+}
+
+.client-card-actions-tools {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    flex-shrink: 0;
 }
 
 /* Expense Category Accordion Container & Cards */
@@ -2299,19 +2322,32 @@ h1, h2, h3, h4, h5, h6 {
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
-        justify-content: flex-start;
+        justify-content: space-between;
         align-items: center;
         width: 100%;
+        box-sizing: border-box;
     }
-    .client-card-footer .btn {
-        flex: 1 1 calc(50% - 6px);
-        min-width: 95px;
+    .client-card-actions-main {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        flex: 1 1 auto;
+        width: 100%;
+    }
+    .client-card-actions-main .btn {
+        flex: 1 1 calc(50% - 4px);
+        min-width: 80px;
         font-size: 11px;
-        padding: 6px 6px;
+        padding: 5px 6px;
         justify-content: center;
         box-sizing: border-box;
     }
-    .client-card-footer .btn-icon-only {
+    .client-card-actions-tools {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 4px;
+        margin-left: auto;
         flex: 0 0 auto;
     }
     
@@ -3729,19 +3765,6 @@ h1, h2, h3, h4, h5, h6 {
 .petty-member-pct {
     color: var(--text-muted);
     font-size: 10px;
-}
-
-.btn-whatsapp {
-    background: #25D366 !important;
-    border-color: #25D366 !important;
-    color: #ffffff !important;
-    font-weight: 600;
-}
-
-.btn-whatsapp:hover {
-    background: #1eb954 !important;
-    border-color: #1eb954 !important;
-    color: #ffffff !important;
 }
 
 
