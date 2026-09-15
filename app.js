@@ -5417,9 +5417,9 @@ function buildClientStatementElement(client, stats, fy) {
             <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2.5px solid #0d9488; padding-bottom:10px; margin-bottom:12px;">
                 <div>
                     <h2 style="margin:0; font-size:20px; color:#0f766e; font-weight:800; letter-spacing:-0.5px;">ARYA ASSOCIATES</h2>
-                    <p style="margin:2px 0 0 0; font-size:10.5px; color:#0d9488; font-weight:700;">Taxation, Accounting & Corporate Advisory Services</p>
+                    <p style="margin:2px 0 0 0; font-size:10.5px; color:#0d9488; font-weight:700;">Accounting & Taxation Consultant</p>
                     <p style="margin:2px 0 0 0; font-size:10px; color:#475569; font-weight:600;">RAVI KATARA &nbsp;|&nbsp; Mobile: 8815052555, 8982147763</p>
-                    <p style="margin:2px 0 0 0; font-size:9.5px; color:#64748b;">Financial Accounting & Client Ledger Statement</p>
+                    <p style="margin:2px 0 0 0; font-size:9.5px; color:#64748b;">Client Ledger Statement</p>
                 </div>
                 <div style="text-align:right;">
                     <span style="display:inline-block; background:#f0fdfa; color:#0f766e; border:1px solid #99f6e4; font-weight:700; font-size:11px; padding:3px 8px; border-radius:4px;">
@@ -5546,7 +5546,7 @@ function buildClientStatementElement(client, stats, fy) {
 
             <!-- Footer / Terms -->
             <div class="pdf-avoid-break" style="margin-top:14px; padding-top:6px; border-top:1px dashed #cbd5e1; display:flex; justify-content:space-between; font-size:9.5px; color:#64748b;">
-                <span>ARYA ASSOCIATES — Financial Accounting (Mob: 8815052555, 8982147763)</span>
+                <span>ARYA ASSOCIATES — Accounting & Taxation Consultant (Mob: 8815052555, 8982147763)</span>
                 <span style="font-weight:700; color:#0f766e;">RAVI KATARA (Authorized Signatory)</span>
             </div>
         </div>
@@ -5969,7 +5969,7 @@ function buildPaymentReceiptElement(log, client, stats) {
         <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px dashed #cbd5e1; padding-bottom: 16px; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
             <div style="max-width: 60%;">
                 <div style="font-size: 22px; font-weight: 800; color: #0f766e; letter-spacing: 0.5px; text-transform: uppercase;">ARYA ASSOCIATES</div>
-                <div style="font-size: 11px; color: #475569; font-weight: 600; margin-top: 2px;">Taxation, Accounting & Corporate Advisory Services</div>
+                <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">Accounting & Taxation Consultant</div>
                 <div style="font-size: 11px; color: #64748b; margin-top: 4px;">
                     <strong>Ravi Katara</strong> | 📞 8815052555, 8982147763
                 </div>
@@ -6175,7 +6175,7 @@ window.shareReceiptWhatsApp = async function(logId) {
 
     const text = `*PAYMENT RECEIPT ACKNOWLEDGMENT*
 *ARYA ASSOCIATES*
-Taxation, Accounting & Advisory Services
+Accounting & Taxation Consultant
 ------------------------------------------------
 Dear *${client.name}*,
 
