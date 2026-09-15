@@ -4805,20 +4805,20 @@ window.renderContractItemsTable = function() {
                 <input type="text" class="contract-item-input ci-particulars" placeholder="e.g. Monthly Retainer, GST" value="${item.particulars || ''}">
             </td>
             <td>
-                <input type="text" class="contract-item-input ci-period" placeholder="e.g. Apr 26 - Mar 27" value="${item.period || ''}">
+                <input type="text" class="contract-item-input ci-period" placeholder="e.g. FY 2026-2027" value="${item.period || ''}">
             </td>
             <td>
-                <input type="number" min="1" step="1" class="contract-item-input ci-months" placeholder="12" value="${item.months !== undefined ? item.months : 12}" style="text-align:center;">
+                <input type="number" min="1" step="1" class="contract-item-input ci-months" placeholder="12" value="${item.months !== undefined ? item.months : 12}">
             </td>
             <td>
-                <input type="number" min="0" step="any" class="contract-item-input ci-rate" placeholder="2500" value="${item.rate !== undefined ? item.rate : ''}" style="text-align:right;">
+                <input type="number" min="0" step="any" class="contract-item-input ci-rate" placeholder="2500" value="${item.rate !== undefined ? item.rate : ''}">
             </td>
             <td>
-                <input type="number" min="0" step="any" class="contract-item-input ci-amount" placeholder="30000" value="${item.amount !== undefined ? item.amount : ''}" style="text-align:right; font-weight:700;">
+                <input type="number" min="0" step="any" class="contract-item-input ci-amount" placeholder="30000" value="${item.amount !== undefined ? item.amount : ''}">
             </td>
             <td style="text-align:center;">
                 <button type="button" class="btn-del-contract-row" onclick="removeContractItemRow(${idx})" title="Delete Row">
-                    <i data-lucide="trash-2" style="width:13px; height:13px;"></i>
+                    <i data-lucide="trash-2" style="width:14px; height:14px;"></i>
                 </button>
             </td>
         `;

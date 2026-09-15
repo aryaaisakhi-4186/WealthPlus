@@ -2053,6 +2053,12 @@ h1, h2, h3, h4, h5, h6 {
     overflow: hidden;
 }
 
+.modal-box.modal-lg,
+#modal-client .modal-box {
+    max-width: 760px;
+    width: 95%;
+}
+
 .modal-overlay.active .modal-box { transform: translateY(0); }
 .modal-header {
     display: flex;
@@ -3251,17 +3257,60 @@ h1, h2, h3, h4, h5, h6 {
     border: 1px solid rgba(99, 102, 241, 0.25);
 }
 
-/* Contract & Services Retainer Items Table Inputs */
+/* Contract & Services Retainer Items Table & Inputs */
+.contract-breakdown-box {
+    background: var(--bg-secondary);
+    border: 1.5px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    margin-bottom: 18px;
+}
+
+.data-table-mini {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 4px;
+}
+
+.data-table-mini thead th {
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    border-bottom: 2px solid var(--border-color);
+    background: transparent;
+    white-space: nowrap;
+}
+
+.data-table-mini tbody td {
+    padding: 4px 5px;
+    vertical-align: middle;
+}
+
 .contract-item-input {
     width: 100%;
-    padding: 6px 8px;
-    font-size: 12px;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-weight: 600;
     border-radius: var(--radius-sm);
-    border: 1px solid var(--border-color);
+    border: 1.5px solid var(--border-color);
     background: var(--bg-primary);
     color: var(--text-primary);
     box-sizing: border-box;
     font-family: inherit;
+    height: 38px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+/* Hide intrusive browser number spinners that cut off numbers */
+.contract-item-input::-webkit-outer-spin-button,
+.contract-item-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.contract-item-input[type=number] {
+    -moz-appearance: textfield;
 }
 
 .contract-item-input:focus {
@@ -3270,12 +3319,46 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: 0 0 0 2px var(--primary-glow);
 }
 
+.ci-particulars {
+    min-width: 160px;
+    font-weight: 500;
+}
+
+.ci-period {
+    min-width: 130px;
+    font-weight: 500;
+}
+
+.ci-months {
+    width: 70px;
+    min-width: 65px;
+    text-align: center;
+    font-weight: 700;
+}
+
+.ci-rate {
+    width: 110px;
+    min-width: 95px;
+    text-align: right;
+    font-weight: 700;
+}
+
+.ci-amount {
+    width: 130px;
+    min-width: 115px;
+    text-align: right;
+    font-weight: 800;
+    color: var(--primary);
+    background: rgba(13, 148, 136, 0.05);
+    border-color: rgba(13, 148, 136, 0.35);
+}
+
 .btn-del-contract-row {
     background: transparent;
     border: none;
     color: var(--danger);
     cursor: pointer;
-    padding: 4px;
+    padding: 6px;
     border-radius: 4px;
     display: inline-flex;
     align-items: center;
