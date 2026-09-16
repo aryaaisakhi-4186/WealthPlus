@@ -6401,7 +6401,7 @@ function buildPaymentReceiptElement(log, client, stats) {
         <!-- Appreciation & Thank You Note -->
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #0d9488; border-radius: 6px; padding: 10px 14px; margin-bottom: 20px;">
             <div style="font-size: 11.5px; font-weight: 700; color: #0f766e; margin-bottom: 2px;">
-                ✨ Thank You for Your Valued Business & Timely Payment!
+                ✨ Thank You for Your Continued Trust & Support!
             </div>
             <div style="font-size: 10.5px; color: #475569; line-height: 1.45;">
                 We sincerely appreciate your prompt payment and valuable association with <strong>Arya Associates</strong>. We are committed to providing you with the highest standard of professional services and look forward to our continued partnership.
@@ -6599,7 +6599,7 @@ We gratefully confirm the receipt of your payment. Below are the official receip
 🏦 *Payment Mode / Account:* ${log.mode || 'Direct Account'}
 ${log.discount > 0 ? `🎁 *Discount Allowed:* ₹${Number(log.discount).toLocaleString('en-IN')}\n` : ''}${log.remark ? `📌 *Remarks / Purpose:* ${log.remark}\n` : ''}
 ------------------------------------------------
-✨ *Thank you for your valued business and timely payment!* We sincerely appreciate your trust and look forward to our continued partnership.
+✨ *Thank you for your continued trust and support!* We sincerely appreciate your valuable association with *Arya Associates* and look forward to our continued partnership.
 
 Warm regards,
 *ARYA ASSOCIATES*
