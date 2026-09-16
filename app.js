@@ -5728,6 +5728,7 @@ function buildClientStatementElement(client, stats, fy) {
                 <div>
                     <h2 style="margin:0; font-size:20px; color:#0f766e; font-weight:800; letter-spacing:-0.5px;">ARYA ASSOCIATES</h2>
                     <p style="margin:2px 0 0 0; font-size:10.5px; color:#0d9488; font-weight:700;">Accounting & Taxation Consultant</p>
+                    <p style="margin:2px 0 0 0; font-size:9.5px; color:#64748b; line-height:1.3;">📍 Kishore Sagar Complex, Shop No.4, 1st Floor, Jawahar Road, Chhatarpur, M.P. - 471001</p>
                     <p style="margin:2px 0 0 0; font-size:10px; color:#475569; font-weight:600;">RAVI KATARA &nbsp;|&nbsp; Mobile: 8815052555, 8982147763</p>
                     <p style="margin:2px 0 0 0; font-size:9.5px; color:#64748b;">Client Ledger Statement</p>
                 </div>
@@ -6334,10 +6335,13 @@ function buildPaymentReceiptElement(log, client, stats) {
 
         <!-- Header Section -->
         <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px dashed #cbd5e1; padding-bottom: 16px; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
-            <div style="max-width: 60%;">
+            <div style="max-width: 62%;">
                 <div style="font-size: 22px; font-weight: 800; color: #0f766e; letter-spacing: 0.5px; text-transform: uppercase;">ARYA ASSOCIATES</div>
                 <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">Accounting & Taxation Consultant</div>
-                <div style="font-size: 11px; color: #64748b; margin-top: 4px;">
+                <div style="font-size: 10.5px; color: #64748b; margin-top: 3px; line-height: 1.35;">
+                    📍 Kishore Sagar Complex, Shop No.4, 1st Floor, Jawahar Road, Chhatarpur, M.P. - 471001
+                </div>
+                <div style="font-size: 11px; color: #475569; margin-top: 3px;">
                     <strong>Ravi Katara</strong> | 📞 8815052555, 8982147763
                 </div>
             </div>
@@ -6580,9 +6584,10 @@ window.shareReceiptWhatsApp = async function(logId) {
     const safeFileReceipt = receiptIdFull.replace('/', '_');
     const amtWords = numberToWordsINR(log.amount);
 
-    const text = `*PAYMENT RECEIPT ACKNOWLEDGMENT*
+    const text = `*RECEIPT ACKNOWLEDGMENT*
 *ARYA ASSOCIATES*
 Accounting & Taxation Consultant
+📍 Kishore Sagar Complex, Shop No.4, 1st Floor, Jawahar Road, Chhatarpur, M.P. - 471001
 ------------------------------------------------
 Dear *${client.name}*,
 
