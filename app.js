@@ -5858,7 +5858,7 @@ function buildClientStatementElement(client, stats, fy) {
             <!-- Footer / Terms -->
             <div class="pdf-avoid-break" style="margin-top:14px; padding-top:6px; border-top:1px dashed #cbd5e1; display:flex; justify-content:space-between; font-size:9.5px; color:#64748b;">
                 <span>ARYA ASSOCIATES — Accounting & Taxation Consultant (Mob: 8815052555, 8982147763)</span>
-                <span style="font-weight:700; color:#0f766e;">RAVI KATARA (Authorized Signatory)</span>
+                <span style="font-weight:600; color:#64748b; font-style:italic;">* Computer-generated statement. No physical signature required.</span>
             </div>
         </div>
     `;
@@ -6408,16 +6408,13 @@ function buildPaymentReceiptElement(log, client, stats) {
             </div>
         </div>
 
-        <!-- Footer / Signatures -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-top: 18px; border-top: 1px dashed #cbd5e1; margin-top: 10px;">
-            <div style="font-size: 10px; color: #94a3b8; font-style: italic;">
-                * This is a computer-generated receipt note acknowledged by Arya Associates.
+        <!-- Footer -->
+        <div style="padding-top: 14px; border-top: 1px dashed #cbd5e1; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 10.5px; color: #64748b; flex-wrap: wrap; gap: 6px;">
+            <div style="font-style: italic; color: #94a3b8;">
+                * This is a computer-generated receipt note. No physical signature is required.
             </div>
-            <div style="text-align: center; min-width: 170px;">
-                <div style="font-size: 12px; font-weight: 800; color: #0f766e; margin-bottom: 30px;">For ARYA ASSOCIATES</div>
-                <div style="font-size: 11px; font-weight: 700; color: #334155; border-top: 1px solid #94a3b8; padding-top: 4px;">
-                    Authorized Signatory
-                </div>
+            <div style="font-weight: 700; color: #0f766e;">
+                ARYA ASSOCIATES
             </div>
         </div>
     `;
