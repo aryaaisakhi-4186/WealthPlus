@@ -304,6 +304,49 @@ function saveStateLocalOnly() {
     }
 }
 
+function formatAccountOptionLabel(a) {
+    if (!a) return '';
+    const name = a.name || '';
+    const nameLower = name.toLowerCase();
+    if (nameLower.includes('household petty cash') || a.id === 'acc_petty_cash') {
+        return `🏠 Household Petty Cash Wallet`;
+    } else if (name === 'Main Cash' || a.id === 'acc_1') {
+        return `💵 Main Cash`;
+    } else if (a.type === 'Bank') {
+        return `🏦 ${name} (Bank Account)`;
+    } else if (a.type === 'Credit Card') {
+        return `💳 ${name} (Credit Card)`;
+    }
+    return `${name} (${a.type || 'Account'})`;
+}
+
+function ensureHouseholdPettyCashAccount(syncToCloud = true) {
+    if (!state.accounts) state.accounts = [];
+    let updated = false;
+    const exists = state.accounts.some(a => a.name.toLowerCase().includes('household petty cash') || a.id === 'acc_petty_cash');
+    if (!exists) {
+        const pettyAcc = {
+            id: 'acc_petty_cash',
+            name: 'Household Petty Cash',
+            type: 'Cash',
+            openingBalance: 0
+        };
+        state.accounts.push(pettyAcc);
+        updated = true;
+        if (syncToCloud && state.cloudSyncEnabled && state.firebaseConfig) {
+            firebaseWrite('accounts', pettyAcc.id, pettyAcc);
+        }
+    }
+    if (!state.categoriesConfig) state.categoriesConfig = {};
+    if (!state.categoriesConfig['Household Petty Cash']) {
+        state.categoriesConfig['Household Petty Cash'] = { color: '#0d9488', icon: 'home' };
+        updated = true;
+    }
+    if (updated) {
+        saveStateLocalOnly();
+    }
+}
+
 // --- FIREBASE SYNC ENGINE ---
 let firebaseDb = null;
 
@@ -327,26 +370,32 @@ function initFirebaseApp() {
 }
 
 function firebaseWrite(collection, docId, data) {
-    if (firebaseDb) {
-        firebaseDb.collection(collection).doc(docId).set(data).catch(e => console.error("Firebase write error:", e));
+    if (!state.cloudSyncEnabled || !firebaseDb) return;
+    try {
+        const cleanData = JSON.parse(JSON.stringify(data));
+        firebaseDb.collection(collection).doc(docId).set(cleanData, { merge: true })
+            .catch(err => console.error(`Firebase write error (${collection}/${docId}):`, err));
+    } catch (e) {
+        console.error(`Firebase sanitize error (${collection}/${docId}):`, e);
     }
 }
 
 function firebaseDelete(collection, docId) {
-    if (firebaseDb) {
-        firebaseDb.collection(collection).doc(docId).delete().catch(e => console.error("Firebase delete error:", e));
-    }
+    if (!state.cloudSyncEnabled || !firebaseDb) return;
+    firebaseDb.collection(collection).doc(docId).delete()
+        .catch(err => console.error(`Firebase delete error (${collection}/${docId}):`, err));
 }
 
 function firebaseWriteSettings() {
-    if (firebaseDb) {
-        firebaseDb.collection('settings').doc('config').set({
-            budgets: state.budgets,
-            customClientFields: state.customClientFields,
-            customTxFields: state.customTxFields,
-            categoriesConfig: state.categoriesConfig
-        }).catch(e => console.error("Firebase settings write error:", e));
-    }
+    if (!state.cloudSyncEnabled || !firebaseDb) return;
+    const settingsDoc = {
+        budgets: state.budgets || {},
+        customClientFields: state.customClientFields || [],
+        customTxFields: state.customTxFields || [],
+        categoriesConfig: state.categoriesConfig || {}
+    };
+    firebaseDb.collection('settings').doc('config').set(settingsDoc, { merge: true })
+        .catch(err => console.error("Firebase settings write error:", err));
 }
 
 // Firestore snapshot listeners
@@ -400,7 +449,25 @@ function initFirebaseSyncListeners() {
         if (!snapshot.empty) {
             snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
         }
-        if (!isSame(state.accounts, items)) {
+        if (items.length > 0) {
+            const hasPetty = items.some(a => a.name.toLowerCase().includes('household petty cash') || a.id === 'acc_petty_cash');
+            if (!hasPetty) {
+                const pettyAcc = {
+                    id: 'acc_petty_cash',
+                    name: 'Household Petty Cash',
+                    type: 'Cash',
+                    openingBalance: 0
+                };
+                items.push(pettyAcc);
+                if (state.cloudSyncEnabled && state.firebaseConfig) {
+                    firebaseWrite('accounts', pettyAcc.id, pettyAcc);
+                }
+            }
+        } else {
+            ensureHouseholdPettyCashAccount(true);
+            items = [...state.accounts];
+        }
+        if (!isSame(state.accounts, items) && items.length > 0) {
             state.accounts = items;
             saveStateLocalOnly();
             renderPage(state.activePage);
@@ -2566,9 +2633,10 @@ function openInvestmentModal(id = null) {
 
     // Populate Account select with Cash and Bank accounts
     if (accSelect) {
+        ensureHouseholdPettyCashAccount();
         accSelect.innerHTML = '';
         (state.accounts || []).forEach(acc => {
-            accSelect.innerHTML += `<option value="${acc.name}">${acc.name} (${acc.type})</option>`;
+            accSelect.innerHTML += `<option value="${acc.name}">${formatAccountOptionLabel(acc)}</option>`;
         });
     }
 
@@ -2607,7 +2675,7 @@ function openInvestmentModal(id = null) {
 
         let partyFundsHTML = '';
         if (availableClientFunds.length === 0) {
-            partyFundsHTML = `<option value="" disabled>No clients with available received funds</option>`;
+            partyFundsHTML = `<option value="" disabled>No parties with available received funds</option>`;
         } else {
             partyFundsHTML = availableClientFunds.map(item => {
                 const availText = fC(item.availableFund);
@@ -2617,39 +2685,37 @@ function openInvestmentModal(id = null) {
         }
 
         fundSelect.innerHTML = `
-            <option value="">General Surplus / Direct Account Book</option>
-            <optgroup label="Capital / Opening Funds">
+            <option value="">-- Select Fund Origin / Source --</option>
+            <optgroup label="Capital / Opening Surplus">
                 ${capitalOptions}
             </optgroup>
-            <optgroup label="Party / Client Inflow (${availableClientFunds.length} with available balance)">
+            <optgroup label="Party Received Inflows (${availableClientFunds.length} with available balance)">
                 ${partyFundsHTML}
             </optgroup>
         `;
     }
 
-    const editIdInput = document.getElementById('edit-investment-id');
-    const dateInput = document.getElementById('investment-date');
-    if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
-
     if (id) {
         const inv = (state.investments || []).find(i => i.id === id);
         if (inv) {
-            title.innerText = 'Edit Investment Details';
-            editIdInput.value = inv.id;
+            title.innerText = 'Edit Investment Record';
+            document.getElementById('investment-id').value = inv.id;
             document.getElementById('investment-name').value = inv.name || '';
-            document.getElementById('investment-category').value = inv.category || 'Mutual Funds / SIP';
+            document.getElementById('investment-category').value = inv.category || 'Fixed Deposit';
             document.getElementById('investment-amount').value = inv.amount || '';
-            if (dateInput) dateInput.value = inv.date || '';
+            document.getElementById('investment-date').value = inv.date || '';
             if (accSelect) accSelect.value = inv.account || '';
             if (fundSelect) fundSelect.value = inv.fundSource || '';
             document.getElementById('investment-remark').value = inv.remark || '';
+            updateInvestmentFundHelperBadge();
         }
     } else {
-        title.innerText = 'Add New Investment';
-        editIdInput.value = '';
+        title.innerText = 'Add Investment Record';
+        document.getElementById('investment-id').value = '';
+        document.getElementById('investment-date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('investment-fund-balance-badge').style.display = 'none';
     }
 
-    updateInvestmentFundHelperBadge();
     modal.classList.add('active');
 }
 
@@ -2660,24 +2726,22 @@ function closeInvestmentModal() {
 
 async function handleInvestmentSubmit(e) {
     e.preventDefault();
-    const editId = document.getElementById('edit-investment-id').value;
+    const id = document.getElementById('investment-id').value;
     const name = document.getElementById('investment-name').value.trim();
     const category = document.getElementById('investment-category').value;
     const amount = Number(document.getElementById('investment-amount').value) || 0;
     const date = document.getElementById('investment-date').value;
     const account = document.getElementById('investment-account-select').value;
-    const fundSource = document.getElementById('investment-fund-source') ? document.getElementById('investment-fund-source').value : '';
+    const fundSource = document.getElementById('investment-fund-source').value;
     const remark = document.getElementById('investment-remark').value.trim();
 
-    if (!name || amount <= 0 || !date || !account) {
-        alert("Please enter a valid investment name, amount, date, and payment account.");
+    if (!name || amount <= 0 || !date || !account || !fundSource) {
+        alert("Please fill in all required fields.");
         return;
     }
 
-    if (!state.investments) state.investments = [];
-
-    if (editId) {
-        const inv = state.investments.find(i => i.id === editId);
+    if (id) {
+        const inv = (state.investments || []).find(i => i.id === id);
         if (inv) {
             inv.name = name;
             inv.category = category;
@@ -2750,9 +2814,10 @@ function openWithdrawModal(investmentId) {
 
     const accSelect = document.getElementById('withdraw-account-select');
     if (accSelect) {
+        ensureHouseholdPettyCashAccount();
         accSelect.innerHTML = '';
         (state.accounts || []).forEach(acc => {
-            accSelect.innerHTML += `<option value="${acc.name}">${acc.name} (${acc.type})</option>`;
+            accSelect.innerHTML += `<option value="${acc.name}">${formatAccountOptionLabel(acc)}</option>`;
         });
         if (inv.account && Array.from(accSelect.options).some(o => o.value === inv.account)) {
             accSelect.value = inv.account;
@@ -3491,10 +3556,11 @@ function renderReportsPage() {
         });
     }
 
+    ensureHouseholdPettyCashAccount();
     const ledgerSelect = document.getElementById('ledger-account-select');
     ledgerSelect.innerHTML = '';
     state.accounts.forEach(acc => {
-        ledgerSelect.innerHTML += `<option value="${acc.id}">${acc.name} (${acc.type})</option>`;
+        ledgerSelect.innerHTML += `<option value="${acc.id}">${formatAccountOptionLabel(acc)}</option>`;
     });
 
     if (state.selectedLedgerAccountId) {
@@ -5331,9 +5397,10 @@ window.openClientModal = function(editId = '') {
 
     // Populate loan source accounts dropdown
     if (loanSourceSelect) {
+        ensureHouseholdPettyCashAccount();
         loanSourceSelect.innerHTML = `<option value="">None / Past Old Due (No Cash/Bank deduction)</option>`;
         (state.accounts || []).forEach(acc => {
-            loanSourceSelect.innerHTML += `<option value="${acc.name}">${acc.name} (${acc.type})</option>`;
+            loanSourceSelect.innerHTML += `<option value="${acc.name}">${formatAccountOptionLabel(acc)}</option>`;
         });
     }
 
@@ -6276,7 +6343,7 @@ function buildPaymentReceiptElement(log, client, stats) {
             </div>
             <div style="text-align: right;">
                 <div style="display: inline-block; background: #0d9488; color: #ffffff; font-size: 11px; font-weight: 800; letter-spacing: 1px; padding: 4px 10px; border-radius: 4px; text-transform: uppercase;">
-                    PAYMENT RECEIPT
+                    RECEIPT
                 </div>
                 <div style="font-size: 13px; font-weight: 700; color: #0f766e; margin-top: 6px;">
                     Receipt No: <span style="font-family: monospace; color: #1e293b;">${receiptIdFull}</span>
@@ -6936,9 +7003,10 @@ function openIncomeModal(editId = '', presetClientId = '') {
         clientSelect.innerHTML += `<option value="${c.id}">${c.name}</option>`;
     });
 
+    ensureHouseholdPettyCashAccount();
     accSelect.innerHTML = '';
     state.accounts.forEach(a => {
-        accSelect.innerHTML += `<option value="${a.name}">${a.name} (${a.type})</option>`;
+        accSelect.innerHTML += `<option value="${a.name}">${formatAccountOptionLabel(a)}</option>`;
     });
 
     document.getElementById('income-date').value = new Date().toISOString().split('T')[0];
@@ -7210,9 +7278,10 @@ function openExpenseModal(editId = '', presetCategory = '', presetAccount = '', 
         </optgroup>
     `;
 
+    ensureHouseholdPettyCashAccount();
     accSelect.innerHTML = '';
     state.accounts.forEach(a => {
-        accSelect.innerHTML += `<option value="${a.name}">${a.name} (${a.type})</option>`;
+        accSelect.innerHTML += `<option value="${a.name}">${formatAccountOptionLabel(a)}</option>`;
     });
 
     if (spentBySelect) {
@@ -7520,19 +7589,11 @@ window.openTransferModal = function(preset = 'cash-to-bank', editId = '') {
     if (feedback) feedback.style.display = 'none';
 
     // Populate Accounts dropdowns with clear descriptive labels
+    ensureHouseholdPettyCashAccount();
     fromSel.innerHTML = '';
     toSel.innerHTML = '';
     state.accounts.forEach(a => {
-        let label = `${a.name} (${a.type})`;
-        if (a.name.toLowerCase().includes('household petty cash') || a.id === 'acc_petty_cash') {
-            label = `🏠 Household Petty Cash Wallet`;
-        } else if (a.name === 'Main Cash' || a.id === 'acc_1') {
-            label = `💵 Main Cash`;
-        } else if (a.type === 'Bank') {
-            label = `🏦 ${a.name} (Bank Account)`;
-        } else if (a.type === 'Credit Card') {
-            label = `💳 ${a.name} (Credit Card)`;
-        }
+        const label = formatAccountOptionLabel(a);
         fromSel.innerHTML += `<option value="${a.name}">${label}</option>`;
         toSel.innerHTML += `<option value="${a.name}">${label}</option>`;
     });
@@ -7730,9 +7791,10 @@ window.openLoanModal = function(presetType = 'given', presetPartyId = '', editId
 
     // Populate Account dropdown with Cash and Bank accounts
     if (accountSelect) {
+        ensureHouseholdPettyCashAccount();
         accountSelect.innerHTML = '';
         state.accounts.forEach(a => {
-            accountSelect.innerHTML += `<option value="${a.name}">${a.name} (${a.type})</option>`;
+            accountSelect.innerHTML += `<option value="${a.name}">${formatAccountOptionLabel(a)}</option>`;
         });
     }
 
