@@ -4525,9 +4525,17 @@ function addCategoryPrompt() {
     const cleanCatName = catName.trim();
     if (!cleanCatName) return;
 
+    if (!state.categoriesConfig) state.categoriesConfig = {};
+    if (!state.budgets) state.budgets = {};
+
     const exists = Object.keys(state.categoriesConfig).some(c => c.toLowerCase() === cleanCatName.toLowerCase());
     if (exists) {
         alert(`Category "${cleanCatName}" already exists.`);
+        const expenseCategorySelect = document.getElementById('expense-category');
+        if (expenseCategorySelect) {
+            const match = Object.keys(state.categoriesConfig).find(c => c.toLowerCase() === cleanCatName.toLowerCase());
+            if (match) expenseCategorySelect.value = match;
+        }
         return;
     }
 
@@ -4547,7 +4555,27 @@ function addCategoryPrompt() {
         firebaseWriteSettings();
     }
 
-    renderPage('master');
+    // Refresh category dropdowns in modals & page filters
+    populateCategoryDropdowns();
+
+    // Auto-select newly created category in Add/Edit Expense modal
+    const expenseCategorySelect = document.getElementById('expense-category');
+    if (expenseCategorySelect) {
+        expenseCategorySelect.value = cleanCatName;
+    }
+
+    // Update active view
+    if (state.activePage === 'master' && (!state.currentUser || state.currentUser.role !== 'Staff')) {
+        renderMasterBudgetsEditor();
+    } else if (state.activePage === 'expenses') {
+        renderExpensesPage();
+    } else if (state.activePage) {
+        renderPage(state.activePage);
+    }
+
+    if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        lucide.createIcons();
+    }
 }
 
 function renameCategoryPrompt(oldCat) {
@@ -4595,7 +4623,19 @@ function renameCategoryPrompt(oldCat) {
     }
 
     alert(`Successfully renamed category and updated ${updatedTxCount} transactions.`);
-    renderPage('master');
+
+    populateCategoryDropdowns();
+    if (state.activePage === 'master' && (!state.currentUser || state.currentUser.role !== 'Staff')) {
+        renderMasterBudgetsEditor();
+    } else if (state.activePage === 'expenses') {
+        renderExpensesPage();
+    } else if (state.activePage) {
+        renderPage(state.activePage);
+    }
+
+    if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        lucide.createIcons();
+    }
 }
 
 function deleteCategoryPrompt(cat) {
@@ -4634,8 +4674,24 @@ function deleteCategoryPrompt(cat) {
     }
 
     alert(`Successfully deleted category "${cat}" and moved ${updatedTxCount} transactions to "${fallbackCat}".`);
-    renderPage('master');
+
+    populateCategoryDropdowns();
+    if (state.activePage === 'master' && (!state.currentUser || state.currentUser.role !== 'Staff')) {
+        renderMasterBudgetsEditor();
+    } else if (state.activePage === 'expenses') {
+        renderExpensesPage();
+    } else if (state.activePage) {
+        renderPage(state.activePage);
+    }
+
+    if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        lucide.createIcons();
+    }
 }
+
+window.addCategoryPrompt = addCategoryPrompt;
+window.renameCategoryPrompt = renameCategoryPrompt;
+window.deleteCategoryPrompt = deleteCategoryPrompt;
 
 function renderMasterCustomColumns() {
     const clientList = document.getElementById('client-custom-fields-list');
@@ -5090,10 +5146,18 @@ function initEventHandlers() {
     // Excel Export trigger
     document.getElementById('btn-export-excel').addEventListener('click', exportToExcel);
 
-    // Add Category Button Trigger
+    // Add Category Button Triggers
     const btnAddCategory = document.getElementById('btn-add-category');
     if (btnAddCategory) {
         btnAddCategory.addEventListener('click', addCategoryPrompt);
+    }
+    const btnExpenseAddCategory = document.getElementById('btn-expense-add-category');
+    if (btnExpenseAddCategory) {
+        btnExpenseAddCategory.addEventListener('click', addCategoryPrompt);
+    }
+    const btnExpensesAddCategory = document.getElementById('btn-expenses-add-category');
+    if (btnExpensesAddCategory) {
+        btnExpensesAddCategory.addEventListener('click', addCategoryPrompt);
     }
 
     setupSearchableClientDropdown({

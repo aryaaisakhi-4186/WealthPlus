@@ -587,18 +587,28 @@
                             <h3 style="margin-bottom: 4px;">Wealth Plus Expenses</h3>
                             <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">Category-wise expense breakdown & records</p>
                         </div>
-                        <button class="btn btn-primary" id="btn-add-expense">
-                            <i data-lucide="plus"></i> Add Expense
-                        </button>
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-secondary" id="btn-expenses-add-category" onclick="addCategoryPrompt()" style="display: inline-flex; align-items: center; gap: 6px;">
+                                <i data-lucide="tag"></i> + Add Category
+                            </button>
+                            <button class="btn btn-primary" id="btn-add-expense">
+                                <i data-lucide="plus"></i> Add Expense
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Expense Search & Category Filter Bar -->
                     <div class="party-filter-dropdown-wrapper" style="margin-bottom: 14px; padding: 10px 12px;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
-                            <label style="font-size: 12px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 5px;">
-                                <i data-lucide="tags" style="width: 14px; height: 14px; color: var(--primary);"></i>
-                                Expense Categories:
-                            </label>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <label style="font-size: 12px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 5px; margin: 0;">
+                                    <i data-lucide="tags" style="width: 14px; height: 14px; color: var(--primary);"></i>
+                                    Expense Categories:
+                                </label>
+                                <button type="button" onclick="addCategoryPrompt()" style="font-size: 11px; font-weight: 600; color: var(--primary); background: none; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px;" title="Add new category">
+                                    <i data-lucide="plus-circle" style="width: 12px; height: 12px;"></i> + Add Category
+                                </button>
+                            </div>
                             <span id="expense-total-badge" class="badge" style="font-size: 11px; padding: 2px 8px;">Total: ₹0 (0 Entries)</span>
                         </div>
                         <div class="filter-controls-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
@@ -1894,7 +1904,12 @@
                 </div>
                 <div class="form-group-row">
                     <div class="form-group">
-                        <label for="expense-category">Category *</label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <label for="expense-category" style="margin-bottom: 0;">Category *</label>
+                            <button type="button" id="btn-expense-add-category" onclick="addCategoryPrompt()" style="font-size: 11px; font-weight: 600; color: var(--primary); background: none; border: none; cursor: pointer; padding: 2px 4px; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px;" title="Add new category">
+                                <i data-lucide="plus-circle" style="width: 12px; height: 12px;"></i> + Add Category
+                            </button>
+                        </div>
                         <select id="expense-category" required>
                             <option value="Food">Food</option>
                             <option value="Shopping">Shopping</option>
@@ -2343,9 +2358,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.8.7"></script>
-    <script src="app.js?v=6.8.7"></script>
-    <script src="sindhu_v1.js?v=6.8.7"></script>
+    <script src="firebase-config.js?v=6.8.8"></script>
+    <script src="app.js?v=6.8.8"></script>
+    <script src="sindhu_v1.js?v=6.8.8"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">
