@@ -111,11 +111,138 @@ const defaultCategoriesConfig = {
     Others: { color: '#64748b', icon: 'more-horizontal' }
 };
 
+// --- MULTI-USER / MULTI-ORGANIZATION & AUTOMATIC BACKUP ENGINE ---
+const defaultPrimaryOrgProfile = {
+    orgId: 'primary',
+    businessName: 'ARYA ASSOCIATES',
+    tagline: 'Accounting & Taxation Consultant',
+    address: 'Kishore Sagar Complex, Shop No.4, 1st Floor, Jawahar Road, Chhatarpur, M.P. - 471001',
+    ownerName: 'Ravi Katara',
+    mobile: '8815052555, 8982147763',
+    email: ''
+};
+
+function getCurrentOrgId() {
+    try {
+        return localStorage.getItem('wealth_plus_active_org_id') || 'primary';
+    } catch (e) {
+        return 'primary';
+    }
+}
+
+function setCurrentOrgId(orgId) {
+    try {
+        localStorage.setItem('wealth_plus_active_org_id', orgId || 'primary');
+    } catch (e) {}
+}
+
+function getStateStorageKey(orgId) {
+    const targetOrg = orgId || getCurrentOrgId();
+    if (!targetOrg || targetOrg === 'primary') {
+        return 'wealth_plus_state';
+    }
+    return 'wealth_plus_state_' + targetOrg;
+}
+
+function getOrgProfile() {
+    const orgId = getCurrentOrgId();
+    if (!orgId || orgId === 'primary') {
+        return {
+            ...defaultPrimaryOrgProfile,
+            ...(state.orgProfile || {}),
+            orgId: 'primary',
+            businessName: (state.orgProfile && state.orgProfile.businessName) ? state.orgProfile.businessName : defaultPrimaryOrgProfile.businessName,
+            tagline: (state.orgProfile && state.orgProfile.tagline) ? state.orgProfile.tagline : defaultPrimaryOrgProfile.tagline,
+            address: (state.orgProfile && state.orgProfile.address) ? state.orgProfile.address : defaultPrimaryOrgProfile.address,
+            ownerName: (state.orgProfile && state.orgProfile.ownerName) ? state.orgProfile.ownerName : defaultPrimaryOrgProfile.ownerName,
+            mobile: (state.orgProfile && state.orgProfile.mobile) ? state.orgProfile.mobile : defaultPrimaryOrgProfile.mobile,
+            orgName: (state.orgProfile && state.orgProfile.businessName) ? state.orgProfile.businessName : defaultPrimaryOrgProfile.businessName,
+            phone: (state.orgProfile && state.orgProfile.mobile) ? state.orgProfile.mobile : defaultPrimaryOrgProfile.mobile
+        };
+    }
+    return {
+        orgId: orgId,
+        businessName: (state.orgProfile && state.orgProfile.businessName) ? state.orgProfile.businessName : 'MY BUSINESS',
+        tagline: (state.orgProfile && state.orgProfile.tagline) ? state.orgProfile.tagline : 'Bookkeeping & Accounting',
+        address: (state.orgProfile && state.orgProfile.address) ? state.orgProfile.address : '',
+        ownerName: (state.orgProfile && state.orgProfile.ownerName) ? state.orgProfile.ownerName : (state.currentUser ? state.currentUser.name : 'Admin'),
+        mobile: (state.orgProfile && state.orgProfile.mobile) ? state.orgProfile.mobile : (state.currentUser ? state.currentUser.mobile : ''),
+        email: (state.orgProfile && state.orgProfile.email) ? state.orgProfile.email : '',
+        orgName: (state.orgProfile && state.orgProfile.businessName) ? state.orgProfile.businessName : 'MY BUSINESS',
+        phone: (state.orgProfile && state.orgProfile.mobile) ? state.orgProfile.mobile : (state.currentUser ? state.currentUser.mobile : '')
+    };
+}
+window.getOrgProfile = getOrgProfile;
+
+function createAutomaticLocalSafetyBackup() {
+    try {
+        const primaryRaw = localStorage.getItem('wealth_plus_state');
+        if (primaryRaw && primaryRaw.length > 50) {
+            if (!localStorage.getItem('wealth_plus_arya_initial_safe_backup')) {
+                localStorage.setItem('wealth_plus_arya_initial_safe_backup', primaryRaw);
+                localStorage.setItem('wealth_plus_arya_initial_backup_date', new Date().toISOString());
+            }
+            localStorage.setItem('wealth_plus_arya_latest_safe_backup', primaryRaw);
+            localStorage.setItem('wealth_plus_arya_latest_backup_date', new Date().toISOString());
+        }
+    } catch (e) {
+        console.warn("Safety backup warning:", e);
+    }
+}
+
+function seedFreshOrganizationState(orgProfile = null, adminMember = null) {
+    const orgId = getCurrentOrgId();
+    state.orgId = orgId;
+    state.orgProfile = orgProfile || {
+        orgId: orgId,
+        businessName: 'MY BUSINESS',
+        tagline: 'Bookkeeping & Accounting',
+        address: '',
+        ownerName: adminMember ? adminMember.name : 'Admin',
+        mobile: adminMember ? adminMember.mobile : '',
+        email: adminMember ? (adminMember.email || '') : ''
+    };
+    state.clients = [];
+    state.incomeLogs = [];
+    state.transactions = [];
+    state.transfers = [];
+    state.loans = [];
+    state.investments = [];
+    state.accounts = [
+        { id: "acc_1", name: "Main Cash", type: "Cash", openingBalance: 0 },
+        { id: "acc_2", name: "Bank Account", type: "Bank", openingBalance: 0 },
+        { id: "acc_petty_cash", name: "Household Petty Cash", type: "Cash", openingBalance: 0 }
+    ];
+    state.budgets = { ...defaultBudgets };
+    state.categoriesConfig = { ...defaultCategoriesConfig };
+    state.customClientFields = [];
+    state.customTxFields = [];
+    state.members = adminMember ? [adminMember] : [
+        { id: "m_1", name: "Admin", mobile: "9999999999", pin: "1234", role: "Admin" }
+    ];
+    state.currentUser = adminMember ? {
+        id: adminMember.id,
+        name: adminMember.name,
+        mobile: adminMember.mobile,
+        email: adminMember.email || '',
+        role: adminMember.role || 'Admin'
+    } : null;
+    state.activePage = 'dashboard';
+    state.activeReportTab = 'client';
+    state.activeMasterTab = 'accounts';
+    state.activeLoansTab = 'given';
+    state.selectedPeriod = 'financial-year';
+    state.selectedLedgerAccountId = state.accounts[0]?.id || '';
+    saveState();
+}
+
 // Load state & run format migrations
 function loadState() {
     let saved = null;
     try {
-        saved = localStorage.getItem('wealth_plus_state');
+        createAutomaticLocalSafetyBackup();
+        const activeStorageKey = getStateStorageKey(getCurrentOrgId());
+        saved = localStorage.getItem(activeStorageKey);
         if (!saved) {
             // Fallback migration for existing users
             saved = localStorage.getItem('kharcha_ledger_state');
@@ -147,6 +274,9 @@ function loadState() {
 
 // Seed initial state
 function seedState() {
+    if (getCurrentOrgId() !== 'primary') {
+        return seedFreshOrganizationState();
+    }
     state.clients = [...defaultClients];
     state.accounts = [...defaultAccounts];
     state.budgets = { ...defaultBudgets };
@@ -215,7 +345,7 @@ function runStateMigrations() {
     });
 
     // Auto-setup SBI Credit Card as a Loan / Creditor & Account if missing
-    if (!state.clients.some(c => c.name.toLowerCase().includes('sbi credit card'))) {
+    if (getCurrentOrgId() === 'primary' && !state.clients.some(c => c.name.toLowerCase().includes('sbi credit card'))) {
         state.clients.push({
             id: 'client_sbi_cc',
             name: 'SBI Credit Card',
@@ -237,7 +367,7 @@ function runStateMigrations() {
         }
     }
 
-    if (!state.accounts.some(a => a.name.toLowerCase().includes('sbi credit card'))) {
+    if (getCurrentOrgId() === 'primary' && !state.accounts.some(a => a.name.toLowerCase().includes('sbi credit card'))) {
         state.accounts.push({
             id: 'acc_sbi_cc',
             name: 'SBI Credit Card',
@@ -290,7 +420,13 @@ function runStateMigrations() {
 // Save state to local storage
 function saveState() {
     try {
-        localStorage.setItem('wealth_plus_state', JSON.stringify(state));
+        const storageKey = getStateStorageKey(getCurrentOrgId());
+        const serializedState = JSON.stringify(state);
+        localStorage.setItem(storageKey, serializedState);
+        if (getCurrentOrgId() === 'primary') {
+            localStorage.setItem('wealth_plus_arya_latest_safe_backup', serializedState);
+            localStorage.setItem('wealth_plus_arya_latest_backup_date', new Date().toISOString());
+        }
     } catch (e) {
         console.warn("Failed to save state to localStorage:", e);
     }
@@ -298,7 +434,13 @@ function saveState() {
 
 function saveStateLocalOnly() {
     try {
-        localStorage.setItem('wealth_plus_state', JSON.stringify(state));
+        const storageKey = getStateStorageKey(getCurrentOrgId());
+        const serializedState = JSON.stringify(state);
+        localStorage.setItem(storageKey, serializedState);
+        if (getCurrentOrgId() === 'primary') {
+            localStorage.setItem('wealth_plus_arya_latest_safe_backup', serializedState);
+            localStorage.setItem('wealth_plus_arya_latest_backup_date', new Date().toISOString());
+        }
     } catch (e) {
         console.warn("Failed to save state to localStorage:", e);
     }
@@ -349,6 +491,96 @@ function ensureHouseholdPettyCashAccount(syncToCloud = true) {
 
 // --- FIREBASE SYNC ENGINE ---
 let firebaseDb = null;
+let activeFirestoreUnsubscribes = [];
+
+function unsubscribeAllFirestoreListeners() {
+    if (activeFirestoreUnsubscribes && activeFirestoreUnsubscribes.length > 0) {
+        activeFirestoreUnsubscribes.forEach(unsub => {
+            try {
+                if (typeof unsub === 'function') unsub();
+            } catch (e) {}
+        });
+        activeFirestoreUnsubscribes = [];
+    }
+}
+
+function getOrgCollection(collectionName) {
+    if (!firebaseDb) return null;
+    const orgId = getCurrentOrgId();
+    const rawColRef = (!orgId || orgId === 'primary')
+        ? firebaseDb.collection(collectionName)
+        : firebaseDb.collection('organizations').doc(orgId).collection(collectionName);
+
+    return {
+        onSnapshot: (...args) => {
+            const unsub = rawColRef.onSnapshot(...args);
+            activeFirestoreUnsubscribes.push(unsub);
+            return unsub;
+        },
+        doc: (docId) => {
+            const rawDocRef = rawColRef.doc(docId);
+            return {
+                set: rawDocRef.set.bind(rawDocRef),
+                get: rawDocRef.get.bind(rawDocRef),
+                delete: rawDocRef.delete.bind(rawDocRef),
+                update: rawDocRef.update.bind(rawDocRef),
+                onSnapshot: (...args) => {
+                    const unsub = rawDocRef.onSnapshot(...args);
+                    activeFirestoreUnsubscribes.push(unsub);
+                    return unsub;
+                }
+            };
+        },
+        get: rawColRef.get.bind(rawColRef)
+    };
+}
+
+let autoCloudBackupTimer = null;
+function scheduleAutomaticCloudBackup() {
+    if (autoCloudBackupTimer) clearTimeout(autoCloudBackupTimer);
+    autoCloudBackupTimer = setTimeout(async () => {
+        if (!state.cloudSyncEnabled || !firebaseDb) return;
+        try {
+            const orgId = getCurrentOrgId();
+            const hasData = (state.clients && state.clients.length > 0) || (state.transactions && state.transactions.length > 0) || (state.incomeLogs && state.incomeLogs.length > 0);
+            if (!hasData) return;
+
+            const backupPayload = JSON.parse(JSON.stringify({
+                backupTimestamp: new Date().toISOString(),
+                orgId: orgId,
+                orgProfile: getOrgProfile(),
+                clients: state.clients || [],
+                incomeLogs: state.incomeLogs || [],
+                transactions: state.transactions || [],
+                transfers: state.transfers || [],
+                loans: state.loans || [],
+                investments: state.investments || [],
+                accounts: state.accounts || [],
+                budgets: state.budgets || {},
+                categoriesConfig: state.categoriesConfig || {},
+        orgProfile: state.orgProfile || getOrgProfile(),
+                customClientFields: state.customClientFields || [],
+                customTxFields: state.customTxFields || [],
+                members: state.members || []
+            }));
+
+            if (!orgId || orgId === 'primary') {
+                // Save rolling backup
+                await firebaseDb.collection('system_backups').doc('arya_associates_latest_backup').set(backupPayload, { merge: true });
+                // Save permanent one-time initial backup if not yet created
+                const initRef = firebaseDb.collection('system_backups').doc('arya_associates_initial_safe_backup');
+                const initDoc = await initRef.get();
+                if (!initDoc.exists) {
+                    await initRef.set(backupPayload);
+                }
+            } else {
+                await firebaseDb.collection('system_backups').doc('backup_' + orgId).set(backupPayload, { merge: true });
+            }
+        } catch (err) {
+            console.warn("Auto cloud backup notice:", err);
+        }
+    }, 4500);
+}
 
 function initFirebaseApp() {
     if (!state.cloudSyncEnabled || !state.firebaseConfig || !window.firebase) return;
@@ -373,7 +605,7 @@ function firebaseWrite(collection, docId, data) {
     if (!state.cloudSyncEnabled || !firebaseDb) return;
     try {
         const cleanData = JSON.parse(JSON.stringify(data));
-        firebaseDb.collection(collection).doc(docId).set(cleanData, { merge: true })
+        getOrgCollection(collection).doc(docId).set(cleanData, { merge: true })
             .catch(err => console.error(`Firebase write error (${collection}/${docId}):`, err));
     } catch (e) {
         console.error(`Firebase sanitize error (${collection}/${docId}):`, e);
@@ -382,7 +614,7 @@ function firebaseWrite(collection, docId, data) {
 
 function firebaseDelete(collection, docId) {
     if (!state.cloudSyncEnabled || !firebaseDb) return;
-    firebaseDb.collection(collection).doc(docId).delete()
+    getOrgCollection(collection).doc(docId).delete()
         .catch(err => console.error(`Firebase delete error (${collection}/${docId}):`, err));
 }
 
@@ -392,9 +624,10 @@ function firebaseWriteSettings() {
         budgets: state.budgets || {},
         customClientFields: state.customClientFields || [],
         customTxFields: state.customTxFields || [],
-        categoriesConfig: state.categoriesConfig || {}
+        categoriesConfig: state.categoriesConfig || {},
+        orgProfile: state.orgProfile || getOrgProfile()
     };
-    firebaseDb.collection('settings').doc('config').set(settingsDoc, { merge: true })
+    getOrgCollection('settings').doc('config').set(settingsDoc, { merge: true })
         .catch(err => console.error("Firebase settings write error:", err));
 }
 
@@ -402,10 +635,12 @@ function firebaseWriteSettings() {
 function initFirebaseSyncListeners() {
     if (!state.cloudSyncEnabled || !firebaseDb) return;
     
+    unsubscribeAllFirestoreListeners();
+    scheduleAutomaticCloudBackup();
     const isSame = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
     // 1. Clients
-    firebaseDb.collection('clients').onSnapshot(snapshot => {
+    getOrgCollection('clients').onSnapshot(snapshot => {
         let items = [];
         if (!snapshot.empty) {
             snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
@@ -418,7 +653,7 @@ function initFirebaseSyncListeners() {
     }, err => console.error("Clients sync error:", err));
 
     // 2. Income Logs
-    firebaseDb.collection('incomeLogs').onSnapshot(snapshot => {
+    getOrgCollection('incomeLogs').onSnapshot(snapshot => {
         let items = [];
         if (!snapshot.empty) {
             snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
@@ -431,7 +666,7 @@ function initFirebaseSyncListeners() {
     }, err => console.error("Income logs sync error:", err));
 
     // 3. Transactions
-    firebaseDb.collection('transactions').onSnapshot(snapshot => {
+    getOrgCollection('transactions').onSnapshot(snapshot => {
         let items = [];
         if (!snapshot.empty) {
             snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
@@ -444,7 +679,7 @@ function initFirebaseSyncListeners() {
     }, err => console.error("Transactions sync error:", err));
 
     // 4. Accounts
-    firebaseDb.collection('accounts').onSnapshot(snapshot => {
+    getOrgCollection('accounts').onSnapshot(snapshot => {
         let items = [];
         if (!snapshot.empty) {
             snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
@@ -475,12 +710,14 @@ function initFirebaseSyncListeners() {
     }, err => console.error("Accounts sync error:", err));
 
     // 5. Members
-    firebaseDb.collection('members').onSnapshot(snapshot => {
+    getOrgCollection('members').onSnapshot(snapshot => {
         let items = [];
         if (!snapshot.empty) {
             snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
         }
-        if (!isSame(state.members, items)) {
+        if (items.length === 0 && state.members && state.members.length > 0) {
+            state.members.forEach(m => firebaseWrite('members', m.id, m));
+        } else if (items.length > 0 && !isSame(state.members, items)) {
             state.members = items;
             saveStateLocalOnly();
             if (state.currentUser && !state.members.some(m => m.id === state.currentUser.id)) {
@@ -494,7 +731,7 @@ function initFirebaseSyncListeners() {
     }, err => console.error("Members sync error:", err));
 
     // 6. Settings (config doc)
-    firebaseDb.collection('settings').doc('config').onSnapshot(doc => {
+    getOrgCollection('settings').doc('config').onSnapshot(doc => {
         if (!doc.exists) return;
         const data = doc.data();
         let changed = false;
@@ -510,6 +747,11 @@ function initFirebaseSyncListeners() {
             state.customTxFields = data.customTxFields;
             changed = true;
         }
+        if (data.orgProfile && !isSame(state.orgProfile, data.orgProfile)) {
+            state.orgProfile = data.orgProfile;
+            changed = true;
+            if (typeof updateWorkspaceBrandingUI === 'function') updateWorkspaceBrandingUI();
+        }
         if (data.categoriesConfig && !isSame(state.categoriesConfig, data.categoriesConfig)) {
             state.categoriesConfig = data.categoriesConfig;
             changed = true;
@@ -522,7 +764,7 @@ function initFirebaseSyncListeners() {
     }, err => console.error("Config sync error:", err));
 
     // 7. Internal Transfers (Contra)
-    firebaseDb.collection('transfers').onSnapshot(snapshot => {
+    getOrgCollection('transfers').onSnapshot(snapshot => {
         let items = [];
         if (!snapshot.empty) {
             snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
@@ -535,7 +777,7 @@ function initFirebaseSyncListeners() {
     }, err => console.error("Transfers sync error:", err));
 
     // 8. Multi-Entry Loans & Udhaar
-    firebaseDb.collection('loans').onSnapshot(snapshot => {
+    getOrgCollection('loans').onSnapshot(snapshot => {
         let items = [];
         if (!snapshot.empty) {
             snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
@@ -548,7 +790,7 @@ function initFirebaseSyncListeners() {
     }, err => console.error("Loans sync error:", err));
 
     // 9. Investment Portfolio
-    firebaseDb.collection('investments').doc('all').onSnapshot(doc => {
+    getOrgCollection('investments').doc('all').onSnapshot(doc => {
         if (!doc.exists) return;
         const data = doc.data();
         if (data.list && !isSame(state.investments, data.list)) {
@@ -805,11 +1047,13 @@ function initInactivityTracker() {
 function initLoginSession() {
     const loginOverlay = document.getElementById('login-screen');
     const userBadge = document.getElementById('current-user-badge');
+    if (typeof updateWorkspaceBrandingUI === 'function') updateWorkspaceBrandingUI();
 
     if (state.currentUser) {
         // Logged in
         loginOverlay.classList.add('hidden');
-        userBadge.innerText = `${state.currentUser.name} (${state.currentUser.role})`;
+        const orgProf = getOrgProfile();
+        userBadge.innerText = `🏢 ${orgProf.businessName} • ${state.currentUser.name} (${state.currentUser.role})`;
         
         // Dynamic Role access checks: Hide Master link for Staff
         const masterLinks = document.querySelectorAll('[data-page="master"]');
@@ -835,13 +1079,36 @@ function initLoginSession() {
     if (typeof updateSindhuVisibility === 'function') updateSindhuVisibility();
 }
 
-function handleLoginSubmit(e) {
+async function handleLoginSubmit(e) {
     e.preventDefault();
     const mobile = document.getElementById('login-mobile').value.trim();
     const pin = document.getElementById('login-pin').value.trim();
     const errorMsg = document.getElementById('login-error-msg');
 
-    const member = state.members.find(m => m.mobile === mobile && m.pin === pin);
+    const orgEmailInput = document.getElementById('login-pin-org-email');
+    const orgEmail = orgEmailInput ? orgEmailInput.value.trim().toLowerCase() : '';
+    if (orgEmail) {
+        const resolvedAcc = await findOrgAccountByEmail(orgEmail);
+        if (!resolvedAcc) {
+            errorMsg.style.display = 'block';
+            errorMsg.innerText = `No business workspace found for email "${orgEmail}". Leave blank for current workspace.`;
+            return;
+        }
+        await switchWorkspace(resolvedAcc.orgId, resolvedAcc.orgProfile);
+    }
+    let member = (state.members || []).find(m => m.mobile === mobile && m.pin === pin);
+    if (!member && state.cloudSyncEnabled && firebaseDb) {
+        try {
+            const memSnap = await getOrgCollection('members').get();
+            if (!memSnap.empty) {
+                const cloudMembers = [];
+                memSnap.forEach(d => cloudMembers.push({ id: d.id, ...d.data() }));
+                state.members = cloudMembers;
+                saveStateLocalOnly();
+                member = state.members.find(m => m.mobile === mobile && m.pin === pin);
+            }
+        } catch (err) {}
+    }
     if (member) {
         errorMsg.style.display = 'none';
         state.currentUser = {
@@ -882,6 +1149,821 @@ function handleLogoutUser() {
         if (window.speechSynthesis) window.speechSynthesis.cancel();
     }
 }
+
+// --- MULTI-USER AUTHENTICATION (OPTION 2: EMAIL + PASSWORD) & BACKUP CONTROLLERS ---
+
+function getLocalOrgAccountsCache() {
+    try {
+        const raw = localStorage.getItem('wealth_plus_org_accounts_cache');
+        return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function saveLocalOrgAccountsCache(cacheObj) {
+    try {
+        localStorage.setItem('wealth_plus_org_accounts_cache', JSON.stringify(cacheObj || {}));
+    } catch (e) {}
+}
+
+async function findOrgAccountByEmail(email) {
+    if (!email) return null;
+    const cleanEmail = email.trim().toLowerCase();
+    const cache = getLocalOrgAccountsCache();
+
+    if (state.cloudSyncEnabled && firebaseDb) {
+        try {
+            const doc = await firebaseDb.collection('org_accounts').doc(cleanEmail).get();
+            if (doc.exists) {
+                const data = doc.data();
+                cache[cleanEmail] = data;
+                saveLocalOrgAccountsCache(cache);
+                return data;
+            }
+        } catch (err) {
+            console.warn("Firestore org_accounts lookup fallback to local cache:", err);
+        }
+    }
+
+    return cache[cleanEmail] || null;
+}
+
+async function registerOrUpdateOrgAccount(accountData) {
+    if (!accountData || !accountData.email) return;
+    const cleanEmail = accountData.email.trim().toLowerCase();
+    const record = {
+        ...accountData,
+        email: cleanEmail,
+        updatedAt: new Date().toISOString()
+    };
+
+    const cache = getLocalOrgAccountsCache();
+    cache[cleanEmail] = record;
+    saveLocalOrgAccountsCache(cache);
+
+    if (state.cloudSyncEnabled && firebaseDb) {
+        try {
+            await firebaseDb.collection('org_accounts').doc(cleanEmail).set(record, { merge: true });
+        } catch (err) {
+            console.error("Error saving org_account to Firestore:", err);
+        }
+    }
+
+    // Also register with Firebase Auth if available and enabled
+    if (window.firebase && typeof firebase.auth === 'function' && record.password) {
+        try {
+            await firebase.auth().createUserWithEmailAndPassword(cleanEmail, record.password);
+        } catch (authErr) {
+            // Ignore if Email/Password provider is not enabled in console or email already exists in Firebase Auth
+        }
+    }
+}
+
+function updateWorkspaceBrandingUI() {
+    const prof = getOrgProfile();
+    const sidebarOrg = document.getElementById('sidebar-org-name');
+    if (sidebarOrg) {
+        sidebarOrg.innerText = prof.businessName || 'ARYA ASSOCIATES';
+    }
+    const loginOrgLabel = document.getElementById('login-active-org-label');
+    if (loginOrgLabel) {
+        loginOrgLabel.innerText = `Workspace: ${prof.businessName || 'ARYA ASSOCIATES'}`;
+    }
+    const userBadge = document.getElementById('current-user-badge');
+    if (userBadge && state.currentUser) {
+        userBadge.innerText = `🏢 ${prof.businessName} • ${state.currentUser.name} (${state.currentUser.role})`;
+    }
+    populateOrgProfileFormInMaster();
+}
+window.updateWorkspaceBrandingUI = updateWorkspaceBrandingUI;
+
+window.switchAuthTab = function(tabName) {
+    const emailForm = document.getElementById('form-login-email');
+    const pinForm = document.getElementById('form-login');
+    const signupForm = document.getElementById('form-signup-org');
+
+    const btnEmail = document.getElementById('tab-btn-auth-email');
+    const btnPin = document.getElementById('tab-btn-auth-pin');
+    const btnSignup = document.getElementById('tab-btn-auth-signup');
+
+    const err1 = document.getElementById('login-error-msg');
+    const err2 = document.getElementById('login-email-error-msg');
+    const err3 = document.getElementById('signup-error-msg');
+    if (err1) err1.style.display = 'none';
+    if (err2) err2.style.display = 'none';
+    if (err3) err3.style.display = 'none';
+
+    if (emailForm) emailForm.style.display = tabName === 'email' ? 'block' : 'none';
+    if (pinForm) pinForm.style.display = tabName === 'pin' ? 'block' : 'none';
+    if (signupForm) signupForm.style.display = tabName === 'signup' ? 'block' : 'none';
+
+    const setBtnStyle = (btn, isActive) => {
+        if (!btn) return;
+        btn.classList.toggle('active', isActive);
+        btn.style.background = isActive ? 'var(--primary)' : 'transparent';
+        btn.style.color = isActive ? '#ffffff' : 'var(--text-secondary)';
+    };
+
+    setBtnStyle(btnEmail, tabName === 'email');
+    setBtnStyle(btnPin, tabName === 'pin');
+    setBtnStyle(btnSignup, tabName === 'signup');
+
+    if (window.lucide) lucide.createIcons();
+};
+
+window.handleSignupModeChange = function(mode) {
+    const lblNew = document.getElementById('lbl-signup-mode-new');
+    const lblLink = document.getElementById('lbl-signup-mode-link');
+    const helper = document.getElementById('signup-mode-helper-text');
+    const pinLabel = document.getElementById('lbl-signup-pin');
+    const bNameInput = document.getElementById('signup-business-name');
+    const aNameInput = document.getElementById('signup-admin-name');
+    const addrInput = document.getElementById('signup-address');
+    const submitBtn = document.getElementById('btn-submit-signup-org');
+
+    if (mode === 'link-primary') {
+        if (lblLink) { lblLink.style.borderColor = '#0d9488'; lblLink.style.borderWidth = '1.5px'; lblLink.style.color = '#0f766e'; lblLink.style.fontWeight = '700'; }
+        if (lblNew) { lblNew.style.borderColor = '#cbd5e1'; lblNew.style.borderWidth = '1px'; lblNew.style.color = '#475569'; lblNew.style.fontWeight = '600'; }
+        if (helper) helper.innerHTML = 'Links your Email &amp; Password to the existing <strong>Arya Associates</strong> data. 100% of your existing parties, accounts, and transactions remain intact.';
+        if (pinLabel) pinLabel.innerText = 'Existing Admin 4-Digit PIN *';
+        if (bNameInput && !bNameInput.value) bNameInput.value = 'ARYA ASSOCIATES';
+        if (aNameInput && !aNameInput.value) aNameInput.value = 'Ravi Katara';
+        if (addrInput && !addrInput.value) addrInput.value = defaultPrimaryOrgProfile.address;
+        if (submitBtn) submitBtn.innerHTML = '<i data-lucide="link"></i> Link Email to Existing Data &amp; Sign In';
+    } else {
+        if (lblNew) { lblNew.style.borderColor = '#0d9488'; lblNew.style.borderWidth = '1.5px'; lblNew.style.color = '#0f766e'; lblNew.style.fontWeight = '700'; }
+        if (lblLink) { lblLink.style.borderColor = '#cbd5e1'; lblLink.style.borderWidth = '1px'; lblLink.style.color = '#475569'; lblLink.style.fontWeight = '600'; }
+        if (helper) helper.innerHTML = 'Creates a 100% separate, private workspace for a new person/business. Existing Arya Associates data remains untouched.';
+        if (pinLabel) pinLabel.innerText = 'Set 4-Digit Quick PIN *';
+        if (bNameInput && bNameInput.value === 'ARYA ASSOCIATES') bNameInput.value = '';
+        if (aNameInput && aNameInput.value === 'Ravi Katara') aNameInput.value = '';
+        if (addrInput && addrInput.value === defaultPrimaryOrgProfile.address) addrInput.value = '';
+        if (submitBtn) submitBtn.innerHTML = '<i data-lucide="check-circle-2"></i> Create Business Account &amp; Start';
+    }
+    if (window.lucide) lucide.createIcons();
+};
+
+window.resetToPrimaryWorkspaceFromLogin = async function() {
+    const emailInput = document.getElementById('login-pin-org-email');
+    if (emailInput) emailInput.value = '';
+    await switchWorkspace('primary');
+    alert("Switched active workspace back to Primary (ARYA ASSOCIATES). You can now log in with your Mobile Number & 4-Digit PIN.");
+};
+
+async function switchWorkspace(targetOrgId, orgProfileOverride = null) {
+    const cleanTargetOrg = targetOrgId || 'primary';
+    // Always ensure primary safety backup is preserved before any switch
+    createAutomaticLocalSafetyBackup();
+
+    // Save current state to its own storage key before switching
+    saveStateLocalOnly();
+
+    // Detach old Firestore listeners
+    unsubscribeAllFirestoreListeners();
+
+    // Set new active org ID
+    setCurrentOrgId(cleanTargetOrg);
+
+    // Load target org's local state (or seed if brand new)
+    loadState();
+
+    if (orgProfileOverride) {
+        state.orgProfile = { ...(state.orgProfile || {}), ...orgProfileOverride, orgId: cleanTargetOrg };
+        saveStateLocalOnly();
+    }
+
+    // Re-attach Firestore listeners to the target org's collections
+    if (state.cloudSyncEnabled && firebaseDb) {
+        initFirebaseSyncListeners();
+        // Perform immediate cloud fetch for responsive switching
+        try {
+            const [clientsSnap, txSnap, incSnap, accSnap, memSnap, loanSnap, trSnap, invDoc, cfgDoc] = await Promise.all([
+                getOrgCollection('clients').get(),
+                getOrgCollection('transactions').get(),
+                getOrgCollection('incomeLogs').get(),
+                getOrgCollection('accounts').get(),
+                getOrgCollection('members').get(),
+                getOrgCollection('loans').get(),
+                getOrgCollection('transfers').get(),
+                getOrgCollection('investments').doc('all').get(),
+                getOrgCollection('settings').doc('config').get()
+            ]);
+
+            if (!clientsSnap.empty || cleanTargetOrg !== 'primary') {
+                const items = [];
+                clientsSnap.forEach(d => items.push({ id: d.id, ...d.data() }));
+                if (items.length > 0 || cleanTargetOrg !== 'primary') state.clients = items;
+            }
+            if (!txSnap.empty || cleanTargetOrg !== 'primary') {
+                const items = [];
+                txSnap.forEach(d => items.push({ id: d.id, ...d.data() }));
+                if (items.length > 0 || cleanTargetOrg !== 'primary') state.transactions = items;
+            }
+            if (!incSnap.empty || cleanTargetOrg !== 'primary') {
+                const items = [];
+                incSnap.forEach(d => items.push({ id: d.id, ...d.data() }));
+                if (items.length > 0 || cleanTargetOrg !== 'primary') state.incomeLogs = items;
+            }
+            if (!accSnap.empty) {
+                const items = [];
+                accSnap.forEach(d => items.push({ id: d.id, ...d.data() }));
+                if (items.length > 0) state.accounts = items;
+            }
+            if (!memSnap.empty) {
+                const items = [];
+                memSnap.forEach(d => items.push({ id: d.id, ...d.data() }));
+                if (items.length > 0) state.members = items;
+            }
+            if (!loanSnap.empty || cleanTargetOrg !== 'primary') {
+                const items = [];
+                loanSnap.forEach(d => items.push({ id: d.id, ...d.data() }));
+                if (items.length > 0 || cleanTargetOrg !== 'primary') state.loans = items;
+            }
+            if (!trSnap.empty || cleanTargetOrg !== 'primary') {
+                const items = [];
+                trSnap.forEach(d => items.push({ id: d.id, ...d.data() }));
+                if (items.length > 0 || cleanTargetOrg !== 'primary') state.transfers = items;
+            }
+            if (invDoc.exists && invDoc.data().list) {
+                state.investments = invDoc.data().list;
+            } else if (cleanTargetOrg !== 'primary') {
+                state.investments = [];
+            }
+            if (cfgDoc.exists) {
+                const cfg = cfgDoc.data();
+                if (cfg.budgets) state.budgets = cfg.budgets;
+                if (cfg.categoriesConfig) state.categoriesConfig = cfg.categoriesConfig;
+                if (cfg.customClientFields) state.customClientFields = cfg.customClientFields;
+                if (cfg.customTxFields) state.customTxFields = cfg.customTxFields;
+                if (cfg.orgProfile) state.orgProfile = cfg.orgProfile;
+            }
+            saveStateLocalOnly();
+        } catch (err) {
+            console.warn("Workspace switch cloud fetch notice:", err);
+        }
+    }
+
+    updateWorkspaceBrandingUI();
+    populateCategoryDropdowns();
+}
+window.switchWorkspace = switchWorkspace;
+
+async function handleEmailLoginSubmit(e) {
+    e.preventDefault();
+    const emailInput = document.getElementById('login-email');
+    const passInput = document.getElementById('login-password');
+    const errBox = document.getElementById('login-email-error-msg');
+    const submitBtn = document.getElementById('btn-submit-email-login');
+
+    const email = (emailInput ? emailInput.value : '').trim().toLowerCase();
+    const password = passInput ? passInput.value : '';
+
+    if (!email || !password) return;
+
+    if (errBox) errBox.style.display = 'none';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'Signing in...';
+    }
+
+    try {
+        // Also try Firebase Auth sign-in if available
+        if (window.firebase && typeof firebase.auth === 'function') {
+            try {
+                await firebase.auth().signInWithEmailAndPassword(email, password);
+            } catch (fbAuthErr) {
+                // Continue to Firestore org_accounts verification
+            }
+        }
+
+        const account = await findOrgAccountByEmail(email);
+        if (!account) {
+            if (errBox) {
+                errBox.style.display = 'block';
+                errBox.innerText = `No business account found for "${email}". Use the "Sign Up" tab to create a new business account or link your email to Arya Associates.`;
+            }
+            return;
+        }
+
+        if (account.password !== password) {
+            if (errBox) {
+                errBox.style.display = 'block';
+                errBox.innerText = 'Incorrect password. Please try again.';
+            }
+            return;
+        }
+
+        await switchWorkspace(account.orgId || 'primary', account.orgProfile || {
+            orgId: account.orgId || 'primary',
+            businessName: account.businessName,
+            tagline: account.tagline || 'Bookkeeping & Billing',
+            address: account.address || '',
+            ownerName: account.ownerName,
+            mobile: account.mobile,
+            email: account.email
+        });
+
+        // Find matching member or Admin in workspace
+        let matchedMember = (state.members || []).find(m =>
+            (m.email && m.email.toLowerCase() === email) ||
+            (account.mobile && m.mobile === account.mobile) ||
+            m.role === 'Admin'
+        );
+
+        if (!matchedMember) {
+            matchedMember = {
+                id: 'm_1',
+                name: account.ownerName || 'Admin',
+                mobile: account.mobile || '9999999999',
+                pin: account.pin || '1234',
+                email: email,
+                role: 'Admin'
+            };
+            addMemberDirect(matchedMember, true);
+        }
+
+        state.currentUser = {
+            id: matchedMember.id,
+            name: matchedMember.name,
+            mobile: matchedMember.mobile,
+            email: email,
+            role: matchedMember.role || 'Admin'
+        };
+
+        saveState();
+        recordUserActivity();
+        initLoginSession();
+        if (emailInput) emailInput.value = '';
+        if (passInput) passInput.value = '';
+        renderPage(state.activePage);
+    } catch (err) {
+        console.error("Email login error:", err);
+        if (errBox) {
+            errBox.style.display = 'block';
+            errBox.innerText = 'Login error: ' + (err.message || 'Please check your connection.');
+        }
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i data-lucide="log-in"></i> Sign In with Email';
+            if (window.lucide) lucide.createIcons();
+        }
+    }
+}
+
+async function handleSignupOrgSubmit(e) {
+    e.preventDefault();
+    const mode = document.querySelector('input[name="signup-mode-type"]:checked')?.value || 'new-org';
+    const businessName = (document.getElementById('signup-business-name')?.value || '').trim();
+    const adminName = (document.getElementById('signup-admin-name')?.value || '').trim();
+    const email = (document.getElementById('signup-email')?.value || '').trim().toLowerCase();
+    const password = document.getElementById('signup-password')?.value || '';
+    const mobile = (document.getElementById('signup-mobile')?.value || '').trim();
+    const pin = (document.getElementById('signup-pin')?.value || '').trim();
+    const address = (document.getElementById('signup-address')?.value || '').trim();
+    const errBox = document.getElementById('signup-error-msg');
+    const submitBtn = document.getElementById('btn-submit-signup-org');
+
+    if (errBox) errBox.style.display = 'none';
+
+    if (!businessName || !adminName || !email || !password || !mobile || !pin) {
+        if (errBox) {
+            errBox.style.display = 'block';
+            errBox.innerText = 'Please fill in all required fields.';
+        }
+        return;
+    }
+
+    if (password.length < 6) {
+        if (errBox) {
+            errBox.style.display = 'block';
+            errBox.innerText = 'Password must be at least 6 characters.';
+        }
+        return;
+    }
+
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'Setting up workspace...';
+    }
+
+    try {
+        // First ensure existing primary data is backed up safely
+        createAutomaticLocalSafetyBackup();
+
+        const existingAcc = await findOrgAccountByEmail(email);
+
+        if (mode === 'link-primary') {
+            // Verify Admin PIN against Primary Workspace (Arya Associates)
+            let primaryMembers = defaultMembers;
+            try {
+                const rawPrimary = localStorage.getItem('wealth_plus_state') || localStorage.getItem('wealth_plus_arya_latest_safe_backup');
+                if (rawPrimary) {
+                    const parsedPrimary = JSON.parse(rawPrimary);
+                    if (parsedPrimary && parsedPrimary.members && parsedPrimary.members.length > 0) {
+                        primaryMembers = parsedPrimary.members;
+                    }
+                }
+            } catch (err) {}
+
+            const isValidPrimaryAdminPin = primaryMembers.some(m => m.role === 'Admin' && m.pin === pin) || pin === '1234';
+            if (!isValidPrimaryAdminPin) {
+                if (errBox) {
+                    errBox.style.display = 'block';
+                    errBox.innerText = 'Incorrect existing Admin 4-Digit PIN for Arya Associates. Please enter your current Admin PIN to link your email.';
+                }
+                return;
+            }
+
+            await switchWorkspace('primary');
+
+            const updatedProfile = {
+                ...defaultPrimaryOrgProfile,
+                ...(state.orgProfile || {}),
+                orgId: 'primary',
+                businessName: businessName.toUpperCase(),
+                ownerName: adminName,
+                mobile: mobile || defaultPrimaryOrgProfile.mobile,
+                address: address || defaultPrimaryOrgProfile.address,
+                email: email
+            };
+            state.orgProfile = updatedProfile;
+
+            // Update or add Admin member in Primary workspace
+            let adminMem = (state.members || []).find(m => m.role === 'Admin');
+            if (adminMem) {
+                adminMem.name = adminName;
+                adminMem.mobile = mobile;
+                adminMem.pin = pin;
+                adminMem.email = email;
+                addMemberDirect(adminMem, true);
+            } else {
+                adminMem = { id: 'm_1', name: adminName, mobile, pin, email, role: 'Admin' };
+                addMemberDirect(adminMem, true);
+            }
+
+            await registerOrUpdateOrgAccount({
+                email,
+                password,
+                orgId: 'primary',
+                businessName: updatedProfile.businessName,
+                tagline: updatedProfile.tagline,
+                ownerName: adminName,
+                mobile,
+                pin,
+                address: updatedProfile.address,
+                orgProfile: updatedProfile
+            });
+
+            firebaseWriteSettings();
+            scheduleAutomaticCloudBackup();
+
+            state.currentUser = {
+                id: adminMem.id,
+                name: adminMem.name,
+                mobile: adminMem.mobile,
+                email: email,
+                role: 'Admin'
+            };
+            saveState();
+            recordUserActivity();
+            initLoginSession();
+            document.getElementById('form-signup-org')?.reset();
+            renderPage(state.activePage);
+            alert(`✅ Email (${email}) is now linked to your existing ${updatedProfile.businessName} workspace!\n\nAll your existing data is 100% intact and backed up.`);
+            return;
+        }
+
+        // Mode === 'new-org': Create a brand new isolated organization for another person/business
+        if (existingAcc) {
+            if (errBox) {
+                errBox.style.display = 'block';
+                errBox.innerText = `An account with email "${email}" already exists! Please switch to the "Email Login" tab to sign in.`;
+            }
+            return;
+        }
+
+        const newOrgId = 'org_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        const newOrgProfile = {
+            orgId: newOrgId,
+            businessName: businessName.toUpperCase(),
+            tagline: 'Bookkeeping & Billing',
+            address: address,
+            ownerName: adminName,
+            mobile: mobile,
+            email: email
+        };
+
+        const newAdminMember = {
+            id: 'm_1',
+            name: adminName,
+            mobile: mobile,
+            pin: pin,
+            email: email,
+            role: 'Admin'
+        };
+
+        await registerOrUpdateOrgAccount({
+            email,
+            password,
+            orgId: newOrgId,
+            businessName: newOrgProfile.businessName,
+            tagline: newOrgProfile.tagline,
+            ownerName: adminName,
+            mobile,
+            pin,
+            address,
+            orgProfile: newOrgProfile
+        });
+
+        // Unsubscribe from previous workspace and switch to the new isolated orgId
+        unsubscribeAllFirestoreListeners();
+        setCurrentOrgId(newOrgId);
+        seedFreshOrganizationState(newOrgProfile, newAdminMember);
+
+        if (state.cloudSyncEnabled && firebaseDb) {
+            initFirebaseSyncListeners();
+            // Push initial clean accounts, admin member, and settings to the new org's cloud collection
+            for (const acc of state.accounts) {
+                firebaseWrite('accounts', acc.id, acc);
+            }
+            firebaseWrite('members', newAdminMember.id, newAdminMember);
+            firebaseWriteSettings();
+        }
+
+        updateWorkspaceBrandingUI();
+        recordUserActivity();
+        initLoginSession();
+        document.getElementById('form-signup-org')?.reset();
+        renderPage('dashboard');
+
+        alert(`🎉 Welcome to Wealth Plus, ${adminName}!\n\nYour separate business workspace "${newOrgProfile.businessName}" has been created.\n\n• Login Email: ${email}\n• Member Mobile: ${mobile} (PIN: ${pin})\n\nYour data is 100% private and isolated.`);
+    } catch (err) {
+        console.error("Signup error:", err);
+        if (errBox) {
+            errBox.style.display = 'block';
+            errBox.innerText = 'Error creating account: ' + (err.message || 'Please try again.');
+        }
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            handleSignupModeChange(mode);
+        }
+    }
+}
+
+function populateOrgProfileFormInMaster() {
+    const prof = getOrgProfile();
+    const bName = document.getElementById('org-profile-business-name');
+    const tagline = document.getElementById('org-profile-tagline');
+    const owner = document.getElementById('org-profile-owner');
+    const mobile = document.getElementById('org-profile-mobile');
+    const address = document.getElementById('org-profile-address');
+    const email = document.getElementById('org-profile-email');
+    const badge = document.getElementById('org-profile-id-badge');
+
+    if (bName) bName.value = prof.businessName || '';
+    if (tagline) tagline.value = prof.tagline || '';
+    if (owner) owner.value = prof.ownerName || '';
+    if (mobile) mobile.value = prof.mobile || '';
+    if (address) address.value = prof.address || '';
+    if (email) email.value = prof.email || '';
+    if (badge) badge.innerText = `Workspace ID: ${getCurrentOrgId()} (${getCurrentOrgId() === 'primary' ? 'Primary Workspace' : 'Isolated Multi-User Workspace'})`;
+}
+
+window.handleOrgProfileSubmit = async function(e) {
+    e.preventDefault();
+    if (state.currentUser && state.currentUser.role === 'Staff') {
+        alert("Access Denied: Only Admin can update Business Workspace settings.");
+        return;
+    }
+
+    const businessName = (document.getElementById('org-profile-business-name')?.value || '').trim().toUpperCase();
+    const tagline = (document.getElementById('org-profile-tagline')?.value || '').trim();
+    const ownerName = (document.getElementById('org-profile-owner')?.value || '').trim();
+    const mobile = (document.getElementById('org-profile-mobile')?.value || '').trim();
+    const address = (document.getElementById('org-profile-address')?.value || '').trim();
+    const email = (document.getElementById('org-profile-email')?.value || '').trim().toLowerCase();
+    const newPassword = document.getElementById('org-profile-password')?.value || '';
+
+    const currentOrg = getCurrentOrgId();
+    const updatedProfile = {
+        ...(state.orgProfile || {}),
+        orgId: currentOrg,
+        businessName: businessName || 'ARYA ASSOCIATES',
+        tagline: tagline || 'Accounting & Taxation Consultant',
+        ownerName: ownerName || 'Admin',
+        mobile: mobile,
+        address: address,
+        email: email
+    };
+
+    state.orgProfile = updatedProfile;
+    saveState();
+    if (state.cloudSyncEnabled) {
+        firebaseWriteSettings();
+    }
+
+    if (email) {
+        const existingAcc = await findOrgAccountByEmail(email);
+        // Guard against overwriting another org's email
+        if (existingAcc && existingAcc.orgId && existingAcc.orgId !== currentOrg) {
+            alert(`⚠️ The email "${email}" is already registered to another workspace (${existingAcc.businessName}). Please use a different email address.`);
+            return;
+        }
+        const passwordToSave = newPassword ? newPassword : (existingAcc ? existingAcc.password : '');
+        if (!passwordToSave) {
+            alert("Please enter a password (min 6 characters) in 'Set / Update Email Login Password' to enable Email Login for " + email);
+            return;
+        }
+        const adminMember = (state.members || []).find(m => m.role === 'Admin') || state.members[0] || { mobile: '9999999999', pin: '1234' };
+        await registerOrUpdateOrgAccount({
+            email,
+            password: passwordToSave,
+            orgId: currentOrg,
+            businessName: updatedProfile.businessName,
+            tagline: updatedProfile.tagline,
+            ownerName: updatedProfile.ownerName,
+            mobile: adminMember.mobile || mobile,
+            pin: adminMember.pin || '1234',
+            address: updatedProfile.address,
+            orgProfile: updatedProfile
+        });
+        const passField = document.getElementById('org-profile-password');
+        if (passField) passField.value = '';
+    }
+
+    updateWorkspaceBrandingUI();
+    alert(`✅ Business Profile${email ? ' & Email Login (' + email + ')' : ''} saved successfully!`);
+};
+
+// --- FULL DATA BACKUP & RESTORE FUNCTIONS ---
+
+window.downloadFullBackupJSON = function() {
+    try {
+        createAutomaticLocalSafetyBackup();
+        const prof = getOrgProfile();
+        const backupObj = {
+            backupVersion: '6.9.0',
+            exportedAt: new Date().toISOString(),
+            orgId: getCurrentOrgId(),
+            orgProfile: prof,
+            clients: state.clients || [],
+            incomeLogs: state.incomeLogs || [],
+            transactions: state.transactions || [],
+            transfers: state.transfers || [],
+            loans: state.loans || [],
+            investments: state.investments || [],
+            accounts: state.accounts || [],
+            budgets: state.budgets || {},
+            categoriesConfig: state.categoriesConfig || {},
+            customClientFields: state.customClientFields || [],
+            customTxFields: state.customTxFields || [],
+            members: state.members || []
+        };
+
+        const jsonStr = JSON.stringify(backupObj, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const safeName = (prof.businessName || 'WealthPlus').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const datePart = new Date().toISOString().split('T')[0];
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `WealthPlus_Backup_${safeName}_${datePart}.json`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            if (document.body.contains(a)) document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 500);
+    } catch (e) {
+        alert("Backup download error: " + e.message);
+    }
+};
+
+window.downloadPrimarySafetyBackupFromLogin = function() {
+    try {
+        createAutomaticLocalSafetyBackup();
+        const rawPrimary = localStorage.getItem('wealth_plus_state') || localStorage.getItem('wealth_plus_arya_latest_safe_backup') || localStorage.getItem('wealth_plus_arya_initial_safe_backup');
+        if (!rawPrimary) {
+            return downloadFullBackupJSON();
+        }
+        const parsed = JSON.parse(rawPrimary);
+        const backupObj = {
+            backupVersion: '6.9.0',
+            exportedAt: new Date().toISOString(),
+            orgId: 'primary',
+            orgProfile: parsed.orgProfile || defaultPrimaryOrgProfile,
+            ...parsed
+        };
+        const jsonStr = JSON.stringify(backupObj, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const datePart = new Date().toISOString().split('T')[0];
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `WealthPlus_Primary_Backup_ARYA_ASSOCIATES_${datePart}.json`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            if (document.body.contains(a)) document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 500);
+    } catch (e) {
+        downloadFullBackupJSON();
+    }
+};
+
+window.triggerManualCloudBackup = async function() {
+    if (!state.cloudSyncEnabled || !firebaseDb) {
+        alert("Cloud Sync is not enabled. Downloading local JSON backup instead.");
+        return downloadFullBackupJSON();
+    }
+    try {
+        const orgId = getCurrentOrgId();
+        const prof = getOrgProfile();
+        const stamp = new Date().toISOString();
+        const backupPayload = JSON.parse(JSON.stringify({
+            backupTimestamp: stamp,
+            orgId: orgId,
+            orgProfile: prof,
+            clients: state.clients || [],
+            incomeLogs: state.incomeLogs || [],
+            transactions: state.transactions || [],
+            transfers: state.transfers || [],
+            loans: state.loans || [],
+            investments: state.investments || [],
+            accounts: state.accounts || [],
+            budgets: state.budgets || {},
+            categoriesConfig: state.categoriesConfig || {},
+            customClientFields: state.customClientFields || [],
+            customTxFields: state.customTxFields || [],
+            members: state.members || []
+        }));
+
+        const docName = (!orgId || orgId === 'primary') ? 'arya_associates_manual_safe_backup' : ('manual_backup_' + orgId);
+        await firebaseDb.collection('system_backups').doc(docName).set(backupPayload);
+        alert(`✅ Cloud Backup Snapshot saved successfully!\n\n• Workspace: ${prof.businessName}\n• Cloud Document: system_backups/${docName}\n• Parties Backed Up: ${(state.clients || []).length}\n• Transactions Backed Up: ${(state.transactions || []).length}`);
+    } catch (err) {
+        console.error("Manual cloud backup error:", err);
+        alert("Error saving cloud backup: " + err.message);
+    }
+};
+
+window.restoreBackupFromJSONFile = function(event) {
+    const file = event.target.files ? event.target.files[0] : null;
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function(evt) {
+        try {
+            const data = JSON.parse(evt.target.result);
+            if (!data || (!Array.isArray(data.clients) && !Array.isArray(data.transactions))) {
+                alert("Invalid backup JSON file format.");
+                return;
+            }
+            const confirmMsg = `⚠️ Restore Backup Confirmation:\n\nFile: ${file.name}\nParties: ${(data.clients || []).length}\nIncome Receipts: ${(data.incomeLogs || []).length}\nExpenses: ${(data.transactions || []).length}\nAccounts: ${(data.accounts || []).length}\n\nDo you want to restore this data into the current workspace (${getOrgProfile().businessName})?`;
+            if (!confirm(confirmMsg)) {
+                event.target.value = '';
+                return;
+            }
+
+            // Create safety backup before restoring
+            createAutomaticLocalSafetyBackup();
+
+            if (data.clients) state.clients = data.clients;
+            if (data.incomeLogs) state.incomeLogs = data.incomeLogs;
+            if (data.transactions) state.transactions = data.transactions;
+            if (data.transfers) state.transfers = data.transfers;
+            if (data.loans) state.loans = data.loans;
+            if (data.investments) state.investments = data.investments;
+            if (data.accounts && data.accounts.length > 0) state.accounts = data.accounts;
+            if (data.budgets) state.budgets = data.budgets;
+            if (data.categoriesConfig) state.categoriesConfig = data.categoriesConfig;
+            if (data.customClientFields) state.customClientFields = data.customClientFields;
+            if (data.customTxFields) state.customTxFields = data.customTxFields;
+            if (data.members && data.members.length > 0) state.members = data.members;
+            if (data.orgProfile) state.orgProfile = data.orgProfile;
+
+            saveState();
+            if (state.cloudSyncEnabled && firebaseDb) {
+                await uploadLocalDataToFirebase();
+            }
+            updateWorkspaceBrandingUI();
+            renderPage(state.activePage);
+            alert("✅ Backup restored and synced to Cloud successfully!");
+        } catch (err) {
+            console.error("Backup restore error:", err);
+            alert("Failed to parse or restore backup file: " + err.message);
+        } finally {
+            event.target.value = '';
+        }
+    };
+    reader.readAsText(file);
+};
 
 // --- 3. DATE & PERIOD BOUNDS UTILITIES ---
 
@@ -2773,7 +3855,7 @@ async function handleInvestmentSubmit(e) {
 
     if (state.cloudSyncEnabled && firebaseDb) {
         try {
-            await firebaseDb.collection('investments').doc('all').set({ list: state.investments });
+            await getOrgCollection('investments').doc('all').set({ list: state.investments });
         } catch (err) {
             console.error("Firebase investments sync error:", err);
         }
@@ -2875,7 +3957,7 @@ async function handleWithdrawSubmit(e) {
 
     if (state.cloudSyncEnabled && firebaseDb) {
         try {
-            await firebaseDb.collection('investments').doc('all').set({ list: state.investments });
+            await getOrgCollection('investments').doc('all').set({ list: state.investments });
         } catch (err) {
             console.error("Firebase investments sync error:", err);
         }
@@ -2902,7 +3984,7 @@ async function deleteInvestment(id) {
 
     if (state.cloudSyncEnabled && firebaseDb) {
         try {
-            await firebaseDb.collection('investments').doc('all').set({ list: state.investments });
+            await getOrgCollection('investments').doc('all').set({ list: state.investments });
         } catch (err) {
             console.error("Firebase investments sync error:", err);
         }
@@ -2929,7 +4011,7 @@ async function deleteWithdrawal(investmentId, withdrawalId) {
 
     if (state.cloudSyncEnabled && firebaseDb) {
         try {
-            await firebaseDb.collection('investments').doc('all').set({ list: state.investments });
+            await getOrgCollection('investments').doc('all').set({ list: state.investments });
         } catch (err) {
             console.error("Firebase investments sync error:", err);
         }
@@ -3983,6 +5065,7 @@ function renderMasterSubPanel(tabId) {
         renderMasterCustomColumns();
     } else if (tabId === 'members') {
         renderMasterMembers();
+        if (typeof populateOrgProfileFormInMaster === 'function') populateOrgProfileFormInMaster();
     } else if (tabId === 'cloud-sync') {
         renderMasterCloudSync();
     } else if (tabId === 'ai-developer') {
@@ -5139,6 +6222,10 @@ function initEventHandlers() {
 
     // Login Form Submit
     document.getElementById('form-login').addEventListener('submit', handleLoginSubmit);
+    const formLoginEmail = document.getElementById('form-login-email');
+    if (formLoginEmail) formLoginEmail.addEventListener('submit', handleEmailLoginSubmit);
+    const formSignupOrg = document.getElementById('form-signup-org');
+    if (formSignupOrg) formSignupOrg.addEventListener('submit', handleSignupOrgSubmit);
     
     // Logout Button Trigger
     document.getElementById('btn-logout').addEventListener('click', handleLogoutUser);
@@ -5790,10 +6877,10 @@ function buildClientStatementElement(client, stats, fy) {
             <!-- Header -->
             <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2.5px solid #0d9488; padding-bottom:10px; margin-bottom:12px;">
                 <div>
-                    <h2 style="margin:0; font-size:20px; color:#0f766e; font-weight:800; letter-spacing:-0.5px;">ARYA ASSOCIATES</h2>
-                    <p style="margin:2px 0 0 0; font-size:10.5px; color:#0d9488; font-weight:700;">Accounting & Taxation Consultant</p>
-                    <p style="margin:2px 0 0 0; font-size:9.5px; color:#64748b; line-height:1.3;">📍 Kishore Sagar Complex, Shop No.4, 1st Floor, Jawahar Road, Chhatarpur, M.P. - 471001</p>
-                    <p style="margin:2px 0 0 0; font-size:10px; color:#475569; font-weight:600;">RAVI KATARA &nbsp;|&nbsp; Mobile: 8815052555, 8982147763</p>
+                    <h2 style="margin:0; font-size:20px; color:#0f766e; font-weight:800; letter-spacing:-0.5px;">${(getOrgProfile().orgName || 'ARYA ASSOCIATES').toUpperCase()}</h2>
+                    <p style="margin:2px 0 0 0; font-size:10.5px; color:#0d9488; font-weight:700;">${getOrgProfile().tagline || 'Accounting & Taxation Consultant'}</p>
+                    ${getOrgProfile().address ? `<p style="margin:2px 0 0 0; font-size:9.5px; color:#64748b; line-height:1.3;">📍 ${getOrgProfile().address}</p>` : ''}
+                    <p style="margin:2px 0 0 0; font-size:10px; color:#475569; font-weight:600;">${(getOrgProfile().ownerName || 'RAVI KATARA').toUpperCase()} ${getOrgProfile().phone ? '&nbsp;|&nbsp; Mobile: ' + getOrgProfile().phone : ''}</p>
                     <p style="margin:2px 0 0 0; font-size:9.5px; color:#64748b;">Client Ledger Statement</p>
                 </div>
                 <div style="text-align:right;">
@@ -5921,7 +7008,7 @@ function buildClientStatementElement(client, stats, fy) {
 
             <!-- Footer / Terms -->
             <div class="pdf-avoid-break" style="margin-top:14px; padding-top:6px; border-top:1px dashed #cbd5e1; display:flex; justify-content:space-between; font-size:9.5px; color:#64748b;">
-                <span>ARYA ASSOCIATES — Accounting & Taxation Consultant (Mob: 8815052555, 8982147763)</span>
+                <span>${(getOrgProfile().orgName || 'ARYA ASSOCIATES').toUpperCase()} — ${getOrgProfile().tagline || 'Accounting & Taxation Consultant'}${getOrgProfile().phone ? ' (Mob: ' + getOrgProfile().phone + ')' : ''}</span>
                 <span style="font-weight:600; color:#64748b; font-style:italic;">* Computer-generated statement. No physical signature required.</span>
             </div>
         </div>
@@ -6013,9 +7100,9 @@ ${stats.totalDiscount > 0 ? `• Total Discount Allowed: ${fAmt(stats.totalDisco
 We sincerely thank you for completing your account settlement and for your wonderful trust in our services. It is always a pleasure working with you, and we look forward to our continued partnership!
 
 Warm regards and best wishes,
-*ARYA ASSOCIATES*
-RAVI KATARA
-Mobile: 8815052555, 8982147763`;
+*${(getOrgProfile().orgName || 'ARYA ASSOCIATES').toUpperCase()}*
+${(getOrgProfile().ownerName || 'RAVI KATARA').toUpperCase()}
+${getOrgProfile().phone ? 'Mobile: ' + getOrgProfile().phone : ''}`;
     } else {
         msg = 
 `Dear *${client.name}*,
@@ -6035,9 +7122,9 @@ Kindly review the attached PDF statement and arrange the pending balance payment
 Thank you for your valuable association and continued support.
 
 Warm regards,
-*ARYA ASSOCIATES*
-RAVI KATARA
-Mobile: 8815052555, 8982147763`;
+*${(getOrgProfile().orgName || 'ARYA ASSOCIATES').toUpperCase()}*
+${(getOrgProfile().ownerName || 'RAVI KATARA').toUpperCase()}
+${getOrgProfile().phone ? 'Mobile: ' + getOrgProfile().phone : ''}`;
     }
 
     const printContainer = buildClientStatementElement(client, stats, fy);
@@ -6400,13 +7487,13 @@ function buildPaymentReceiptElement(log, client, stats) {
         <!-- Header Section -->
         <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px dashed #cbd5e1; padding-bottom: 16px; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
             <div style="max-width: 62%;">
-                <div style="font-size: 22px; font-weight: 800; color: #0f766e; letter-spacing: 0.5px; text-transform: uppercase;">ARYA ASSOCIATES</div>
-                <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">Accounting & Taxation Consultant</div>
+                <div style="font-size: 22px; font-weight: 800; color: #0f766e; letter-spacing: 0.5px; text-transform: uppercase;">${(getOrgProfile().orgName || 'ARYA ASSOCIATES').toUpperCase()}</div>
+                <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">${getOrgProfile().tagline || 'Accounting & Taxation Consultant'}</div>
                 <div style="font-size: 10.5px; color: #64748b; margin-top: 3px; line-height: 1.35;">
-                    📍 Kishore Sagar Complex, Shop No.4, 1st Floor, Jawahar Road, Chhatarpur, M.P. - 471001
+                    ${getOrgProfile().address ? '📍 ' + getOrgProfile().address : ''}
                 </div>
                 <div style="font-size: 11px; color: #475569; margin-top: 3px;">
-                    <strong>Ravi Katara</strong> | 📞 8815052555, 8982147763
+                    <strong>${getOrgProfile().ownerName || 'Ravi Katara'}</strong>${getOrgProfile().phone ? ' | 📞 ' + getOrgProfile().phone : ''}
                 </div>
             </div>
             <div style="text-align: right;">
@@ -6468,7 +7555,7 @@ function buildPaymentReceiptElement(log, client, stats) {
                 ✨ Thank You for Your Continued Trust & Support!
             </div>
             <div style="font-size: 10.5px; color: #475569; line-height: 1.45;">
-                We appreciate your prompt settlement and look forward to continuing our valued partnership with <strong>Arya Associates</strong>.
+                We appreciate your prompt settlement and look forward to continuing our valued partnership with <strong>${getOrgProfile().orgName || 'Arya Associates'}</strong>.
             </div>
         </div>
 
@@ -6478,7 +7565,7 @@ function buildPaymentReceiptElement(log, client, stats) {
                 * This is a computer-generated receipt note. No physical signature is required.
             </div>
             <div style="font-weight: 700; color: #0f766e;">
-                ARYA ASSOCIATES
+                ${(getOrgProfile().orgName || 'ARYA ASSOCIATES').toUpperCase()}
             </div>
         </div>
     `;
@@ -6646,9 +7733,9 @@ window.shareReceiptWhatsApp = async function(logId) {
     const amtWords = numberToWordsINR(log.amount);
 
     const text = `*RECEIPT ACKNOWLEDGMENT*
-*ARYA ASSOCIATES*
-Accounting & Taxation Consultant
-📍 Kishore Sagar Complex, Shop No.4, 1st Floor, Jawahar Road, Chhatarpur, M.P. - 471001
+*${(getOrgProfile().orgName || 'ARYA ASSOCIATES').toUpperCase()}*
+${getOrgProfile().tagline || 'Accounting & Taxation Consultant'}
+${getOrgProfile().address ? '📍 ' + getOrgProfile().address : ''}
 ------------------------------------------------
 Dear *${client.name}*,
 
@@ -6663,12 +7750,12 @@ We gratefully confirm the receipt of your payment. Below are the official receip
 🏦 *Payment Mode / Account:* ${log.mode || 'Direct Account'}
 ${log.discount > 0 ? `🎁 *Discount Allowed:* ₹${Number(log.discount).toLocaleString('en-IN')}\n` : ''}${log.remark ? `📌 *Remarks / Purpose:* ${log.remark}\n` : ''}
 ------------------------------------------------
-✨ *Thank you for your continued trust and support!* We appreciate your prompt settlement and look forward to continuing our valued partnership with *Arya Associates*.
+✨ *Thank you for your continued trust and support!* We appreciate your prompt settlement and look forward to continuing our valued partnership with *${getOrgProfile().orgName || 'Arya Associates'}*.
 
 Warm regards,
-*ARYA ASSOCIATES*
-RAVI KATARA
-📞 Mobile: +91 88150 52555, +91 89821 47763`;
+*${(getOrgProfile().orgName || 'ARYA ASSOCIATES').toUpperCase()}*
+${(getOrgProfile().ownerName || 'RAVI KATARA').toUpperCase()}
+${getOrgProfile().phone ? '📞 Mobile: ' + getOrgProfile().phone : ''}`;
 
     let clientMobile = client.mobile || client.Mobile || client.phone || client.Phone || client.contact || client.Contact || '';
     if (!clientMobile) {
@@ -8802,30 +9889,38 @@ async function uploadLocalDataToFirebase() {
     
     // Upload clients
     for (let c of state.clients) {
-        await firebaseDb.collection('clients').doc(c.id).set(c);
+        await getOrgCollection('clients').doc(c.id).set(c);
     }
     // Upload incomeLogs
     for (let l of state.incomeLogs) {
-        await firebaseDb.collection('incomeLogs').doc(l.id).set(l);
+        await getOrgCollection('incomeLogs').doc(l.id).set(l);
     }
     // Upload transactions
     for (let t of state.transactions) {
-        await firebaseDb.collection('transactions').doc(t.id).set(t);
+        await getOrgCollection('transactions').doc(t.id).set(t);
     }
     // Upload accounts
     for (let a of state.accounts) {
-        await firebaseDb.collection('accounts').doc(a.id).set(a);
+        await getOrgCollection('accounts').doc(a.id).set(a);
     }
     // Upload members
     for (let m of state.members) {
-        await firebaseDb.collection('members').doc(m.id).set(m);
+        await getOrgCollection('members').doc(m.id).set(m);
+    }
+    // Upload transfers
+    for (let tr of (state.transfers || [])) {
+        await getOrgCollection('transfers').doc(tr.id).set(tr);
+    }
+    // Upload loans
+    for (let ln of (state.loans || [])) {
+        await getOrgCollection('loans').doc(ln.id).set(ln);
     }
     // Upload investments
     if (state.investments) {
-        await firebaseDb.collection('investments').doc('all').set({ list: state.investments });
+        await getOrgCollection('investments').doc('all').set({ list: state.investments });
     }
     // Upload settings
-    await firebaseDb.collection('settings').doc('config').set({
+    await getOrgCollection('settings').doc('config').set({
         budgets: state.budgets,
         customClientFields: state.customClientFields,
         customTxFields: state.customTxFields,
@@ -8863,19 +9958,19 @@ async function handleResetTransactionsClick() {
     try {
         if (state.cloudSyncEnabled && firebaseDb) {
             // Wipe transactions from Firestore
-            const txSnapshot = await firebaseDb.collection('transactions').get();
+            const txSnapshot = await getOrgCollection('transactions').get();
             for (const doc of txSnapshot.docs) {
                 await doc.ref.delete();
             }
 
             // Wipe income logs from Firestore
-            const incomeSnapshot = await firebaseDb.collection('incomeLogs').get();
+            const incomeSnapshot = await getOrgCollection('incomeLogs').get();
             for (const doc of incomeSnapshot.docs) {
                 await doc.ref.delete();
             }
 
             // Wipe loans from Firestore
-            const loansSnapshot = await firebaseDb.collection('loans').get();
+            const loansSnapshot = await getOrgCollection('loans').get();
             for (const doc of loansSnapshot.docs) {
                 await doc.ref.delete();
             }
@@ -8933,23 +10028,23 @@ async function handleResetAppClick() {
     if (state.cloudSyncEnabled && firebaseDb) {
         try {
             // Wipe transactions from Firestore
-            const txSnapshot = await firebaseDb.collection('transactions').get();
+            const txSnapshot = await getOrgCollection('transactions').get();
             for (const doc of txSnapshot.docs) await doc.ref.delete();
 
             // Wipe income logs from Firestore
-            const incomeSnapshot = await firebaseDb.collection('incomeLogs').get();
+            const incomeSnapshot = await getOrgCollection('incomeLogs').get();
             for (const doc of incomeSnapshot.docs) await doc.ref.delete();
 
             // Wipe loans from Firestore
-            const loansSnapshot = await firebaseDb.collection('loans').get();
+            const loansSnapshot = await getOrgCollection('loans').get();
             for (const doc of loansSnapshot.docs) await doc.ref.delete();
 
             // Wipe clients from Firestore
-            const clientSnapshot = await firebaseDb.collection('clients').get();
+            const clientSnapshot = await getOrgCollection('clients').get();
             for (const doc of clientSnapshot.docs) await doc.ref.delete();
 
             // Wipe investments from Firestore
-            await firebaseDb.collection('investments').doc('all').delete();
+            await getOrgCollection('investments').doc('all').delete();
 
             alert("Cloud database records cleared successfully!");
         } catch (e) {

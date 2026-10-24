@@ -40,13 +40,58 @@
          SECURE MEMBER LOGIN SCREEN OVERLAY
          ========================================== -->
     <div id="login-screen" class="login-overlay">
-        <div class="login-box">
+        <div class="login-box" style="max-width: 450px; padding: 26px 24px; max-height: 94vh; overflow-y: auto;">
             <div class="login-logo">
                 <div class="logo-icon"><i data-lucide="lock"></i></div>
                 <h3>Wealth Plus</h3>
-                <p>Secure Bookkeeping Portal</p>
+                <p id="login-portal-subtitle" style="margin: 0;">Multi-Business Bookkeeping &amp; Billing Portal</p>
+                <div id="login-active-workspace-pill" style="margin-top: 6px; display: inline-flex; align-items: center; gap: 6px; background: var(--primary-glow); color: var(--primary-dark); border: 1px solid rgba(13, 148, 136, 0.25); padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;">
+                    <i data-lucide="building-2" style="width: 12px; height: 12px;"></i>
+                    <span id="login-active-org-label">Workspace: ARYA ASSOCIATES</span>
+                </div>
             </div>
-            <form id="form-login" class="login-form">
+            <!-- Auth Mode Switcher Tabs -->
+            <div class="auth-mode-tabs" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; background: var(--bg-tertiary); padding: 4px; border-radius: 10px; margin-bottom: 14px; border: 1px solid var(--border-color);">
+                <button type="button" class="auth-tab-btn active" id="tab-btn-auth-email" onclick="switchAuthTab('email')" style="padding: 8px 6px; font-size: 11.5px; font-weight: 700; border: none; border-radius: 7px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; background: var(--primary); color: #ffffff; transition: all 0.2s;">
+                    <i data-lucide="mail" style="width: 13px; height: 13px;"></i> Email Login
+                </button>
+                <button type="button" class="auth-tab-btn" id="tab-btn-auth-pin" onclick="switchAuthTab('pin')" style="padding: 8px 6px; font-size: 11.5px; font-weight: 700; border: none; border-radius: 7px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; background: transparent; color: var(--text-secondary); transition: all 0.2s;">
+                    <i data-lucide="key-round" style="width: 13px; height: 13px;"></i> Member PIN
+                </button>
+                <button type="button" class="auth-tab-btn" id="tab-btn-auth-signup" onclick="switchAuthTab('signup')" style="padding: 8px 6px; font-size: 11.5px; font-weight: 700; border: none; border-radius: 7px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; background: transparent; color: var(--text-secondary); transition: all 0.2s;">
+                    <i data-lucide="user-plus" style="width: 13px; height: 13px;"></i> Sign Up
+                </button>
+            </div>
+
+            <!-- 1. EMAIL & PASSWORD LOGIN FORM (Option 2 Primary) -->
+            <form id="form-login-email" class="login-form modal-form" style="padding: 0; max-height: none; overflow: visible; display: block;">
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label for="login-email">Registered Business Email *</label>
+                    <input type="email" id="login-email" required placeholder="e.g. account@business.com" autocomplete="username" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13px; color: var(--text-primary); width: 100%; outline: none;">
+                </div>
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label for="login-password">Account Password *</label>
+                    <input type="password" id="login-password" required placeholder="Enter your password" autocomplete="current-password" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13px; color: var(--text-primary); width: 100%; outline: none;">
+                </div>
+                <div id="login-email-error-msg" class="login-error-text" style="display: none; margin-bottom: 12px;"></div>
+                <button type="submit" id="btn-submit-email-login" class="btn btn-primary btn-block" style="width: 100%; padding: 11px;">
+                    <i data-lucide="log-in"></i> Sign In with Email
+                </button>
+                <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-secondary); flex-wrap: wrap; gap: 6px;">
+                    <a href="javascript:void(0)" onclick="switchAuthTab('signup')" style="color: var(--primary); font-weight: 700; text-decoration: none;">+ New User? Create Business Account</a>
+                    <a href="javascript:void(0)" onclick="switchAuthTab('pin')" style="color: var(--text-secondary); font-weight: 600; text-decoration: none;">Team Member PIN Login &rarr;</a>
+                </div>
+            </form>
+
+            <!-- 2. TEAM MEMBER MOBILE + 4-DIGIT PIN LOGIN FORM -->
+            <form id="form-login" class="login-form modal-form" style="padding: 0; max-height: none; overflow: visible; display: none;">
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <label for="login-pin-org-email" style="margin: 0; font-size: 11.5px;">Business Email (Optional for Primary)</label>
+                        <button type="button" onclick="resetToPrimaryWorkspaceFromLogin()" style="font-size: 10.5px; color: var(--primary); background: none; border: none; cursor: pointer; font-weight: 700; padding: 0;" title="Switch back to Arya Associates">Use Arya Associates</button>
+                    </div>
+                    <input type="email" id="login-pin-org-email" placeholder="Leave blank for current workspace (or enter company email)" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); padding: 9px 12px; border-radius: var(--radius-sm); font-size: 12px; color: var(--text-primary); width: 100%; outline: none;">
+                </div>
                 <div class="form-group">
                     <label for="login-mobile">Registered Mobile Number *</label>
                     <input type="text" id="login-mobile" required placeholder="e.g. 9999999999" maxlength="10" pattern="\d{10}" inputmode="numeric">
@@ -56,7 +101,82 @@
                     <input type="password" id="login-pin" required placeholder="&bull; &bull; &bull; &bull;" maxlength="4" pattern="\d{4}" inputmode="numeric">
                 </div>
                 <div id="login-error-msg" class="login-error-text" style="display: none;">Invalid credentials or member not registered.</div>
-                <button type="submit" class="btn btn-primary btn-block" style="width:100%; margin-top:10px;">Verify & Log In</button>
+                <button type="submit" class="btn btn-primary btn-block" style="width:100%; margin-top:10px;"><i data-lucide="unlock"></i> Verify &amp; Log In</button>
+            </form>
+
+            <!-- 3. CREATE NEW ACCOUNT / SIGN UP FORM -->
+            <form id="form-signup-org" class="login-form modal-form" style="padding: 0; max-height: none; overflow: visible; display: none;">
+                <div style="background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; font-size: 11px; color: #0f766e;">
+                    <div style="font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 5px;">
+                        <i data-lucide="sparkles" style="width: 13px; height: 13px;"></i> Select Account Setup Mode:
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                        <label id="lbl-signup-mode-new" style="display: flex; align-items: center; gap: 5px; background: #ffffff; border: 1.5px solid #0d9488; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 700; color: #0f766e;">
+                            <input type="radio" name="signup-mode-type" value="new-org" checked onchange="handleSignupModeChange(this.value)" style="margin: 0;">
+                            <span>🏢 New Business (Fresh)</span>
+                        </label>
+                        <label id="lbl-signup-mode-link" style="display: flex; align-items: center; gap: 5px; background: #ffffff; border: 1px solid #cbd5e1; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; color: #475569;">
+                            <input type="radio" name="signup-mode-type" value="link-primary" onchange="handleSignupModeChange(this.value)" style="margin: 0;">
+                            <span>🔗 Link Existing Data</span>
+                        </label>
+                    </div>
+                    <div id="signup-mode-helper-text" style="margin-top: 6px; font-size: 10.5px; color: #0f766e; line-height: 1.35;">
+                        Creates a 100% separate, private workspace for a new person/business. Existing Arya Associates data remains untouched.
+                    </div>
+                </div>
+
+                <div class="form-group-row" style="margin-bottom: 10px; gap: 10px;">
+                    <div class="form-group">
+                        <label for="signup-business-name">Business / Firm Name *</label>
+                        <input type="text" id="signup-business-name" required placeholder="e.g. Sharma Enterprises" style="padding: 8px 10px; font-size: 12.5px;">
+                    </div>
+                    <div class="form-group">
+                        <label for="signup-admin-name">Your Full Name (Admin) *</label>
+                        <input type="text" id="signup-admin-name" required placeholder="e.g. Rahul Sharma" style="padding: 8px 10px; font-size: 12.5px;">
+                    </div>
+                </div>
+
+                <div class="form-group-row" style="margin-bottom: 10px; gap: 10px;">
+                    <div class="form-group">
+                        <label for="signup-email">Email Address (Login ID) *</label>
+                        <input type="email" id="signup-email" required placeholder="e.g. rahul@gmail.com" autocomplete="username" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); padding: 8px 10px; border-radius: var(--radius-sm); font-size: 12.5px; color: var(--text-primary); width: 100%; outline: none;">
+                    </div>
+                    <div class="form-group">
+                        <label for="signup-password">Create Password *</label>
+                        <input type="password" id="signup-password" required minlength="6" placeholder="Min 6 characters" autocomplete="new-password" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); padding: 8px 10px; border-radius: var(--radius-sm); font-size: 12.5px; color: var(--text-primary); width: 100%; outline: none;">
+                    </div>
+                </div>
+
+                <div class="form-group-row" style="margin-bottom: 10px; gap: 10px;">
+                    <div class="form-group">
+                        <label for="signup-mobile">Mobile Number (10 Digits) *</label>
+                        <input type="text" id="signup-mobile" required placeholder="e.g. 9876543210" maxlength="10" pattern="\d{10}" inputmode="numeric" style="padding: 8px 10px; font-size: 12.5px;">
+                    </div>
+                    <div class="form-group">
+                        <label for="signup-pin" id="lbl-signup-pin">Set 4-Digit Quick PIN *</label>
+                        <input type="password" id="signup-pin" required placeholder="4-digit PIN (e.g. 1234)" maxlength="4" pattern="\d{4}" inputmode="numeric" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); padding: 8px 10px; border-radius: var(--radius-sm); font-size: 12.5px; color: var(--text-primary); width: 100%; outline: none;">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label for="signup-address">Business Address (Optional - Printed on Receipts)</label>
+                    <input type="text" id="signup-address" placeholder="e.g. Main Market, Bhopal, M.P." style="padding: 8px 10px; font-size: 12.5px;">
+                </div>
+
+                <div id="signup-error-msg" class="login-error-text" style="display: none; margin-bottom: 10px;"></div>
+
+                <button type="submit" id="btn-submit-signup-org" class="btn btn-primary btn-block" style="width: 100%; padding: 11px;">
+                    <i data-lucide="check-circle-2"></i> Create Business Account &amp; Start
+                </button>
+
+                <div style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 11px; color: var(--text-muted);">
+                    <span style="display: inline-flex; align-items: center; gap: 4px; color: #0f766e; font-weight: 600;">
+                        <i data-lucide="shield" style="width: 12px; height: 12px;"></i> Data Backup Protected
+                    </span>
+                    <button type="button" onclick="downloadPrimarySafetyBackupFromLogin()" style="background: none; border: 1px solid var(--border-color); border-radius: 4px; padding: 3px 8px; font-size: 10.5px; font-weight: 600; color: var(--text-secondary); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Download a safe backup file of your data">
+                        <i data-lucide="download" style="width: 11px; height: 11px;"></i> Download Backup (.JSON)
+                    </button>
+                </div>
             </form>
         </div>
     </div>
@@ -71,7 +191,7 @@
                 </div>
                 <div class="brand-text">
                     <h1>Wealth Plus</h1>
-                    <span>Bookkeeping & Billing</span>
+                    <span id="sidebar-org-name" style="color: var(--primary); font-weight: 700;">ARYA ASSOCIATES</span>
                 </div>
             </div>
             <nav class="sidebar-menu">
@@ -1270,6 +1390,73 @@
 
                         <!-- Panel E: Members Settings -->
                         <div id="master-panel-members" class="master-sub-panel">
+                            <!-- Business Workspace Profile, Email Account & Backup Card -->
+                            <div class="card" style="padding: 18px 20px; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1.5px solid rgba(13, 148, 136, 0.3); margin-bottom: 22px;">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                                    <div>
+                                        <h4 style="margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px; color: var(--primary-dark);">
+                                            <i data-lucide="building-2" style="width: 18px; height: 18px; color: var(--primary);"></i>
+                                            Business Workspace Profile &amp; Email Login Setup
+                                        </h4>
+                                        <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">Configure your Business Name, Receipt Header, Email/Password Login, and Data Backups for this workspace.</p>
+                                    </div>
+                                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="downloadFullBackupJSON()" style="display: inline-flex; align-items: center; gap: 5px; font-weight: 700;">
+                                            <i data-lucide="download" style="width: 13px; height: 13px;"></i> Download Backup (.JSON)
+                                        </button>
+                                        <button type="button" class="btn btn-outline btn-sm" onclick="triggerManualCloudBackup()" style="display: inline-flex; align-items: center; gap: 5px; font-weight: 700; color: #059669; border-color: #059669;">
+                                            <i data-lucide="cloud-upload" style="width: 13px; height: 13px;"></i> Cloud Backup Snapshot
+                                        </button>
+                                        <label class="btn btn-outline btn-sm" style="display: inline-flex; align-items: center; gap: 5px; font-weight: 600; cursor: pointer; margin: 0;">
+                                            <i data-lucide="upload" style="width: 13px; height: 13px;"></i> Restore JSON
+                                            <input type="file" id="restore-backup-file-input" accept=".json" onchange="restoreBackupFromJSONFile(event)" style="display: none;">
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <form id="form-org-profile" onsubmit="handleOrgProfileSubmit(event)">
+                                    <div class="form-group-row" style="margin-bottom: 12px;">
+                                        <div class="form-group">
+                                            <label for="org-profile-business-name" style="font-size: 12px; font-weight: 600;">Business / Firm Name *</label>
+                                            <input type="text" id="org-profile-business-name" required placeholder="e.g. ARYA ASSOCIATES" style="width: 100%; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 13px;">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="org-profile-tagline" style="font-size: 12px; font-weight: 600;">Tagline / Profession</label>
+                                            <input type="text" id="org-profile-tagline" placeholder="e.g. Accounting & Taxation Consultant" style="width: 100%; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 13px;">
+                                        </div>
+                                    </div>
+                                    <div class="form-group-row" style="margin-bottom: 12px;">
+                                        <div class="form-group">
+                                            <label for="org-profile-owner" style="font-size: 12px; font-weight: 600;">Owner / Consultant Name</label>
+                                            <input type="text" id="org-profile-owner" placeholder="e.g. Ravi Katara" style="width: 100%; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 13px;">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="org-profile-mobile" style="font-size: 12px; font-weight: 600;">Contact Numbers (Printed on Receipts)</label>
+                                            <input type="text" id="org-profile-mobile" placeholder="e.g. 8815052555, 8982147763" style="width: 100%; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 13px;">
+                                        </div>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 12px;">
+                                        <label for="org-profile-address" style="font-size: 12px; font-weight: 600;">Office / Business Address (Printed on Receipts &amp; Statements)</label>
+                                        <input type="text" id="org-profile-address" placeholder="e.g. Kishore Sagar Complex, Shop No.4, 1st Floor, Jawahar Road, Chhatarpur, M.P. - 471001" style="width: 100%; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 13px;">
+                                    </div>
+                                    <div class="form-group-row" style="margin-bottom: 14px;">
+                                        <div class="form-group">
+                                            <label for="org-profile-email" style="font-size: 12px; font-weight: 600;">Workspace Login Email ID (Option 2 Login)</label>
+                                            <input type="email" id="org-profile-email" placeholder="e.g. aryaassociates@gmail.com" style="width: 100%; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 13px;">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="org-profile-password" style="font-size: 12px; font-weight: 600;">Set / Update Email Login Password</label>
+                                            <input type="password" id="org-profile-password" placeholder="Leave blank to keep existing password (or enter min 6 chars)" style="width: 100%; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 13px;">
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                                        <span id="org-profile-id-badge" style="font-size: 11px; color: var(--text-muted); font-family: monospace;">Workspace ID: primary</span>
+                                        <button type="submit" class="btn btn-primary btn-sm" style="padding: 8px 16px;">
+                                            <i data-lucide="save"></i> Save Business Profile &amp; Email Login
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
                             <div class="panel-action-header">
                                 <h4>Registered Members Directory</h4>
                                 <button class="btn btn-primary btn-sm" id="btn-master-add-member">
@@ -2355,12 +2542,13 @@
     </div>
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Application Engines -->
-    <script src="firebase-config.js?v=6.8.8"></script>
-    <script src="app.js?v=6.8.8"></script>
-    <script src="sindhu_v1.js?v=6.8.8"></script>
+    <script src="firebase-config.js?v=6.9.0"></script>
+    <script src="app.js?v=6.9.0"></script>
+    <script src="sindhu_v1.js?v=6.9.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
     <div id="sindhu-chat-widget" class="sindhu-widget" style="display: none;">
