@@ -1235,6 +1235,12 @@ function updateWorkspaceBrandingUI() {
         userBadge.innerText = `🏢 ${prof.businessName} • ${state.currentUser.name} (${state.currentUser.role})`;
     }
     populateOrgProfileFormInMaster();
+    const pinEmailLabel = document.querySelector('label[for="login-pin-org-email"]');
+    if (pinEmailLabel) pinEmailLabel.innerText = 'Business Email';
+    const resetPrimaryBtn = document.querySelector('button[onclick*="resetToPrimaryWorkspaceFromLogin"]');
+    if (resetPrimaryBtn) resetPrimaryBtn.remove();
+    const pinEmailInput = document.getElementById('login-pin-org-email');
+    if (pinEmailInput) pinEmailInput.placeholder = 'Enter registered business email';
 }
 window.updateWorkspaceBrandingUI = updateWorkspaceBrandingUI;
 
