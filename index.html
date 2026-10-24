@@ -1892,8 +1892,8 @@
                     </div>
                     <div class="form-group">
                         <label for="client-card-limit">Card / Credit Limit (₹) (For Credit Card / Loan)</label>
-                        <input type="number" id="client-card-limit" placeholder="e.g. 24000" min="0" step="any" inputmode="numeric" value="0">
-                        <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Approved limit (e.g. ₹24,000 for SBI Credit Card).</span>
+                        <input type="number" id="client-card-limit" placeholder="e.g. 50000" min="0" step="any" inputmode="numeric" value="0">
+                        <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Approved limit Approved card limit for this Credit Card / Loan line.</span>
                     </div>
                 </div>
                 <!-- Dynamic client custom fields container -->
@@ -2069,7 +2069,10 @@
                             <i data-lucide="file-text" style="width:14px; height:14px;"></i> Download PDF
                         </button>
                         <button type="button" class="btn btn-sm" id="btn-modal-receipt-whatsapp" style="display:inline-flex; align-items:center; gap:5px; background:#25D366; border-color:#25D366; color:#ffffff; font-weight:700; padding:6px 14px; box-shadow:0 2px 6px rgba(37,211,102,0.3);">
-                            <i data-lucide="send" style="width:14px; height:14px;"></i> Send WhatsApp Receipt Note
+                            <i data-lucide="send" style="width:14px; height:14px;"></i> WhatsApp Direct
+                        </button>
+                        <button type="button" class="btn btn-sm" id="btn-modal-receipt-whatsapp-pdf" onclick="shareReceiptPdfNoSave(window.currentPreviewReceiptLogId || '')" style="display:inline-flex; align-items:center; gap:5px; background:#075e54; border-color:#075e54; color:#ffffff; font-weight:700; padding:6px 14px; box-shadow:0 2px 6px rgba(7,94,84,0.3);">
+                            <i data-lucide="share-2" style="width:14px; height:14px;"></i> Share PDF (No Save)
                         </button>
                     </div>
                 </div>
@@ -2187,8 +2190,8 @@
                     </div>
                     <div class="form-group">
                         <label for="account-credit-limit">Credit / Card Limit (₹)</label>
-                        <input type="number" id="account-credit-limit" placeholder="e.g. 24000" min="0" step="any" inputmode="numeric" value="0">
-                        <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">For Credit Cards (e.g. ₹24,000).</span>
+                        <input type="number" id="account-credit-limit" placeholder="e.g. 50000" min="0" step="any" inputmode="numeric" value="0">
+                        <span class="field-helper-text" style="font-size:11px; color:var(--text-secondary); display:block; margin-top:4px;">Approved card limit for this Credit Card / Loan line.</span>
                     </div>
                 </div>
                 <div class="modal-footer-actions">
@@ -2548,7 +2551,7 @@
 
     <!-- Application Engines -->
     <script src="firebase-config.js?v=6.9.0"></script>
-    <script src="app.js?v=6.9.2"></script>
+    <script src="app.js?v=6.9.3"></script>
     <script src="sindhu_v1.js?v=6.9.0"></script>
 
     <!-- Sindhu AI Assistant Widget -->
