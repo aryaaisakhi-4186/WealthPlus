@@ -6590,7 +6590,7 @@ window.openClientModal = function(editId = '') {
             if (pendingYearSelect) pendingYearSelect.value = client.pendingYear || '2026-2027';
             if (openingBalanceInput) openingBalanceInput.value = client.openingBalance || 0;
             const cardLimitInput = document.getElementById('client-card-limit');
-            if (cardLimitInput) cardLimitInput.value = client.cardLimit || (client.name.toLowerCase().includes('credit card') ? 24000 : 0);
+            if (cardLimitInput) cardLimitInput.value = (client.cardLimit !== undefined && client.cardLimit !== null) ? client.cardLimit : ((getCurrentOrgId() === 'primary' && client.name.toLowerCase().includes('sbi credit card')) ? 24000 : 0);
 
             // Custom fields
             (state.customClientFields || []).forEach(f => {
@@ -7078,6 +7078,16 @@ window.shareClientLedgerWhatsApp = async function(clientId) {
     const fAmt = v => 'Rs. ' + Math.round(v).toLocaleString('en-IN') + '/-';
     const fy = client.pendingYear || '2026-2027';
     const isSettled = stats.balanceReceivable <= 0;
+    let clientMobile = client.mobile || client.Mobile || client.phone || client.Phone || client.contact || client.Contact || '';
+    if (!clientMobile) {
+        (state.customClientFields || []).forEach(f => {
+            if (/mobile|phone|contact|whatsapp/i.test(f.name) && client[f.name]) {
+                clientMobile = String(client[f.name]);
+            }
+        });
+    }
+    let cleanPhone = (clientMobile || '').replace(/\D/g, '');
+    if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
 
     // Contract details description
     let contractBreakdownText = `• Total Contract / Services: ${fAmt(stats.yearlyContract)}`;
@@ -7176,44 +7186,58 @@ ${getOrgProfile().phone ? 'Mobile: ' + getOrgProfile().phone : ''}`;
             }
         }
 
-        // Fallback for Desktop / non-file share: download PDF & open regular WhatsApp
-        const fileUrl = URL.createObjectURL(pdfBlob);
-        const a = document.createElement('a');
-        a.href = fileUrl;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-            if (document.body.contains(a)) document.body.removeChild(a);
-            URL.revokeObjectURL(fileUrl);
-        }, 1000);
-
-        openRegularWhatsApp(msg);
+        // Direct WhatsApp launch without saving file to mobile storage
+        openRegularWhatsApp(msg, cleanPhone);
 
     } catch (err) {
         console.error("PDF generation or share error:", err);
         if (document.body.contains(printContainer)) document.body.removeChild(printContainer);
-        openRegularWhatsApp(msg);
+        openRegularWhatsApp(msg, cleanPhone);
     }
 };
 
-window.openRegularWhatsApp = function(message) {
+window.openRegularWhatsApp = function(message, phone = '') {
     const encoded = encodeURIComponent(message);
+    const cleanPhone = (phone || '').replace(/\D/g, '');
     const isAndroid = /android/i.test(navigator.userAgent || '');
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
     
-    if (isAndroid) {
-        // Explicitly targets Regular WhatsApp package (com.whatsapp) on Android
-        // Bypasses WhatsApp Business (com.whatsapp.w4b)
-        const intentUrl = `intent://send?text=${encoded}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
-        try {
-            window.location.href = intentUrl;
-        } catch (e) {
-            window.location.href = `whatsapp://send?text=${encoded}`;
+    if (cleanPhone) {
+        if (isAndroid) {
+            const intentUrl = `intent://send?phone=${cleanPhone}&text=${encoded}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
+            try {
+                window.location.href = intentUrl;
+                setTimeout(() => {
+                    if (!document.hidden) {
+                        window.location.href = `whatsapp://send?phone=${cleanPhone}&text=${encoded}`;
+                    }
+                }, 800);
+            } catch (e) {
+                window.location.href = `whatsapp://send?phone=${cleanPhone}&text=${encoded}`;
+            }
+        } else if (isMobile) {
+            window.location.href = `whatsapp://send?phone=${cleanPhone}&text=${encoded}`;
+        } else {
+            window.open(`https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encoded}`, '_blank');
         }
     } else {
-        // iOS or Desktop
-        const waUrl = `whatsapp://send?text=${encoded}`;
-        window.open(waUrl, '_blank');
+        if (isAndroid) {
+            const intentUrl = `intent://send?text=${encoded}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
+            try {
+                window.location.href = intentUrl;
+                setTimeout(() => {
+                    if (!document.hidden) {
+                        window.location.href = `whatsapp://send?text=${encoded}`;
+                    }
+                }, 800);
+            } catch (e) {
+                window.location.href = `whatsapp://send?text=${encoded}`;
+            }
+        } else if (isMobile) {
+            window.location.href = `whatsapp://send?text=${encoded}`;
+        } else {
+            window.open(`https://web.whatsapp.com/send?text=${encoded}`, '_blank');
+        }
     }
 };
 
@@ -7581,6 +7605,7 @@ function buildPaymentReceiptElement(log, client, stats) {
 window.buildPaymentReceiptElement = buildPaymentReceiptElement;
 
 window.previewReceiptModal = function(logId) {
+    window.currentPreviewReceiptLogId = logId;
     const log = state.incomeLogs.find(l => l.id === logId);
     if (!log) {
         alert("Receipt record not found.");
@@ -7726,22 +7751,14 @@ window.generateReceiptPDF = function(logId) {
     }
 };
 
-window.shareReceiptWhatsApp = async function(logId) {
-    const log = state.incomeLogs.find(l => l.id === logId);
-    if (!log) {
-        alert("Receipt record not found.");
-        return;
-    }
-    const client = state.clients.find(c => c.id === log.clientId) || { name: 'Valued Client' };
-    const stats = getClientReportStats(client.id);
+window.buildReceiptTextMessage = function(log, client, stats) {
     const receiptIdFull = getReceiptNumber(log, client);
-    const safeFileReceipt = receiptIdFull.replace('/', '_');
     const amtWords = numberToWordsINR(log.amount);
-
-    const text = `*RECEIPT ACKNOWLEDGMENT*
-*${(getOrgProfile().orgName || 'ARYA ASSOCIATES').toUpperCase()}*
-${getOrgProfile().tagline || 'Accounting & Taxation Consultant'}
-${getOrgProfile().address ? '📍 ' + getOrgProfile().address : ''}
+    const org = getOrgProfile();
+    return `*RECEIPT ACKNOWLEDGMENT*
+*${(org.orgName || 'ARYA ASSOCIATES').toUpperCase()}*
+${org.tagline || 'Accounting & Taxation Consultant'}
+${org.address ? '📍 ' + org.address : ''}
 ------------------------------------------------
 Dear *${client.name}*,
 
@@ -7756,103 +7773,131 @@ We gratefully confirm the receipt of your payment. Below are the official receip
 🏦 *Payment Mode / Account:* ${log.mode || 'Direct Account'}
 ${log.discount > 0 ? `🎁 *Discount Allowed:* ₹${Number(log.discount).toLocaleString('en-IN')}\n` : ''}${log.remark ? `📌 *Remarks / Purpose:* ${log.remark}\n` : ''}
 ------------------------------------------------
-✨ *Thank you for your continued trust and support!* We appreciate your prompt settlement and look forward to continuing our valued partnership with *${getOrgProfile().orgName || 'Arya Associates'}*.
+✨ *Thank you for your continued trust and support!* We appreciate your prompt settlement and look forward to continuing our valued partnership with *${org.orgName || 'Arya Associates'}*.
 
 Warm regards,
-*${(getOrgProfile().orgName || 'ARYA ASSOCIATES').toUpperCase()}*
-${(getOrgProfile().ownerName || 'RAVI KATARA').toUpperCase()}
-${getOrgProfile().phone ? '📞 Mobile: ' + getOrgProfile().phone : ''}`;
+*${(org.orgName || 'ARYA ASSOCIATES').toUpperCase()}*
+${(org.ownerName || 'RAVI KATARA').toUpperCase()}
+${org.phone ? '📞 Mobile: ' + org.phone : ''}`;
+};
+
+window.shareReceiptPdfNoSave = async function(logId) {
+    const log = state.incomeLogs.find(l => l.id === logId);
+    if (!log) return;
+    const client = state.clients.find(c => c.id === log.clientId) || { name: 'Valued Client' };
+    const stats = getClientReportStats(client.id);
+    const receiptIdFull = getReceiptNumber(log, client);
+    const safeFileReceipt = receiptIdFull.replace('/', '_');
+    const safeClientName = client.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `Receipt_${safeFileReceipt}_${safeClientName}.pdf`;
 
     let clientMobile = client.mobile || client.Mobile || client.phone || client.Phone || client.contact || client.Contact || '';
     if (!clientMobile) {
-        state.customClientFields.forEach(f => {
+        (state.customClientFields || []).forEach(f => {
             if (/mobile|phone|contact|whatsapp/i.test(f.name) && client[f.name]) {
                 clientMobile = String(client[f.name]);
             }
         });
     }
-
     let cleanPhone = (clientMobile || '').replace(/\D/g, '');
-    if (cleanPhone.length === 10) {
-        cleanPhone = '91' + cleanPhone;
+    if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
+
+    const receiptText = buildReceiptTextMessage(log, client, stats);
+
+    if (typeof html2pdf === 'undefined') {
+        openRegularWhatsApp(receiptText, cleanPhone);
+        return;
     }
 
-    const safeClientName = client.name.replace(/[^a-zA-Z0-9_-]/g, '_');
-    const fileName = `Receipt_${safeFileReceipt}_${safeClientName}.pdf`;
+    const printWrapper = document.createElement('div');
+    printWrapper.style.position = 'fixed';
+    printWrapper.style.left = '0';
+    printWrapper.style.top = '0';
+    printWrapper.style.width = '750px';
+    printWrapper.style.zIndex = '-9999';
+    printWrapper.style.opacity = '0';
+    printWrapper.style.pointerEvents = 'none';
 
-    // Try Web Share API with PDF on supported mobile browsers, or download PDF directly
-    if (typeof html2pdf !== 'undefined') {
-        const printWrapper = document.createElement('div');
-        printWrapper.className = 'receipt-pdf-print-wrapper';
-        printWrapper.style.position = 'fixed';
-        printWrapper.style.left = '0';
-        printWrapper.style.top = '0';
-        printWrapper.style.width = '750px';
-        printWrapper.style.zIndex = '-9999';
-        printWrapper.style.opacity = '0';
-        printWrapper.style.pointerEvents = 'none';
+    const receiptElem = buildPaymentReceiptElement(log, client, stats);
+    receiptElem.style.width = '750px';
+    receiptElem.style.boxSizing = 'border-box';
+    printWrapper.appendChild(receiptElem);
+    document.body.appendChild(printWrapper);
 
-        const receiptElem = buildPaymentReceiptElement(log, client, stats);
-        receiptElem.style.width = '750px';
-        receiptElem.style.boxSizing = 'border-box';
-        printWrapper.appendChild(receiptElem);
-        document.body.appendChild(printWrapper);
+    const opt = {
+        margin: [8, 8, 8, 8],
+        filename: fileName,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 1.5, useCORS: true, letterRendering: true, logging: false, scrollY: 0, scrollX: 0 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
 
-        const opt = {
-            margin: [8, 8, 8, 8],
-            filename: fileName,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false, scrollY: 0, scrollX: 0 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
+    try {
+        const pdfBlob = await html2pdf().set(opt).from(receiptElem).output('blob');
+        if (printWrapper.parentNode) printWrapper.parentNode.removeChild(printWrapper);
 
-        try {
-            const pdfBlob = await html2pdf().set(opt).from(receiptElem).output('blob');
-            if (printWrapper.parentNode) printWrapper.parentNode.removeChild(printWrapper);
+        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({
-                        title: `Receipt ${receiptIdFull} - ${client.name}`,
-                        text: text,
-                        files: [file]
-                    });
-                    return;
-                } catch (shareErr) {
-                    if (shareErr.name === 'AbortError') return;
-                    console.warn("Native share error:", shareErr);
-                }
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    title: `Receipt ${receiptIdFull} - ${client.name}`,
+                    text: receiptText,
+                    files: [file]
+                });
+                return;
+            } catch (shareErr) {
+                if (shareErr.name === 'AbortError') return;
+                console.warn("Share sheet dismissed:", shareErr);
             }
+        }
 
-            // Fallback for Desktop/browsers without file sharing:
-            // Auto download the PDF receipt so user has it immediately
-            const fileUrl = URL.createObjectURL(pdfBlob);
-            const a = document.createElement('a');
-            a.href = fileUrl;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-                if (document.body.contains(a)) document.body.removeChild(a);
-                URL.revokeObjectURL(fileUrl);
-            }, 1000);
+        // Direct WhatsApp launch (Zero mobile storage download)
+        openRegularWhatsApp(receiptText, cleanPhone);
 
-        } catch (err) {
-            console.error("PDF generation in WhatsApp share failed:", err);
-            if (printWrapper.parentNode) printWrapper.parentNode.removeChild(printWrapper);
+    } catch (err) {
+        console.error("PDF share error:", err);
+        if (printWrapper.parentNode) printWrapper.parentNode.removeChild(printWrapper);
+        openRegularWhatsApp(receiptText, cleanPhone);
+    }
+};
+
+window.shareReceiptWhatsApp = async function(logId) {
+    const log = state.incomeLogs.find(l => l.id === logId);
+    if (!log) {
+        alert("Receipt record not found.");
+        return;
+    }
+    const client = state.clients.find(c => c.id === log.clientId) || { name: 'Valued Client' };
+    const stats = getClientReportStats(client.id);
+
+    let clientMobile = client.mobile || client.Mobile || client.phone || client.Phone || client.contact || client.Contact || '';
+    if (!clientMobile) {
+        (state.customClientFields || []).forEach(f => {
+            if (/mobile|phone|contact|whatsapp/i.test(f.name) && client[f.name]) {
+                clientMobile = String(client[f.name]);
+            }
+        });
+    }
+    let cleanPhone = (clientMobile || '').replace(/\D/g, '');
+    if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
+
+    if (!cleanPhone) {
+        const ask = prompt(`Please enter WhatsApp Number for ${client.name} (10 digits):`, '');
+        if (ask) {
+            cleanPhone = ask.replace(/\D/g, '');
+            if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
         }
     }
 
-    let waUrl = '';
-    if (cleanPhone && cleanPhone.length >= 10) {
-        waUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`;
-    } else {
-        waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
-    }
+    const text = buildReceiptTextMessage(log, client, stats);
 
-    window.open(waUrl, '_blank');
+    // If mobile supports direct in-memory file sharing without downloading to storage, share PDF file
+    if (typeof html2pdf !== 'undefined' && navigator.canShare) {
+        await shareReceiptPdfNoSave(logId);
+    } else {
+        openRegularWhatsApp(text, cleanPhone);
+    }
 };
 
 // Income logs
@@ -8596,7 +8641,7 @@ function openAccountModal(editId = '') {
             document.getElementById('account-name').value = acc.name;
             document.getElementById('account-type').value = acc.type;
             document.getElementById('account-opening-balance').value = acc.openingBalance !== undefined ? acc.openingBalance : 0;
-            if (limitInput) limitInput.value = acc.limit !== undefined ? acc.limit : (acc.type === 'Credit Card' ? 24000 : 0);
+            if (limitInput) limitInput.value = acc.limit !== undefined ? acc.limit : ((getCurrentOrgId() === 'primary' && acc.name.toLowerCase().includes('sbi credit card')) ? 24000 : 0);
         }
     } else {
         title.innerText = 'Add New Account Book';
@@ -8617,7 +8662,8 @@ function handleAccountSubmit(e) {
     const name = document.getElementById('account-name').value.trim();
     const type = document.getElementById('account-type').value;
     const openingBalance = Number(document.getElementById('account-opening-balance').value) || 0;
-    const limit = Number(document.getElementById('account-credit-limit')?.value) || (type === 'Credit Card' ? 24000 : 0);
+    const limitInputRaw = document.getElementById('account-credit-limit')?.value;
+    const limit = (limitInputRaw !== '' && limitInputRaw !== null && !isNaN(Number(limitInputRaw))) ? Number(limitInputRaw) : ((getCurrentOrgId() === 'primary' && name.toLowerCase().includes('sbi credit card')) ? 24000 : 0);
 
     let accountObj = { name, type, openingBalance, limit };
     if (id) {
@@ -9273,7 +9319,7 @@ function renderLoansPage() {
         // Render Credit Card / Credit Line Cards (e.g. SBI Credit Card)
         creditCardParties.forEach(cc => {
             if (searchQuery && !cc.name.toLowerCase().includes(searchQuery)) return;
-            const limit = Number(cc.cardLimit) || 24000;
+            const limit = (cc.cardLimit !== undefined && cc.cardLimit !== null && Number(cc.cardLimit) > 0) ? Number(cc.cardLimit) : ((getCurrentOrgId() === 'primary' && cc.name.toLowerCase().includes('credit card')) ? 24000 : 0);
             const opening = Number(cc.openingBalance) || 0;
             const ccLoans = (state.loans || []).filter(l => l.clientId === cc.id && l.type === 'taken');
             const borrowed = ccLoans.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
