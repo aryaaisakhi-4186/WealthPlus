@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wealth-plus-cache-v77';
+const CACHE_NAME = 'wealth-plus-cache-v80';
 const ASSETS = [
   './',
   './index.html',
@@ -19,16 +19,17 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
+  self.skipWaiting();
   e.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       for (const asset of ASSETS) {
         try {
-          await cache.add(asset);
+          await cache.add(new Request(asset, { cache: 'reload' }));
         } catch (err) {
           console.warn('SW: Failed to pre-cache', asset, err);
         }
       }
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -46,20 +47,21 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+// Network-First strategy so updates to index.html and app.js appear immediately on refresh
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
-  
+
   e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        fetch(e.request).then((networkResponse) => {
-          if (networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, networkResponse));
-          }
-        }).catch(() => {});
-        return cachedResponse;
-      }
-      return fetch(e.request);
-    })
+    fetch(e.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseClone));
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(e.request);
+      })
   );
 });
