@@ -174,6 +174,81 @@ function getOrgProfile() {
 }
 window.getOrgProfile = getOrgProfile;
 
+function formatOrgAddressHTML(rawAddress, withPin = true) {
+    if (!rawAddress) return '';
+    const addr = String(rawAddress).trim();
+    if (!addr) return '';
+
+    let line1 = '';
+    let line2 = '';
+
+    if (addr.includes('<br>') || addr.includes('<br/>')) {
+        const parts = addr.split(/<br\s*\/?>/i);
+        line1 = parts[0].trim();
+        line2 = parts.slice(1).join(', ').trim();
+    } else if (addr.includes('\n')) {
+        const parts = addr.split('\n');
+        line1 = parts[0].trim();
+        line2 = parts.slice(1).join(', ').trim();
+    } else {
+        // Break address so 1st line stops at "Shop No. 4" / "Shop No.4"
+        const regex = /^(.*?(?:Shop\s*No\.?\s*\d+[a-zA-Z]?,?\s*))(.*)$/i;
+        const m = addr.match(regex);
+        if (m) {
+            line1 = m[1].trim();
+            line2 = m[2].trim();
+        } else {
+            line1 = addr;
+            line2 = '';
+        }
+    }
+
+    if (line2 && !line1.endsWith(',')) {
+        line1 += ',';
+    }
+
+    if (line2) {
+        return `${withPin ? '📍 ' : ''}${line1}<div style="padding-left:${withPin ? '16px' : '0'}; margin-top:2px;">${line2}</div>`;
+    }
+    return `${withPin ? '📍 ' : ''}${line1}`;
+}
+window.formatOrgAddressHTML = formatOrgAddressHTML;
+
+function formatOrgAddressText(rawAddress, withPin = true) {
+    if (!rawAddress) return '';
+    const addr = String(rawAddress).trim();
+    if (!addr) return '';
+
+    let line1 = '';
+    let line2 = '';
+
+    if (addr.includes('\n')) {
+        const parts = addr.split('\n');
+        line1 = parts[0].trim();
+        line2 = parts.slice(1).join(', ').trim();
+    } else {
+        const regex = /^(.*?(?:Shop\s*No\.?\s*\d+[a-zA-Z]?,?\s*))(.*)$/i;
+        const m = addr.match(regex);
+        if (m) {
+            line1 = m[1].trim();
+            line2 = m[2].trim();
+        } else {
+            line1 = addr;
+            line2 = '';
+        }
+    }
+
+    if (line2 && !line1.endsWith(',')) {
+        line1 += ',';
+    }
+
+    if (line2) {
+        return `${withPin ? '📍 ' : ''}${line1}\n   ${line2}`;
+    }
+    return `${withPin ? '📍 ' : ''}${line1}`;
+}
+window.formatOrgAddressText = formatOrgAddressText;
+
 function createAutomaticLocalSafetyBackup() {
     try {
         const primaryRaw = localStorage.getItem('wealth_plus_state');
@@ -6885,7 +6960,7 @@ function buildClientStatementElement(client, stats, fy) {
                 <div>
                     <h2 style="margin:0; font-size:20px; color:#0f766e; font-weight:800; letter-spacing:-0.5px;">${(getOrgProfile().orgName || 'ARYA ASSOCIATES').toUpperCase()}</h2>
                     <p style="margin:2px 0 0 0; font-size:10.5px; color:#0d9488; font-weight:700;">${getOrgProfile().tagline || 'Accounting & Taxation Consultant'}</p>
-                    ${getOrgProfile().address ? `<p style="margin:2px 0 0 0; font-size:9.5px; color:#64748b; line-height:1.3;">📍 ${getOrgProfile().address}</p>` : ''}
+                    ${getOrgProfile().address ? `<div style="margin:2px 0 0 0; font-size:9.5px; color:#64748b; line-height:1.35;">${formatOrgAddressHTML(getOrgProfile().address)}</div>` : ''}
                     <p style="margin:2px 0 0 0; font-size:10px; color:#475569; font-weight:600;">${(getOrgProfile().ownerName || 'RAVI KATARA').toUpperCase()} ${getOrgProfile().phone ? '&nbsp;|&nbsp; Mobile: ' + getOrgProfile().phone : ''}</p>
                     <p style="margin:2px 0 0 0; font-size:9.5px; color:#64748b;">Client Ledger Statement</p>
                 </div>
@@ -7040,7 +7115,7 @@ window.generateClientStatementPDF = function(clientId) {
         margin: [6, 6, 6, 6],
         filename: `${safeClientName}_Ledger_Statement_FY_${fy}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false, scrollY: 0, scrollX: 0 },
+        html2canvas: { scale: 1.5, useCORS: true, letterRendering: true, logging: false, scrollY: 0, scrollX: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'], avoid: ['tr', 'h4', '.pdf-avoid-break'] }
     };
@@ -7067,7 +7142,183 @@ window.generateSelectedClientPDF = function() {
     generateClientStatementPDF(sel.value);
 };
 
+window.closeWhatsAppPdfModal = function() {
+    const m = document.getElementById('modal-share-pdf-whatsapp');
+    if (m) m.classList.remove('active');
+};
+
+window.showWhatsAppPdfShareModal = function({ title, fileName, pdfBlob, text, phone, clientName, subtitle, isSettled }) {
+    let modal = document.getElementById('modal-share-pdf-whatsapp');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-share-pdf-whatsapp';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-box" style="max-width: 480px; width: 92%; border-radius: 14px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.3); border: 1.5px solid rgba(13,148,136,0.3);">
+                <div class="modal-header" style="background: linear-gradient(135deg, #075e54, #128c7e); color: #ffffff; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center;">
+                    <h4 id="share-modal-title" style="margin:0; font-size: 16px; font-weight: 700; display:flex; align-items:center; gap:8px; color:#ffffff;">
+                        <i data-lucide="share-2" style="width:18px; height:18px;"></i> Statement PDF Ready
+                    </h4>
+                    <button type="button" class="btn-close-modal" onclick="closeWhatsAppPdfModal()" style="color: #ffffff; background: transparent; border: none; font-size: 22px; cursor: pointer; line-height: 1;">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 20px 18px; text-align: center;">
+                    <div id="share-modal-icon" style="width: 58px; height: 58px; background: rgba(37, 211, 102, 0.12); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto; color: #25D366; font-size: 28px;">📄</div>
+                    <h3 id="share-modal-client-name" style="margin: 0 0 4px 0; font-size: 17px; font-weight: 700; color: var(--text-primary, #0f172a);"></h3>
+                    <p id="share-modal-subtitle" style="margin: 0 0 16px 0; font-size: 12.5px; color: var(--text-secondary, #64748b);"></p>
+                    <div id="share-modal-notice" style="background: rgba(13, 148, 136, 0.08); border: 1px solid rgba(13, 148, 136, 0.25); border-radius: 8px; padding: 12px; margin-bottom: 18px; font-size: 12px; color: var(--text-primary, #334155); text-align: left; line-height: 1.5;"></div>
+                    <div id="share-modal-actions" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+    }
+
+    const titleEl = document.getElementById('share-modal-title');
+    const nameEl = document.getElementById('share-modal-client-name');
+    const subEl = document.getElementById('share-modal-subtitle');
+    const noticeEl = document.getElementById('share-modal-notice');
+    const actionsEl = document.getElementById('share-modal-actions');
+
+    if (titleEl) titleEl.innerHTML = `<i data-lucide="share-2" style="width:18px; height:18px;"></i> ${title || 'PDF Document Ready'}`;
+    if (nameEl) nameEl.textContent = clientName || 'Client Statement';
+    if (subEl) subEl.textContent = subtitle || 'Financial Statement of Account';
+
+    const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+    const canShareFile = Boolean(navigator.canShare && navigator.canShare({ files: [pdfFile] }));
+
+    if (canShareFile) {
+        // MOBILE 1-TAP NATIVE SHARE
+        if (noticeEl) {
+            noticeEl.innerHTML = `
+                <div style="font-weight: 700; color: #0d9488; margin-bottom: 4px;">✅ PDF तैयार है (No Storage Download):</div>
+                <div style="color: var(--text-secondary); font-size: 11.5px; line-height: 1.5;">
+                    नीचे <strong>"Send PDF to WhatsApp"</strong> पर क्लिक करें। WhatsApp खुलते ही PDF फाइल डायरेक्ट अटैच हो जाएगी। यह फाइल आपके फोन की मेमोरी में सेव नहीं होगी।
+                </div>`;
+        }
+        if (actionsEl) {
+            actionsEl.innerHTML = `
+                <button type="button" class="btn btn-primary" id="btn-do-whatsapp-file-share" style="background:#25D366; border-color:#25D366; color:#ffffff; font-weight:700; font-size:14px; padding:12px; border-radius:8px; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 12px rgba(37,211,102,0.35); cursor:pointer;">
+                    <i data-lucide="send" style="width:18px; height:18px;"></i> 📲 Send PDF to WhatsApp (1-Tap)
+                </button>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-outline" id="btn-do-whatsapp-text-only" style="flex:1; font-size:12px; padding:8px; cursor:pointer;">
+                        💬 Send Message Only
+                    </button>
+                    <button type="button" class="btn btn-outline" onclick="closeWhatsAppPdfModal()" style="flex:1; font-size:12px; padding:8px; cursor:pointer;">
+                        ✕ Cancel
+                    </button>
+                </div>
+            `;
+            const btnShare = document.getElementById('btn-do-whatsapp-file-share');
+            btnShare.onclick = async () => {
+                btnShare.disabled = true;
+                btnShare.innerText = "Opening WhatsApp...";
+                try {
+                    await navigator.share({
+                        files: [pdfFile],
+                        title: title,
+                        text: text
+                    });
+                    closeWhatsAppPdfModal();
+                } catch (err) {
+                    if (err.name === 'AbortError') {
+                        btnShare.disabled = false;
+                        btnShare.innerHTML = '<i data-lucide="send" style="width:18px; height:18px;"></i> 📲 Send PDF to WhatsApp (1-Tap)';
+                        if (window.lucide) lucide.createIcons();
+                        return;
+                    }
+                    console.warn("Direct file share error:", err);
+                    alert("WhatsApp file share directly support nahi ho raha hai. Message ke sath WhatsApp open kiya ja raha hai.");
+                    openRegularWhatsApp(text, phone);
+                    closeWhatsAppPdfModal();
+                }
+            };
+
+            const btnTextOnly = document.getElementById('btn-do-whatsapp-text-only');
+            btnTextOnly.onclick = () => {
+                openRegularWhatsApp(text, phone);
+                closeWhatsAppPdfModal();
+            };
+        }
+    } else {
+        // DESKTOP / LAPTOP HELPER
+        if (noticeEl) {
+            noticeEl.innerHTML = `
+                <div style="font-weight: 700; color: #0d9488; margin-bottom: 4px;">💻 Laptop / Desktop Mode:</div>
+                <div style="color: var(--text-secondary); font-size: 11.5px; line-height: 1.5;">
+                    Desktop browsers WhatsApp Web me direct file attach karne ki permission nahi dete.<br>
+                    <strong>1.</strong> नीचे दिए हरे बटन पर क्लिक करें (PDF डाउनलोड होगी और WhatsApp Web खुलेगा)।<br>
+                    <strong>2.</strong> डाउनलोड हुई PDF फाइल को WhatsApp Web चैट स्क्रीन पर <em>Drag & Drop</em> (खींच कर छोड़) दें।
+                </div>`;
+        }
+        if (actionsEl) {
+            actionsEl.innerHTML = `
+                <button type="button" class="btn btn-primary" id="btn-desktop-download-and-open" style="background:#25D366; border-color:#25D366; color:#ffffff; font-weight:700; font-size:13.5px; padding:12px; border-radius:8px; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 12px rgba(37,211,102,0.35); cursor:pointer;">
+                    <i data-lucide="download" style="width:18px; height:18px;"></i> 🚀 Download PDF & Open WhatsApp Web
+                </button>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" class="btn btn-outline" id="btn-desktop-save-only" style="flex:1; font-size:12px; padding:8px; cursor:pointer;">
+                        📥 Download PDF Only
+                    </button>
+                    <button type="button" class="btn btn-outline" id="btn-desktop-chat-only" style="flex:1; font-size:12px; padding:8px; cursor:pointer;">
+                        💬 Open WhatsApp Web Only
+                    </button>
+                </div>
+                <button type="button" class="btn btn-outline" onclick="closeWhatsAppPdfModal()" style="font-size:12px; padding:6px; margin-top:2px; cursor:pointer;">
+                    ✕ Close
+                </button>
+            `;
+
+            const triggerDownload = () => {
+                const url = URL.createObjectURL(pdfBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    if (document.body.contains(a)) document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 1000);
+            };
+
+            const btnCombo = document.getElementById('btn-desktop-download-and-open');
+            btnCombo.onclick = () => {
+                triggerDownload();
+                openRegularWhatsApp(text, phone);
+                closeWhatsAppPdfModal();
+            };
+
+            const btnSave = document.getElementById('btn-desktop-save-only');
+            btnSave.onclick = () => {
+                triggerDownload();
+            };
+
+            const btnChat = document.getElementById('btn-desktop-chat-only');
+            btnChat.onclick = () => {
+                openRegularWhatsApp(text, phone);
+                closeWhatsAppPdfModal();
+            };
+        }
+    }
+
+    modal.classList.add('active');
+    if (window.lucide) lucide.createIcons();
+};
+
 window.shareClientLedgerWhatsApp = async function(clientId) {
+    const btnReportWa = document.getElementById('btn-client-report-whatsapp');
+    const originalWaBtnHtml = btnReportWa ? btnReportWa.innerHTML : '';
+    if (btnReportWa) {
+        btnReportWa.disabled = true;
+        btnReportWa.innerHTML = '<i data-lucide="loader" style="width:13px; height:13px;"></i> Generating PDF...';
+    }
+    const restoreWaBtn = () => {
+        if (btnReportWa) {
+            btnReportWa.disabled = false;
+            btnReportWa.innerHTML = originalWaBtnHtml;
+            if (window.lucide) lucide.createIcons();
+        }
+    };
     const client = state.clients.find(c => c.id === clientId);
     if (!client) {
         alert("Client not found.");
@@ -7153,12 +7404,13 @@ ${getOrgProfile().phone ? 'Mobile: ' + getOrgProfile().phone : ''}`;
         margin: [6, 6, 6, 6],
         filename: fileName,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false, scrollY: 0, scrollX: 0 },
+        html2canvas: { scale: 1.5, useCORS: true, letterRendering: true, logging: false, scrollY: 0, scrollX: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'], avoid: ['tr', 'h4', '.pdf-avoid-break'] }
     };
 
     if (!window.html2pdf) {
+        restoreWaBtn();
         alert("PDF generator is loading. Please try again in 2 seconds.");
         document.body.removeChild(printContainer);
         return;
@@ -7169,7 +7421,19 @@ ${getOrgProfile().phone ? 'Mobile: ' + getOrgProfile().phone : ''}`;
         const pdfBlob = await pdfWorker.output('blob');
         document.body.removeChild(printContainer);
 
-        const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+        showWhatsAppPdfShareModal({
+            title: isSettled ? 'Final Settled Statement' : 'Statement of Account',
+            fileName: fileName,
+            pdfBlob: pdfBlob,
+            text: msg,
+            phone: cleanPhone,
+            clientName: client.name,
+            subtitle: `FY ${fy} • ${isSettled ? 'Account Fully Settled (Nil Balance)' : ('Balance Due: ' + fAmt(stats.balanceReceivable))}`,
+            isSettled: isSettled
+        });
+        restoreWaBtn();
+        return;
+        // begin unused block
 
         // If Web Share API supports file sharing (Mobile Chrome / Safari / PWA):
         if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
@@ -7186,11 +7450,12 @@ ${getOrgProfile().phone ? 'Mobile: ' + getOrgProfile().phone : ''}`;
             }
         }
 
-        // Direct WhatsApp launch without saving file to mobile storage
+        // end unused block
         openRegularWhatsApp(msg, cleanPhone);
 
     } catch (err) {
         console.error("PDF generation or share error:", err);
+        restoreWaBtn();
         if (document.body.contains(printContainer)) document.body.removeChild(printContainer);
         openRegularWhatsApp(msg, cleanPhone);
     }
@@ -7516,11 +7781,11 @@ function buildPaymentReceiptElement(log, client, stats) {
 
         <!-- Header Section -->
         <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px dashed #cbd5e1; padding-bottom: 16px; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
-            <div style="max-width: 62%;">
+            <div style="max-width: 70%;">
                 <div style="font-size: 22px; font-weight: 800; color: #0f766e; letter-spacing: 0.5px; text-transform: uppercase;">${(getOrgProfile().orgName || 'ARYA ASSOCIATES').toUpperCase()}</div>
                 <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">${getOrgProfile().tagline || 'Accounting & Taxation Consultant'}</div>
-                <div style="font-size: 10.5px; color: #64748b; margin-top: 3px; line-height: 1.35;">
-                    ${getOrgProfile().address ? '📍 ' + getOrgProfile().address : ''}
+                <div style="font-size: 10.5px; color: #64748b; margin-top: 3px; line-height: 1.4;">
+                    ${formatOrgAddressHTML(getOrgProfile().address)}
                 </div>
                 <div style="font-size: 11px; color: #475569; margin-top: 3px;">
                     <strong>${getOrgProfile().ownerName || 'Ravi Katara'}</strong>${getOrgProfile().phone ? ' | 📞 ' + getOrgProfile().phone : ''}
@@ -7727,7 +7992,7 @@ window.generateReceiptPDF = function(logId) {
         margin: [8, 8, 8, 8],
         filename: fileName,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false, scrollY: 0, scrollX: 0 },
+        html2canvas: { scale: 1.5, useCORS: true, letterRendering: true, logging: false, scrollY: 0, scrollX: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
@@ -7758,7 +8023,7 @@ window.buildReceiptTextMessage = function(log, client, stats) {
     return `*RECEIPT ACKNOWLEDGMENT*
 *${(org.orgName || 'ARYA ASSOCIATES').toUpperCase()}*
 ${org.tagline || 'Accounting & Taxation Consultant'}
-${org.address ? '📍 ' + org.address : ''}
+${formatOrgAddressText(org.address)}
 ------------------------------------------------
 Dear *${client.name}*,
 
@@ -7836,7 +8101,17 @@ window.shareReceiptPdfNoSave = async function(logId) {
         const pdfBlob = await html2pdf().set(opt).from(receiptElem).output('blob');
         if (printWrapper.parentNode) printWrapper.parentNode.removeChild(printWrapper);
 
-        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+        showWhatsAppPdfShareModal({
+            title: `Payment Receipt Note`,
+            fileName: fileName,
+            pdfBlob: pdfBlob,
+            text: receiptText,
+            phone: cleanPhone,
+            clientName: client.name,
+            subtitle: `Receipt #${receiptIdFull} • ₹${Number(log.amount).toLocaleString('en-IN')}`,
+            isSettled: false
+        });
+        return;
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
